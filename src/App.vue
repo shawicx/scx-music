@@ -1,0 +1,68 @@
+<script setup lang="ts">
+import { ref } from 'vue'
+import { useTheme } from './composables/useTheme'
+import AppSidebar from './components/AppSidebar.vue'
+import LibraryView from './components/LibraryView.vue'
+import SettingsView from './components/SettingsView.vue'
+import PlayerBar from './components/PlayerBar.vue'
+import NowPlayingOverlay from './components/NowPlayingOverlay.vue'
+
+useTheme()
+
+const activeView = ref('library')
+const showNowPlaying = ref(false)
+</script>
+
+<template>
+  <v-app>
+    <div class="app-shell">
+      <AppSidebar :active-view="activeView" @navigate="activeView = $event" />
+      <div class="main-area">
+        <SettingsView v-if="activeView === 'settings'" @back="activeView = 'library'" />
+        <template v-else>
+          <LibraryView />
+          <PlayerBar @expand="showNowPlaying = true" />
+          <Transition name="overlay">
+            <NowPlayingOverlay
+              v-if="showNowPlaying"
+              @close="showNowPlaying = false"
+            />
+          </Transition>
+        </template>
+      </div>
+    </div>
+  </v-app>
+</template>
+
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --text-xs: 0.6rem;
+  --text-sm: 0.7rem;
+  --text-md: 0.8rem;
+  --text-lg: 0.95rem;
+  --text-xl: 1.1rem;
+  --text-2xl: 1.3rem;
+}
+html, body, #app {
+  height: 100%; overflow: hidden;
+  background: rgb(var(--v-theme-background)); color: rgb(var(--v-theme-on-background));
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: clamp(16px, 1vw + 4px, 24px);
+}
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgb(var(--v-theme-surface-variant)); border-radius: 3px; }
+</style>
+
+<style scoped>
+.app-shell { display: flex; height: 100vh; position: relative; }
+.main-area { flex: 1; display: flex; flex-direction: column; overflow: hidden; position: relative; }
+
+.overlay-enter-active { animation: overlay-fade 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+.overlay-leave-active { animation: overlay-fade 0.25s ease-in reverse; }
+@keyframes overlay-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+</style>
