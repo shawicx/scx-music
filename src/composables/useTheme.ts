@@ -1,17 +1,28 @@
+import { ref } from 'vue'
 import { watch } from 'vue'
-import { useStorage } from '@vueuse/core'
 import { useTheme as useVuetifyTheme } from 'vuetify'
+import { invoke } from '@tauri-apps/api/core'
 import type { ThemeName } from '../plugins/vuetify'
 
-const storageKey = 'scx-music-theme'
+const themeName = ref<ThemeName>('teal')
 
-const themeName = useStorage<ThemeName>(storageKey, 'teal')
+async function loadThemeFromDb() {
+  const value = await invoke<string | null>('get_setting', { key: 'theme' })
+  if (value) {
+    themeName.value = value as ThemeName
+  }
+}
+
+function saveThemeToDb(name: ThemeName) {
+  invoke('set_setting', { key: 'theme', value: name }).catch(console.error)
+}
 
 export function useTheme() {
   const vuetifyTheme = useVuetifyTheme()
 
   function setTheme(name: ThemeName) {
     themeName.value = name
+    saveThemeToDb(name)
   }
 
   watch(
@@ -22,5 +33,5 @@ export function useTheme() {
     { immediate: true },
   )
 
-  return { themeName, setTheme }
+  return { themeName, setTheme, loadThemeFromDb }
 }

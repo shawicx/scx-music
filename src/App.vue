@@ -1,13 +1,19 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useTheme } from './composables/useTheme'
+import { useLibrary } from './composables/useLibrary'
 import AppSidebar from './components/AppSidebar.vue'
 import LibraryView from './components/LibraryView.vue'
 import SettingsView from './components/SettingsView.vue'
 import PlayerBar from './components/PlayerBar.vue'
 import NowPlayingOverlay from './components/NowPlayingOverlay.vue'
 
-useTheme()
+const { loadThemeFromDb } = useTheme()
+const { loadFromDb } = useLibrary()
+
+onMounted(async () => {
+  await Promise.all([loadThemeFromDb(), loadFromDb()])
+})
 
 const activeView = ref('library')
 const showNowPlaying = ref(false)

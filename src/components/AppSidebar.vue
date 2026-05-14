@@ -42,10 +42,10 @@ function closeContextMenu() {
   contextMenu.value.show = false
 }
 
-function handleAddPlaylist() {
+async function handleAddPlaylist() {
   const name = newPlaylistName.value.trim()
   if (!name) return
-  const id = addPlaylist(name)
+  const id = await addPlaylist(name)
   newPlaylistName.value = ''
   showAddDialog.value = false
   setActivePlaylist(id)
@@ -122,7 +122,7 @@ async function handleImportActive() {
       <div class="section-header">
         <span class="section-title">歌单</span>
         <v-btn icon size="x-small" variant="plain" density="compact" @click="showAddDialog = true">
-          <v-icon icon="mdi-plus" size="14"></v-icon>
+          <v-icon icon="mdi-plus" size="20"></v-icon>
         </v-btn>
       </div>
       <v-list density="comfortable" bg-color="transparent" class="playlist-list" color="secondary">
@@ -298,10 +298,10 @@ async function handleImportActive() {
   align-items: center;
   justify-content: space-between;
   padding: 4px 12px 8px;
+  font-size: 1.5rem;
 }
 
 .section-title {
-  font-size: var(--text-xs);
   font-weight: 600;
   text-transform: uppercase;
   color: var(--v-text-muted);

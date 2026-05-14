@@ -1,5 +1,4 @@
 import { computed, ref } from 'vue'
-import { useStorage } from '@vueuse/core'
 import { invoke } from '@tauri-apps/api/core'
 
 export interface Song {
@@ -19,31 +18,17 @@ export interface Playlist {
   id: string
 }
 
-// Global song pool
-const songs = useStorage<Song[]>('scx-music-songs', [])
-const currentSongId = useStorage<string | null>('scx-music-current-song', null)
+// Reactive state (no localStorage)
+const songs = ref<Song[]>([])
+const currentSongId = ref<string | null>(null)
 const searchQuery = ref('')
-const viewMode = useStorage<'list' | 'grid'>('scx-music-view-mode', 'list')
-
-// Playlists
-const playlists = useStorage<Playlist[]>('scx-music-playlists', [
-  { name: '我喜欢的', id: 'fav' },
-  { name: '本地摇滚合集', id: 'rock' },
-  { name: '深夜放松', id: 'night' },
-  { name: '运动 BGM', id: 'sport' },
-])
-
-// Playlist → song IDs mapping
-const playlistSongs = useStorage<Record<string, string[]>>('scx-music-playlist-songs', {})
-
-// Currently active playlist
-const activePlaylistId = useStorage<string | null>('scx-active-playlist', null)
-
-// Display mode (view form in right panel)
-const displayMode = useStorage<'songs' | 'albums' | 'artists'>('scx-display-mode', 'songs')
-
-// Drilldown: when clicking an album/artist card
+const viewMode = ref<'list' | 'grid'>('list')
+const playlists = ref<Playlist[]>([])
+const playlistSongs = ref<Record<string, string[]>>({})
+const activePlaylistId = ref<string | null>(null)
+const displayMode = ref<'songs' | 'albums' | 'artists'>('songs')
 const drilldown = ref<{ type: 'album' | 'artist'; value: string } | null>(null)
+const ready = ref(false)
 
 const gradients = [
   'linear-gradient(135deg, #14b8a6, #0d9488)',
@@ -56,7 +41,39 @@ const gradients = [
   'linear-gradient(135deg, #89f7fe, #66a6ff)',
 ]
 
-// Songs belonging to the active playlist
+// Load all data from SQLite into reactive state
+async function loadFromDb() {
+  const [dbSongs, dbPlaylists, settings] = await Promise.all([
+    invoke<Song[]>('get_all_songs'),
+    invoke<{ id: string; name: string; sort_order: number }[]>('get_playlists'),
+    invoke<Record<string, string>>('get_all_settings'),
+  ])
+
+  songs.value = dbSongs
+  playlists.value = dbPlaylists.map((p) => ({ id: p.id, name: p.name }))
+
+  // Load playlist-song mappings
+  const psMap: Record<string, string[]> = {}
+  for (const p of dbPlaylists) {
+    const pSongs = await invoke<Song[]>('get_playlist_songs', { playlistId: p.id })
+    psMap[p.id] = pSongs.map((s) => s.id)
+  }
+  playlistSongs.value = psMap
+
+  // Restore settings
+  currentSongId.value = settings['currentSongId'] ?? null
+  viewMode.value = (settings['viewMode'] as 'list' | 'grid') ?? 'list'
+  activePlaylistId.value = settings['activePlaylistId'] ?? null
+  displayMode.value = (settings['displayMode'] as 'songs' | 'albums' | 'artists') ?? 'songs'
+
+  ready.value = true
+}
+
+// Persist a setting to SQLite
+function saveSetting(key: string, value: string) {
+  invoke('set_setting', { key, value }).catch(console.error)
+}
+
 const currentPlaylistSongs = computed(() => {
   const pid = activePlaylistId.value
   if (!pid) return []
@@ -66,7 +83,6 @@ const currentPlaylistSongs = computed(() => {
   return songs.value.filter((s) => idSet.has(s.id))
 })
 
-// Search applied to current playlist songs
 const searchedSongs = computed(() => {
   let result = currentPlaylistSongs.value
   const q = searchQuery.value.toLowerCase()
@@ -81,7 +97,6 @@ const searchedSongs = computed(() => {
   return result
 })
 
-// Final displayed songs (after drilldown filter)
 const displayedSongs = computed(() => {
   let result = searchedSongs.value
   const d = drilldown.value
@@ -95,7 +110,6 @@ const displayedSongs = computed(() => {
   return result
 })
 
-// Albums derived from searched songs (for card view)
 const filteredAlbums = computed(() => {
   const source = searchedSongs.value
   const map = new Map<string, number>()
@@ -105,7 +119,6 @@ const filteredAlbums = computed(() => {
   return Array.from(map.entries()).map(([name, count]) => ({ name, count }))
 })
 
-// Artists derived from searched songs (for card view)
 const filteredArtists = computed(() => {
   const source = searchedSongs.value
   const map = new Map<string, number>()
@@ -128,11 +141,13 @@ export function useLibrary() {
     activePlaylistId.value = id
     searchQuery.value = ''
     drilldown.value = null
+    saveSetting('activePlaylistId', id)
   }
 
   function setDisplayMode(mode: 'songs' | 'albums' | 'artists') {
     displayMode.value = mode
     drilldown.value = null
+    saveSetting('displayMode', mode)
   }
 
   function setDrilldown(type: 'album' | 'artist', value: string) {
@@ -143,34 +158,42 @@ export function useLibrary() {
     drilldown.value = null
   }
 
-  function addPlaylist(name: string) {
-    const id = 'pl-' + Date.now()
-    playlists.value = [...playlists.value, { name, id }]
-    return id
+  async function addPlaylist(name: string) {
+    const pl = await invoke<{ id: string; name: string; sort_order: number }>('create_playlist', { name })
+    playlists.value = [...playlists.value, { id: pl.id, name: pl.name }]
+    playlistSongs.value = { ...playlistSongs.value, [pl.id]: [] }
+    return pl.id
   }
 
-  function renamePlaylist(id: string, name: string) {
+  async function renamePlaylist(id: string, name: string) {
+    await invoke('rename_playlist', { id, name })
     playlists.value = playlists.value.map((p) => (p.id === id ? { ...p, name } : p))
   }
 
-  function deletePlaylist(id: string) {
+  async function deletePlaylist(id: string) {
+    await invoke('delete_playlist', { id })
     playlists.value = playlists.value.filter((p) => p.id !== id)
     const updated = { ...playlistSongs.value }
     delete updated[id]
     playlistSongs.value = updated
     if (activePlaylistId.value === id) {
       activePlaylistId.value = playlists.value[0]?.id ?? null
+      if (activePlaylistId.value) {
+        saveSetting('activePlaylistId', activePlaylistId.value)
+      }
     }
   }
 
-  function addSongToPlaylist(playlistId: string, songId: string) {
+  async function addSongToPlaylist(playlistId: string, songId: string) {
     const current = playlistSongs.value[playlistId] ?? []
     if (!current.includes(songId)) {
+      await invoke('add_songs_to_playlist', { playlistId, songIds: [songId] })
       playlistSongs.value = { ...playlistSongs.value, [playlistId]: [...current, songId] }
     }
   }
 
-  function removeSongFromPlaylist(playlistId: string, songId: string) {
+  async function removeSongFromPlaylist(playlistId: string, songId: string) {
+    await invoke('remove_song_from_playlist', { playlistId, songId })
     const current = playlistSongs.value[playlistId] ?? []
     playlistSongs.value = {
       ...playlistSongs.value,
@@ -198,7 +221,7 @@ export function useLibrary() {
       file_path: string
     }> = await invoke('scan_music_folder', { dirPath: selected })
 
-    const newSongs = files.map((f, i) => ({
+    const newSongs: Song[] = files.map((f, i) => ({
       id: f.id,
       title: f.title,
       artist: f.artist,
@@ -210,18 +233,20 @@ export function useLibrary() {
       artGradient: gradients[(songs.value.length + i) % gradients.length],
     }))
 
-    // Merge into global pool (deduplicate by id)
+    // Upsert to SQLite
     const existingIds = new Set(songs.value.map((s) => s.id))
     const uniqueNew = newSongs.filter((s) => !existingIds.has(s.id))
     if (uniqueNew.length > 0) {
+      await invoke('upsert_songs', { songs: uniqueNew })
       songs.value = [...songs.value, ...uniqueNew]
     }
 
-    // Add IDs to playlist (deduplicate)
+    // Add to playlist in SQLite
     const currentIds = playlistSongs.value[playlistId] ?? []
     const currentSet = new Set(currentIds)
     const newIds = newSongs.filter((s) => !currentSet.has(s.id)).map((s) => s.id)
     if (newIds.length > 0) {
+      await invoke('add_songs_to_playlist', { playlistId, songIds: newIds })
       playlistSongs.value = {
         ...playlistSongs.value,
         [playlistId]: [...currentIds, ...newIds],
@@ -233,6 +258,7 @@ export function useLibrary() {
 
   function playSong(id: string) {
     currentSongId.value = id
+    saveSetting('currentSongId', id)
   }
 
   return {
@@ -252,6 +278,7 @@ export function useLibrary() {
     displayedSongs,
     filteredAlbums,
     filteredArtists,
+    ready,
     setActivePlaylist,
     setDisplayMode,
     setDrilldown,
@@ -263,5 +290,6 @@ export function useLibrary() {
     removeSongFromPlaylist,
     importToPlaylist,
     playSong,
+    loadFromDb,
   }
 }

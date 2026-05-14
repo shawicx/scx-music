@@ -1,4 +1,6 @@
 mod audio;
+mod commands;
+mod db;
 
 use std::sync::{Arc, Mutex};
 
@@ -124,6 +126,8 @@ pub fn run() {
             let audio_state: Arc<Mutex<AudioStateInner>> =
                 Arc::new(Mutex::new(AudioStateInner::new()));
             app.manage(audio_state);
+
+            db::init(&app.handle().clone())?;
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -138,6 +142,19 @@ pub fn run() {
             audio::player_previous,
             audio::player_set_mode,
             audio::player_get_state,
+            commands::songs::get_all_songs,
+            commands::songs::upsert_songs,
+            commands::songs::delete_songs,
+            commands::playlists::get_playlists,
+            commands::playlists::create_playlist,
+            commands::playlists::rename_playlist,
+            commands::playlists::delete_playlist,
+            commands::playlists::get_playlist_songs,
+            commands::playlists::add_songs_to_playlist,
+            commands::playlists::remove_song_from_playlist,
+            commands::settings::get_all_settings,
+            commands::settings::get_setting,
+            commands::settings::set_setting,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
