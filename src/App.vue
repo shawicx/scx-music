@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { useTheme } from './composables/useTheme'
 import { useLibrary } from './composables/useLibrary'
+import { usePlayer } from './composables/usePlayer'
 import AppSidebar from './components/AppSidebar.vue'
 import LibraryView from './components/LibraryView.vue'
 import SettingsView from './components/SettingsView.vue'
@@ -10,6 +11,7 @@ import NowPlayingOverlay from './components/NowPlayingOverlay.vue'
 
 const { loadThemeFromDb } = useTheme()
 const { loadFromDb } = useLibrary()
+const { toastMsg, toastVisible } = usePlayer()
 
 onMounted(async () => {
   await Promise.all([loadThemeFromDb(), loadFromDb()])
@@ -37,11 +39,22 @@ const showNowPlaying = ref(false)
         </template>
       </div>
     </div>
+    <v-snackbar
+      v-model="toastVisible"
+      :timeout="2000"
+      color="surface-variant"
+      location="bottom right"
+      density="compact"
+      rounded="lg"
+      elevation="4"
+    >
+      {{ toastMsg }}
+    </v-snackbar>
   </v-app>
 </template>
 
 <style>
-* { margin: 0; padding: 0; box-sizing: border-box; }
+*, *::before, *::after { box-sizing: border-box; }
 :root {
   --text-xs: 0.6rem;
   --text-sm: 0.7rem;

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { usePlayer } from '../composables/usePlayer'
+import { useLibrary } from '../composables/useLibrary'
 
 defineEmits<{ close: [] }>()
 
@@ -10,6 +11,23 @@ const {
   setMode, playbackMode, queue, queueIndex,
   formatTime,
 } = usePlayer()
+
+const { addSongToPlaylist, removeSongFromPlaylist, playlistSongs } = useLibrary()
+
+const isLiked = computed(() => {
+  if (!currentSong.value) return false
+  const favIds = playlistSongs.value['fav']
+  return favIds?.includes(currentSong.value.id) ?? false
+})
+
+async function toggleLike() {
+  if (!currentSong.value) return
+  if (isLiked.value) {
+    await removeSongFromPlaylist('fav', currentSong.value.id)
+  } else {
+    await addSongToPlaylist('fav', currentSong.value.id)
+  }
+}
 
 const progressModel = computed({
   get: () => duration.value > 0 ? (progress.value / duration.value) * 100 : 0,
@@ -80,8 +98,8 @@ const upNext = computed(() => {
       <v-btn icon variant="plain" @click="next">
         <v-icon icon="mdi-skip-next"></v-icon>
       </v-btn>
-      <v-btn icon variant="plain" disabled>
-        <v-icon icon="mdi-heart"></v-icon>
+      <v-btn icon variant="plain" :disabled="!currentSong" @click="toggleLike">
+        <v-icon :icon="isLiked ? 'mdi-heart' : 'mdi-heart-outline'" :color="isLiked ? 'secondary' : undefined"></v-icon>
       </v-btn>
     </div>
     <div v-if="upNext.length" class="up-next">

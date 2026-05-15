@@ -36,10 +36,7 @@ CREATE INDEX IF NOT EXISTS idx_songs_album ON songs(album);
 CREATE INDEX IF NOT EXISTS idx_playlist_songs_playlist ON playlist_songs(playlist_id);
 
 INSERT OR IGNORE INTO playlists (id, name, sort_order) VALUES
-    ('fav', '我喜欢的', 0),
-    ('rock', '本地摇滚合集', 1),
-    ('night', '深夜放松', 2),
-    ('sport', '运动 BGM', 3);
+    ('fav', '我喜欢的', 0);
 ";
 
 pub fn run_migrations(conn: &rusqlite::Connection) -> Result<(), Box<dyn std::error::Error>> {

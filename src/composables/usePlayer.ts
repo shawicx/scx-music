@@ -15,6 +15,18 @@ const playbackMode = ref<PlaybackMode>('sequential')
 const queue = ref<Song[]>([])
 const queueIndex = ref(0)
 
+// Global toast state
+const toastMsg = ref('')
+const toastVisible = ref(false)
+let toastTimer: ReturnType<typeof setTimeout> | null = null
+
+export function showToast(msg: string) {
+  toastMsg.value = msg
+  toastVisible.value = true
+  if (toastTimer) clearTimeout(toastTimer)
+  toastTimer = setTimeout(() => { toastVisible.value = false }, 2000)
+}
+
 let listenersSetup = false
 
 async function setupListeners() {
@@ -31,11 +43,18 @@ async function setupListeners() {
   )
 
   unlisteners.push(
-    await listen<{ state: PlaybackState; currentSong: Song | null }>('audio:state_change', (e) => {
+    await listen<{
+      state: PlaybackState
+      currentSong: Song | null
+      queueIndex: number
+      mode: PlaybackMode
+    }>('audio:state_change', (e) => {
       isPlaying.value = e.payload.state === 'playing'
       if (e.payload.currentSong) {
         currentSong.value = e.payload.currentSong
       }
+      queueIndex.value = e.payload.queueIndex
+      playbackMode.value = e.payload.mode
     }),
   )
 
@@ -99,10 +118,20 @@ export function usePlayer() {
   }
 
   async function next() {
+    if (queue.value.length === 0) return
+    if (queueIndex.value >= queue.value.length - 1 && playbackMode.value === 'sequential') {
+      showToast('已经是最后一首了')
+      return
+    }
     await invoke('player_next')
   }
 
   async function previous() {
+    if (queue.value.length === 0) return
+    if (queueIndex.value === 0) {
+      showToast('已经是第一首了')
+      return
+    }
     await invoke('player_previous')
   }
 
@@ -124,6 +153,8 @@ export function usePlayer() {
     playbackMode,
     queue,
     queueIndex,
+    toastMsg,
+    toastVisible,
     playFromQueue,
     togglePlayPause,
     seek,

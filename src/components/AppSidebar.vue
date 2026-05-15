@@ -70,6 +70,7 @@ function handleRename() {
 
 function handleDelete() {
   const { playlistId, playlistName } = contextMenu.value
+  if (playlistId === 'fav') return
   contextMenu.value.show = false
   deletePlaylist(playlistId)
   snackbarText.value = `歌单「${playlistName}」已删除`
@@ -183,8 +184,8 @@ async function handleImportActive() {
     >
       <v-list density="compact" min-width="140">
         <v-list-item prepend-icon="mdi-folder-open" title="导入文件夹" @click="handleImport" />
-        <v-list-item prepend-icon="mdi-pencil" title="重命名" @click="startRename" />
-        <v-list-item prepend-icon="mdi-delete" title="删除" @click="handleDelete" />
+        <v-list-item v-if="contextMenu.playlistId !== 'fav'" prepend-icon="mdi-pencil" title="重命名" @click="startRename" />
+        <v-list-item v-if="contextMenu.playlistId !== 'fav'" prepend-icon="mdi-delete" title="删除" @click="handleDelete" />
       </v-list>
     </v-menu>
 
@@ -200,7 +201,7 @@ async function handleImportActive() {
 
     <!-- Add dialog -->
     <v-dialog v-model="showAddDialog" width="400">
-      <v-card style="padding: 1rem;">
+      <v-card>
         <v-card-title>新建歌单</v-card-title>
         <v-card-text>
           <v-text-field
@@ -223,7 +224,7 @@ async function handleImportActive() {
 
     <!-- Rename dialog -->
     <v-dialog v-model="showRenameDialog" width="400">
-      <v-card style="padding: 1rem;">
+      <v-card>
         <v-card-title>重命名歌单</v-card-title>
         <v-card-text>
           <v-text-field

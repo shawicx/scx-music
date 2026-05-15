@@ -481,11 +481,15 @@ pub fn player_previous(app: AppHandle, state: tauri::State<'_, AudioState>) -> R
 
 #[tauri::command]
 pub fn player_set_mode(
+    app: AppHandle,
     state: tauri::State<'_, AudioState>,
     mode: PlaybackMode,
 ) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     s.mode = mode;
+    let payload = s.get_state_payload();
+    drop(s);
+    let _ = app.emit("audio:state_change", &payload);
     Ok(())
 }
 

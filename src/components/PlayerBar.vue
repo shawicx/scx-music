@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { usePlayer } from '../composables/usePlayer'
+import { useLibrary } from '../composables/useLibrary'
 
 defineEmits<{ expand: [] }>()
 
@@ -9,6 +10,23 @@ const {
   togglePlayPause, seek, setVolume, next, previous,
   formatTime,
 } = usePlayer()
+
+const { addSongToPlaylist, removeSongFromPlaylist, playlistSongs } = useLibrary()
+
+const isLiked = computed(() => {
+  if (!currentSong.value) return false
+  const favIds = playlistSongs.value['fav']
+  return favIds?.includes(currentSong.value.id) ?? false
+})
+
+async function toggleLike() {
+  if (!currentSong.value) return
+  if (isLiked.value) {
+    await removeSongFromPlaylist('fav', currentSong.value.id)
+  } else {
+    await addSongToPlaylist('fav', currentSong.value.id)
+  }
+}
 
 const progressModel = computed({
   get: () => duration.value > 0 ? (progress.value / duration.value) * 100 : 0,
@@ -31,8 +49,8 @@ const volumeModel = computed({
         <div class="song-name">{{ currentSong?.title ?? '未在播放' }}</div>
         <div class="song-artist">{{ currentSong?.artist ?? '--' }}</div>
       </div>
-      <v-btn icon size="x-small" variant="plain" class="like-btn">
-        <v-icon icon="mdi-heart" size="16" color="secondary"></v-icon>
+      <v-btn icon size="x-small" variant="plain" class="like-btn" :disabled="!currentSong" @click.stop="toggleLike">
+        <v-icon :icon="isLiked ? 'mdi-heart' : 'mdi-heart-outline'" size="16" :color="isLiked ? 'secondary' : undefined"></v-icon>
       </v-btn>
     </div>
     <div class="player-center">
@@ -43,7 +61,7 @@ const volumeModel = computed({
         <v-btn icon size="small" variant="plain" density="compact" @click.stop="previous">
           <v-icon icon="mdi-skip-previous"></v-icon>
         </v-btn>
-        <v-btn icon size="small" color="secondary" elevation="4" class="play-btn" @click.stop="togglePlayPause">
+        <v-btn icon size="small" color="secondary" elevation="4" class="play-btn" :disabled="!currentSong" @click.stop="togglePlayPause">
           <v-icon :icon="isPlaying ? 'mdi-pause' : 'mdi-play'"  color="white"></v-icon>
         </v-btn>
         <v-btn icon size="small" variant="plain" density="compact" @click.stop="next">
