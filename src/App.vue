@@ -41,8 +41,9 @@ const showNowPlaying = ref(false)
     </div>
     <v-snackbar
       v-model="toastVisible"
-      :timeout="2000"
-      color="surface-variant"
+      :timeout="3000"
+      color="error"
+      contained
       location="bottom right"
       density="compact"
       rounded="lg"

@@ -6,6 +6,7 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use rand::Rng;
+use rodio::cpal::traits::HostTrait;
 use rodio::{Decoder, OutputStream, OutputStreamHandle, Sink, Source};
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter};
@@ -52,6 +53,20 @@ pub struct PlayerStatePayload {
     pub queue_index: usize,
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AudioDeviceInfo {
+    pub name: String,
+    pub is_default: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AudioDevicesResponse {
+    pub devices: Vec<AudioDeviceInfo>,
+    pub default_device_name: Option<String>,
+}
+
 struct AudioEngine {
     _stream: OutputStream,
     handle: OutputStreamHandle,
@@ -75,6 +90,7 @@ pub struct AudioStateInner {
     position_base_secs: f64,
     segment_started_at: Option<Instant>,
     progress_stop: Arc<AtomicBool>,
+    output_device_name: Option<String>,
 }
 
 pub type AudioState = Arc<Mutex<AudioStateInner>>;
@@ -92,20 +108,72 @@ impl AudioStateInner {
             position_base_secs: 0.0,
             segment_started_at: None,
             progress_stop: Arc::new(AtomicBool::new(false)),
+            output_device_name: None,
         }
+    }
+
+    pub fn set_output_device_name(&mut self, name: Option<String>) {
+        self.output_device_name = name;
     }
 
     fn ensure_engine(&mut self) -> Result<(), String> {
         if self.engine.is_some() {
             return Ok(());
         }
-        let (stream, handle) =
-            OutputStream::try_default().map_err(|e| format!("No audio output: {}", e))?;
+        let (stream, handle) = if let Some(ref name) = self.output_device_name {
+            match find_device_by_name(name) {
+                Ok(device) => match OutputStream::try_from_device(&device) {
+                    Ok(s) => s,
+                    Err(_) => {
+                        self.output_device_name = None;
+                        OutputStream::try_default()
+                            .map_err(|e| format!("No audio output: {}", e))?
+                    }
+                },
+                Err(_) => {
+                    self.output_device_name = None;
+                    OutputStream::try_default().map_err(|e| format!("No audio output: {}", e))?
+                }
+            }
+        } else {
+            OutputStream::try_default().map_err(|e| format!("No audio output: {}", e))?
+        };
         self.engine = Some(AudioEngine {
             _stream: stream,
             handle,
             sink: None,
         });
+        Ok(())
+    }
+
+    fn rebuild_engine_with_device(&mut self, device_name: Option<String>) -> Result<(), String> {
+        let was_paused = matches!(self.state, PlaybackState::Paused);
+        let current_index = if self.current_song.is_some() {
+            Some(self.queue_index)
+        } else {
+            None
+        };
+        let current_position = self.current_position_secs();
+
+        if let Some(engine) = self.engine.take() {
+            if let Some(sink) = engine.sink {
+                sink.stop();
+                sink.detach();
+            }
+        }
+
+        self.output_device_name = device_name;
+
+        if let Some(index) = current_index {
+            self.play_file_at_index(index)?;
+            if current_position > 0.0 {
+                let _ = self.seek_by_restart(current_position);
+            }
+            if was_paused {
+                self.pause_internal();
+            }
+        }
+
         Ok(())
     }
 
@@ -127,14 +195,28 @@ impl AudioStateInner {
         self.queue_index = index;
 
         self.ensure_engine()?;
-        let engine = self.engine.as_mut().ok_or("No audio engine")?;
 
-        if let Some(old) = engine.sink.take() {
-            old.stop();
-            old.detach();
+        {
+            let engine = self.engine.as_mut().ok_or("No audio engine")?;
+            if let Some(old) = engine.sink.take() {
+                old.stop();
+                old.detach();
+            }
         }
 
-        let sink = Sink::try_new(&engine.handle).map_err(|e| format!("Sink error: {}", e))?;
+        let sink = {
+            let engine = self.engine.as_mut().ok_or("No audio engine")?;
+            match Sink::try_new(&engine.handle) {
+                Ok(s) => s,
+                Err(_) => {
+                    let _ = engine;
+                    self.engine = None;
+                    self.ensure_engine()?;
+                    let engine = self.engine.as_mut().ok_or("No audio engine")?;
+                    Sink::try_new(&engine.handle).map_err(|e| format!("Sink error: {}", e))?
+                }
+            }
+        };
 
         let file = File::open(&song.file_path).map_err(|e| format!("File open error: {}", e))?;
         let source =
@@ -142,7 +224,7 @@ impl AudioStateInner {
 
         sink.set_volume(self.volume);
         sink.append(source);
-        engine.sink = Some(sink);
+        self.engine.as_mut().ok_or("No audio engine")?.sink = Some(sink);
 
         self.current_song = Some(song);
         self.state = PlaybackState::Playing;
@@ -497,4 +579,86 @@ pub fn player_set_mode(
 pub fn player_get_state(state: tauri::State<'_, AudioState>) -> Result<PlayerStatePayload, String> {
     let s = state.lock().map_err(|e| e.to_string())?;
     Ok(s.get_state_payload())
+}
+
+fn find_device_by_name(name: &str) -> Result<rodio::cpal::Device, String> {
+    use rodio::cpal::traits::DeviceTrait;
+    let host = rodio::cpal::default_host();
+    let mut all_devices = host
+        .devices()
+        .map_err(|e| format!("Device enumeration error: {}", e))?;
+    all_devices
+        .find(|d| d.name().ok().as_deref() == Some(name))
+        .ok_or_else(|| format!("Device '{}' not found", name))
+}
+
+#[tauri::command]
+pub fn player_get_output_devices() -> Result<AudioDevicesResponse, String> {
+    use rodio::cpal::traits::DeviceTrait;
+    let host = rodio::cpal::default_host();
+    let default_name = host.default_output_device().and_then(|d| d.name().ok());
+
+    let all_devices = host
+        .devices()
+        .map_err(|e| format!("Failed to enumerate devices: {}", e))?;
+
+    let mut seen = std::collections::HashSet::new();
+    let result: Vec<AudioDeviceInfo> = all_devices
+        .filter_map(|d| {
+            let name = d.name().ok()?;
+            if !seen.insert(name.clone()) {
+                return None;
+            }
+            let is_default = default_name.as_ref() == Some(&name);
+            Some(AudioDeviceInfo { name, is_default })
+        })
+        .collect();
+
+    Ok(AudioDevicesResponse {
+        devices: result,
+        default_device_name: default_name,
+    })
+}
+
+#[tauri::command]
+pub fn player_set_output_device(
+    app: AppHandle,
+    state: tauri::State<'_, AudioState>,
+    db: tauri::State<'_, crate::db::Db>,
+    device_name: Option<String>,
+) -> Result<(), String> {
+    // Validate device can actually be opened
+    if let Some(ref name) = device_name {
+        let device = find_device_by_name(name)?;
+        OutputStream::try_from_device(&device)
+            .map_err(|_| format!("无法使用设备「{}」", name))?;
+    }
+
+    {
+        let conn = db.0.lock().map_err(|e| e.to_string())?;
+        let value = device_name.as_deref().unwrap_or("");
+        conn.execute(
+            "INSERT OR REPLACE INTO settings (key, value) VALUES (?1, ?2)",
+            rusqlite::params!["output_device", value],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+
+    let arc: AudioState = (*state).clone();
+    let payload;
+    {
+        let mut s = arc.lock().map_err(|e| e.to_string())?;
+        s.rebuild_engine_with_device(device_name)?;
+        payload = s.get_state_payload();
+    }
+    let _ = app.emit("audio:state_change", &payload);
+    Ok(())
+}
+
+#[tauri::command]
+pub fn player_get_current_device(
+    state: tauri::State<'_, AudioState>,
+) -> Result<Option<String>, String> {
+    let s = state.lock().map_err(|e| e.to_string())?;
+    Ok(s.output_device_name.clone())
 }

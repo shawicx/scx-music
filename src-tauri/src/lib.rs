@@ -123,11 +123,27 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
-            let audio_state: Arc<Mutex<AudioStateInner>> =
-                Arc::new(Mutex::new(AudioStateInner::new()));
-            app.manage(audio_state);
+            let mut audio_inner = AudioStateInner::new();
 
             db::init(&app.handle().clone())?;
+
+            // Load saved output device setting
+            let db_state: tauri::State<'_, db::Db> = app.state();
+            if let Ok(conn) = db_state.0.lock() {
+                if let Ok(name) = conn.query_row(
+                    "SELECT value FROM settings WHERE key = 'output_device'",
+                    [],
+                    |row| row.get::<_, String>(0),
+                ) {
+                    if !name.is_empty() {
+                        audio_inner.set_output_device_name(Some(name));
+                    }
+                }
+            }
+
+            let audio_state: Arc<Mutex<AudioStateInner>> = Arc::new(Mutex::new(audio_inner));
+            app.manage(audio_state);
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -142,6 +158,9 @@ pub fn run() {
             audio::player_previous,
             audio::player_set_mode,
             audio::player_get_state,
+            audio::player_get_output_devices,
+            audio::player_set_output_device,
+            audio::player_get_current_device,
             commands::songs::get_all_songs,
             commands::songs::upsert_songs,
             commands::songs::delete_songs,
