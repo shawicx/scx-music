@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { usePlayer } from '../composables/usePlayer'
 import { useLibrary } from '../composables/useLibrary'
 
@@ -28,14 +28,41 @@ async function toggleLike() {
   }
 }
 
+// Local state for dragging
+const isDragging = ref(false)
+const localProgress = ref(0)
+
 const progressModel = computed({
-  get: () => duration.value > 0 ? (progress.value / duration.value) * 100 : 0,
-  set: (val: number) => { if (duration.value > 0) seek((val / 100) * duration.value) },
+  get: () => {
+    if (isDragging.value) {
+      return isNaN(localProgress.value) ? 0 : localProgress.value
+    }
+    if (duration.value > 0) {
+      const result = (progress.value / duration.value) * 100
+      return isNaN(result) ? 0 : result
+    }
+    return 0
+  },
+  set: (val: number) => {
+    localProgress.value = val
+    if (duration.value > 0 && !isNaN(val)) {
+      seek((val / 100) * duration.value)
+    }
+  },
 })
 
 const volumeModel = computed({
   get: () => Math.round(volume.value * 100),
   set: (val: number) => setVolume(val / 100),
+})
+
+// Display current time during drag
+const displayProgress = computed(() => {
+  if (isDragging.value && duration.value > 0) {
+    const result = (localProgress.value / 100) * duration.value
+    return isNaN(result) ? progress.value : result
+  }
+  return progress.value
 })
 </script>
 
@@ -72,7 +99,7 @@ const volumeModel = computed({
         </v-btn>
       </div>
       <div class="progress-row">
-        <span class="time">{{ formatTime(progress) }}</span>
+        <span class="time">{{ formatTime(displayProgress) }}</span>
         <v-slider
           v-model="progressModel"
           :max="100"
@@ -82,6 +109,8 @@ const volumeModel = computed({
           color="secondary"
           track-color="surface-variant"
           class="progress-slider"
+          @start="isDragging = true"
+          @end="isDragging = false"
         />
         <span class="time">{{ formatTime(duration) }}</span>
       </div>

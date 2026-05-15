@@ -271,6 +271,7 @@ impl AudioStateInner {
 
     fn seek_by_restart(&mut self, position_secs: f64) -> Result<(), String> {
         let song = self.current_song.clone().ok_or("No song playing")?;
+        let was_paused = matches!(self.state, PlaybackState::Paused);
         self.ensure_engine()?;
         let engine = self.engine.as_mut().ok_or("No audio engine")?;
 
@@ -288,7 +289,13 @@ impl AudioStateInner {
         sink.set_volume(self.volume);
         sink.append(source);
         engine.sink = Some(sink);
-        self.state = PlaybackState::Playing;
+
+        // Restore paused state if it was paused before seek
+        if was_paused {
+            self.pause_internal();
+        } else {
+            self.state = PlaybackState::Playing;
+        }
         Ok(())
     }
 

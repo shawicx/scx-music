@@ -75,6 +75,7 @@ async function setupListeners() {
 }
 
 function formatTime(secs: number): string {
+  if (isNaN(secs) || !isFinite(secs)) return '0:00'
   const s = Math.max(0, Math.floor(secs))
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
 }
