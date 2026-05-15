@@ -28,6 +28,8 @@ const playlistSongs = ref<Record<string, string[]>>({})
 const activePlaylistId = ref<string | null>(null)
 const displayMode = ref<'songs' | 'albums' | 'artists'>('songs')
 const drilldown = ref<{ type: 'album' | 'artist'; value: string } | null>(null)
+const sortBy = ref<'title' | 'artist' | 'album' | 'duration' | 'default'>('default')
+const sortOrder = ref<'asc' | 'desc'>('asc')
 const ready = ref(false)
 
 const gradients = [
@@ -107,6 +109,29 @@ const displayedSongs = computed(() => {
       result = result.filter((s) => s.artist === d.value)
     }
   }
+
+  // Apply sorting
+  if (sortBy.value !== 'default') {
+    result = [...result].sort((a, b) => {
+      let comparison = 0
+      switch (sortBy.value) {
+        case 'title':
+          comparison = a.title.localeCompare(b.title, 'zh-CN')
+          break
+        case 'artist':
+          comparison = a.artist.localeCompare(b.artist, 'zh-CN')
+          break
+        case 'album':
+          comparison = a.album.localeCompare(b.album, 'zh-CN')
+          break
+        case 'duration':
+          comparison = a.durationSecs - b.durationSecs
+          break
+      }
+      return sortOrder.value === 'asc' ? comparison : -comparison
+    })
+  }
+
   return result
 })
 
@@ -156,6 +181,18 @@ export function useLibrary() {
 
   function clearDrilldown() {
     drilldown.value = null
+  }
+
+  function setSortBy(value: 'title' | 'artist' | 'album' | 'duration' | 'default') {
+    sortBy.value = value
+  }
+
+  function setSortOrder(order: 'asc' | 'desc') {
+    sortOrder.value = order
+  }
+
+  function toggleSortOrder() {
+    sortOrder.value = sortOrder.value === 'asc' ? 'desc' : 'asc'
   }
 
   async function addPlaylist(name: string) {
@@ -271,6 +308,8 @@ export function useLibrary() {
     activePlaylist,
     displayMode,
     drilldown,
+    sortBy,
+    sortOrder,
     currentSongId,
     currentSong,
     currentPlaylistSongs,
@@ -283,6 +322,9 @@ export function useLibrary() {
     setDisplayMode,
     setDrilldown,
     clearDrilldown,
+    setSortBy,
+    setSortOrder,
+    toggleSortOrder,
     addPlaylist,
     renamePlaylist,
     deletePlaylist,

@@ -93,21 +93,6 @@ async function handleImport() {
     isImporting.value = null
   }
 }
-
-async function handleImportActive() {
-  if (!activePlaylistId.value) return
-  isImporting.value = activePlaylistId.value
-  try {
-    const count = await importToPlaylist(activePlaylistId.value)
-    if (count !== undefined) {
-      snackbarText.value = `已导入 ${count} 首歌曲`
-      snackbarColor.value = count > 0 ? 'success' : 'warning'
-      showSnackbar.value = true
-    }
-  } finally {
-    isImporting.value = null
-  }
-}
 </script>
 
 <template>
@@ -147,20 +132,6 @@ async function handleImportActive() {
           </template>
         </v-list-item>
       </v-list>
-    </div>
-
-    <!-- Import for active playlist -->
-    <div v-if="activePlaylistId" class="import-wrapper">
-      <v-btn
-        block
-        variant="outlined"
-        :disabled="isImporting !== null"
-        prepend-icon="mdi-folder-open"
-        class="import-btn"
-        @click="handleImportActive"
-      >
-        {{ isImporting ? '扫描中...' : '导入到当前歌单' }}
-      </v-btn>
     </div>
 
     <!-- Settings -->
@@ -311,15 +282,6 @@ async function handleImportActive() {
 
 .playlist-list { padding: 0; }
 .playlist-list :deep(.v-list-item) { padding-left: 16px; }
-
-.import-wrapper { padding: 4px 12px 0; }
-.import-btn {
-  border-color: rgb(var(--v-theme-secondary));
-  color: rgb(var(--v-theme-secondary));
-  background: var(--v-accent-bg);
-  text-transform: none;
-}
-.import-btn:hover { background: var(--v-accent-glow); }
 
 .sidebar-bottom { padding: 0 12px; }
 .settings-btn {

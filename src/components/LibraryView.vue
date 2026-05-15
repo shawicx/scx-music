@@ -22,11 +22,16 @@ const {
   activePlaylistId,
   displayMode,
   drilldown,
+  sortBy,
+  sortOrder,
   displayedSongs,
   filteredAlbums,
   filteredArtists,
   setDrilldown,
   clearDrilldown,
+  setSortBy,
+  setSortOrder,
+  toggleSortOrder,
   addSongToPlaylist,
   playlists,
 } = useLibrary()
@@ -84,6 +89,43 @@ function handleAddToPlaylist(playlistId: string) {
   addSongToPlaylist(playlistId, songMenu.value.songId)
   songMenu.value.show = false
 }
+
+// Sort menu
+const sortMenu = ref<{ show: boolean; x: number; y: number }>({
+  show: false, x: 0, y: 0,
+})
+
+const sortOptions = [
+  { value: 'default', label: '默认排序', icon: 'mdi-sort-variant' },
+  { value: 'title', label: '按标题', icon: 'mdi-format-title' },
+  { value: 'artist', label: '按艺术家', icon: 'mdi-account-music' },
+  { value: 'album', label: '按专辑', icon: 'mdi-album' },
+  { value: 'duration', label: '按时长', icon: 'mdi-clock-outline' },
+]
+
+function openSortMenu(e: MouseEvent) {
+  e.preventDefault()
+  sortMenu.value = { show: true, x: e.clientX, y: e.clientY }
+}
+
+function handleSortBy(value: 'title' | 'artist' | 'album' | 'duration' | 'default') {
+  if (sortBy.value === value && value !== 'default') {
+    toggleSortOrder()
+  } else {
+    setSortBy(value)
+    if (value !== 'default') {
+      setSortOrder('asc')
+    }
+  }
+  sortMenu.value.show = false
+}
+
+const sortLabel = computed(() => {
+  const option = sortOptions.find(o => o.value === sortBy.value)
+  if (!option) return '排序'
+  if (sortBy.value === 'default') return option.label
+  return `${option.label} ${sortOrder.value === 'asc' ? '↑' : '↓'}`
+})
 </script>
 
 <template>
@@ -133,8 +175,8 @@ function handleAddToPlaylist(playlistId: string) {
             <v-icon icon="mdi-view-grid" size="16"></v-icon>
           </v-btn>
         </v-btn-toggle>
-        <v-btn variant="outlined" density="compact" size="small" append-icon="mdi-sort-variant">
-          排序
+        <v-btn variant="outlined" append-icon="mdi-sort-variant" @click="openSortMenu">
+          {{ sortLabel }}
         </v-btn>
       </div>
     </div>
@@ -150,7 +192,7 @@ function handleAddToPlaylist(playlistId: string) {
     <div v-else-if="!songs.length || displayedSongs.length === 0 && !searchQuery && !showCardView" class="empty-state">
       <v-icon icon="mdi-music" size="48" color="secondary"></v-icon>
       <p class="empty-text">还没有音乐</p>
-      <p class="empty-hint">点击「导入到当前歌单」来添加歌曲</p>
+      <p class="empty-hint">右键点击歌单可以导入音乐</p>
     </div>
 
     <!-- No search results -->
@@ -255,6 +297,29 @@ function handleAddToPlaylist(playlistId: string) {
           :title="pl.name"
           @click="handleAddToPlaylist(pl.id)"
         />
+      </v-list>
+    </v-menu>
+
+    <!-- Sort menu -->
+    <v-menu
+      v-model="sortMenu.show"
+      :target="[sortMenu.x, sortMenu.y]"
+      :close-on-content-click="true"
+    >
+      <v-list density="compact" min-width="160">
+        <v-list-subheader>排序方式</v-list-subheader>
+        <v-list-item
+          v-for="option in sortOptions"
+          :key="option.value"
+          :prepend-icon="option.icon"
+          :title="option.label"
+          :active="sortBy === option.value"
+          @click="handleSortBy(option.value)"
+        >
+          <template v-if="sortBy === option.value && option.value !== 'default'" #append>
+            <v-icon :icon="sortOrder === 'asc' ? 'mdi-arrow-up' : 'mdi-arrow-down'" size="16" />
+          </template>
+        </v-list-item>
       </v-list>
     </v-menu>
   </div>
