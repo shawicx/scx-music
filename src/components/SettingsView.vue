@@ -1,15 +1,17 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
-import { useTheme } from '../composables/useTheme'
+import { useSettingsStore } from '../stores/settings'
 import { useToast } from '../composables/useToast'
-import { themeMeta, type ThemeColor } from '../plugins/vuetify'
+import { themeMeta } from '../plugins/vuetify'
 
 const emit = defineEmits<{ back: [] }>()
-const { colorName, mode, setColorTheme, setMode } = useTheme()
+const settingsStore = useSettingsStore()
 const { showToast } = useToast()
 
-const themes = Object.entries(themeMeta) as [ThemeColor, { label: string; color: string }][]
+const { colorName, mode, setColorTheme, setMode } = settingsStore
+
+const themes = Object.entries(themeMeta) as Array<[string, { label: string; color: string }]>
 
 const themeModes = [
   { value: 'light' as const, label: '浅色', icon: 'mdi-white-balance-sunny' },
@@ -91,7 +93,7 @@ onMounted(loadDevices)
           v-for="[key, meta] in themes"
           :key="key"
           :class="['theme-option', { active: colorName === key }]"
-          @click="setColorTheme(key)"
+          @click="setColorTheme(key as any)"
         >
           <span class="theme-swatch" :style="{ background: meta.color }" />
           <span class="theme-label">{{ meta.label }}</span>

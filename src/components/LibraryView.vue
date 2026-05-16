@@ -1,13 +1,18 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { useLibrary } from '../composables/useLibrary'
-import { usePlayer } from '../composables/usePlayer'
+import { storeToRefs } from 'pinia'
+import { useLibraryStore } from '../stores/library'
+import { usePlayerStore } from '../stores/player'
 import LibraryHeader from './library/LibraryHeader.vue'
 import SongTable from './library/SongTable.vue'
+import VirtualSongTable from './library/VirtualSongTable.vue'
 import SongGrid from './library/SongGrid.vue'
 import BrowseCards from './library/BrowseCards.vue'
 import EmptyStates from './library/EmptyStates.vue'
 import SortMenu from './library/SortMenu.vue'
+
+const libraryStore = useLibraryStore()
+const playerStore = usePlayerStore()
 
 const {
   songs,
@@ -22,16 +27,26 @@ const {
   displayedSongs,
   filteredAlbums,
   filteredArtists,
+  playlists,
+} = storeToRefs(libraryStore)
+
+const {
   setDrilldown,
   clearDrilldown,
   setSortBy,
   setSortOrder,
   toggleSortOrder,
   addSongToPlaylist,
-  playlists,
-} = useLibrary()
+} = libraryStore
 
-const { playFromQueue, currentSong, isPlaying } = usePlayer()
+const {
+  currentSong,
+  isPlaying,
+} = storeToRefs(playerStore)
+
+const {
+  playFromQueue,
+} = playerStore
 
 const pageTitle = computed(() => {
   if (!activePlaylist.value) return '选择歌单'
@@ -150,10 +165,19 @@ const emptyStateType = computed(() => {
 
     <!-- List view -->
     <SongTable
+      v-if="viewMode === 'list' && displayedSongs.length < 100"
+      :songs="displayedSongs"
+      :current-song-id="currentSong?.id"
+      :is-playing="isPlaying"
+      @song-click="onSongClick"
+      @song-menu="openSongMenu"
+    />
+    <VirtualSongTable
       v-else-if="viewMode === 'list'"
       :songs="displayedSongs"
       :current-song-id="currentSong?.id"
       :is-playing="isPlaying"
+      :container-height="600"
       @song-click="onSongClick"
       @song-menu="openSongMenu"
     />

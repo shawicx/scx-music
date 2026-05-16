@@ -1,5 +1,25 @@
 # 后端结构
 
+## 错误处理
+
+**文件位置：** `src-tauri/src/error.rs`
+
+**统一错误类型：** `AppError` 枚举
+- `FileOperation` - 文件操作错误
+- `Database` - 数据库错误  
+- `AudioParse` - 音频解析错误
+- `AudioPlayback` - 音频播放错误
+- `DeviceNotFound` - 设备未找到
+- `UnsupportedFormat` - 不支持的音频格式
+- `InvalidArgument` - 无效参数
+- `OperationFailed` - 操作失败
+
+**特性：**
+- 使用 `thiserror` crate 自动生成错误信息
+- 自动转换常见错误类型 (std::io::Error, rusqlite::Error)
+- 统一的 `AppResult<T>` 类型别名
+- 自动转换为 String 以便通过 Tauri IPC 传递
+
 ## Commands (IPC 处理)
 
 ### 核心模块
@@ -74,6 +94,11 @@
 - 使用 `lofty` 库提取音频元数据
 - 递归遍历目录
 - 支持格式：MP3, FLAC, WAV, AAC, OGG, M4A, Opus, WMA
+
+**error.rs** - 统一错误处理
+- `AppError` 枚举定义所有错误类型
+- `AppResult<T>` 类型别名
+- 自动错误转换和传播
 
 ## Async Task
 

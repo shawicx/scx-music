@@ -10,7 +10,7 @@
 
 ## 技术栈
 
-**前端：** Vue 3.5 + TypeScript 5.6 + Vuetify 4.0 + Vite 6.0
+**前端：** Vue 3.5 + TypeScript 5.6 + Vuetify 4.0 + Vite 6.0 + Pinia 3.0
 **后端：** Tauri v2 + Rust (Edition 2021) + Rodio 0.19 + SQLite
 
 ## 启动方式
@@ -33,8 +33,11 @@ pnpm app:build
 
 ```
 src/                        # Vue 3 前端
-├── composables/            # usePlayer, useLibrary, useTheme
+├── stores/                 # Pinia 状态管理 (player, library, settings)
+├── composables/            # Vue composables (useToast)
 ├── components/             # UI 组件
+│   └── library/           # 音乐库子组件
+├── utils/                  # 工具函数 (virtualScroll, errorHandler)
 └── App.vue                 # 根组件
 
 src-tauri/                  # Rust 后端

@@ -1,18 +1,35 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { usePlayer } from '../composables/usePlayer'
-import { useLibrary } from '../composables/useLibrary'
+import { storeToRefs } from 'pinia'
+import { usePlayerStore } from '../stores/player'
+import { useLibraryStore } from '../stores/library'
 
 defineEmits<{ close: [] }>()
 
-const {
-  currentSong, isPlaying, progress, duration,
-  togglePlayPause, seek, next, previous,
-  setMode, playbackMode, queue, queueIndex,
-  formatTime,
-} = usePlayer()
+const playerStore = usePlayerStore()
+const libraryStore = useLibraryStore()
 
-const { addSongToPlaylist, removeSongFromPlaylist, playlistSongs } = useLibrary()
+const {
+  currentSong,
+  isPlaying,
+  progress,
+  duration,
+  playbackMode,
+  queue,
+  queueIndex,
+} = storeToRefs(playerStore)
+
+const {
+  togglePlayPause,
+  seek,
+  next,
+  previous,
+  setMode,
+  formatTime,
+} = playerStore
+
+const { addSongToPlaylist: addSong, removeSongFromPlaylist: removeSong } = libraryStore
+const { playlistSongs } = storeToRefs(libraryStore)
 
 const isLiked = computed(() => {
   if (!currentSong.value) return false
@@ -23,9 +40,9 @@ const isLiked = computed(() => {
 async function toggleLike() {
   if (!currentSong.value) return
   if (isLiked.value) {
-    await removeSongFromPlaylist('fav', currentSong.value.id)
+    await removeSong('fav', currentSong.value.id)
   } else {
-    await addSongToPlaylist('fav', currentSong.value.id)
+    await addSong('fav', currentSong.value.id)
   }
 }
 

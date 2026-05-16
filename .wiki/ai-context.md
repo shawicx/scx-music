@@ -7,16 +7,19 @@ Tauri v2 桌面应用：Vue 3 前端 + Rust 后端
 **通信：** IPC (invoke + emit)
 **数据：** SQLite 数据库
 **音频：** Rodio 引擎
+**状态管理：** Pinia 3.0
 
 ## 关键文件
 
 ### 前端
 ```
-src/composables/usePlayer.ts      # 播放器状态和控制
-src/composables/useLibrary.ts     # 音乐库数据管理
-src/composables/useTheme.ts       # 主题切换
-src/components/PlayerBar.vue      # 播放控制 UI
-src/components/LibraryView.vue    # 音乐库视图
+src/stores/player.ts             # 播放器状态和控制 (usePlayerStore)
+src/stores/library.ts            # 音乐库数据管理 (useLibraryStore)
+src/stores/settings.ts           # 设置和主题管理 (useSettingsStore)
+src/components/PlayerBar.vue     # 播放控制 UI
+src/components/LibraryView.vue   # 音乐库视图
+src/utils/virtualScroll.ts       # 虚拟滚动工具
+src/utils/errorHandler.ts        # 统一错误处理
 ```
 
 ### 后端
@@ -32,41 +35,43 @@ src-tauri/src/db/mod.rs           # 数据库管理
 
 ### 播放歌曲
 ```
-UI -> usePlayer.playFromQueue()
--> invoke('player_set_queue')
+UI -> usePlayerStore.playFromQueue()
+-> invokeCommand('player_set_queue')
 -> audio.rs::player_set_queue()
 -> audio.rs::play_file_at_index()
 -> emit('audio:state_change')
--> usePlayer 监听器
+-> usePlayerStore 监听器
 -> UI 更新
 ```
 
 ### 导入歌曲
 ```
-UI -> useLibrary.importToPlaylist()
--> invoke('scan_music_folder')
+UI -> useLibraryStore.importToPlaylist()
+-> invokeCommand('scan_music_folder')
 -> lib.rs::scan_music_folder()
--> invoke('upsert_songs')
+-> invokeCommand('upsert_songs')
 -> commands/songs.rs::upsert_songs()
 -> 数据库插入
--> useLibrary 状态更新
+-> useLibraryStore 状态更新
 ```
 
 ## 模块职责
 
 | 模块 | 职责 | 关键点 |
 |------|------|--------|
-| usePlayer | 播放器状态 | 进度跟踪 (500ms)、队列管理 |
-| useLibrary | 音乐库 | 搜索/筛选/排序、播放列表 CRUD |
+| usePlayerStore | 播放器状态 | 进度跟踪 (500ms)、队列管理、事件监听 |
+| useLibraryStore | 音乐库 | 搜索/筛选/排序、播放列表 CRUD、虚拟滚动 |
+| useSettingsStore | 设置主题 | Vuetify 主题、系统检测、数据库持久化 |
 | audio.rs | 音频引擎 | Rodio 封装、线程安全、设备切换 |
 | db/ | 数据库 | SQLite 操作、迁移管理 |
 
 ## 注意事项
 
 ### 前端
-- 所有 IPC 调用通过 Composables，组件不直接调用
-- 使用 Composition API，不用 Vuex/Pinia
+- 所有 IPC 调用通过 Pinia Stores，组件不直接调用
+- 使用 Composition API + Pinia 状态管理
 - TypeScript 严格模式
+- 虚拟滚动处理大数据列表
 
 ### 后端
 - 所有 Command 返回 `Result<T, String>`
@@ -79,10 +84,12 @@ UI -> useLibrary.importToPlaylist()
 - 大型音乐库扫描性能
 - 数据库迁移要谨慎
 - 文件路径变化需要更新数据库
+- Pinia Store 事件监听器生命周期管理
 
 ### 开发规范
 - 前端组件：PascalCase
 - 前端函数：camelCase
+- Store 命名：useXxxStore
 - 后端结构体：PascalCase
 - 后端函数：snake_case
 - Command 命名：snake_case

@@ -1,19 +1,25 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { useLibrary } from '../composables/useLibrary'
+import { storeToRefs } from 'pinia'
+import { useLibraryStore } from '../stores/library'
 
 defineProps<{ activeView: string }>()
 const emit = defineEmits<{ navigate: [view: string] }>()
 
+const libraryStore = useLibraryStore()
+
 const {
   playlists,
   activePlaylistId,
+} = storeToRefs(libraryStore)
+
+const {
   addPlaylist,
   renamePlaylist,
   deletePlaylist,
   importToPlaylist,
   setActivePlaylist,
-} = useLibrary()
+} = libraryStore
 
 const showAddDialog = ref(false)
 const newPlaylistName = ref('')

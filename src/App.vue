@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { useTheme } from './composables/useTheme'
-import { useLibrary } from './composables/useLibrary'
+import { ref, onMounted, onUnmounted } from 'vue'
+import { useSettingsStore } from './stores/settings'
+import { useLibraryStore } from './stores/library'
+import { usePlayerStore } from './stores/player'
 import AppSidebar from './components/AppSidebar.vue'
 import LibraryView from './components/LibraryView.vue'
 import SettingsView from './components/SettingsView.vue'
@@ -9,12 +10,21 @@ import PlayerBar from './components/PlayerBar.vue'
 import NowPlayingOverlay from './components/NowPlayingOverlay.vue'
 import { useToast } from './composables/useToast'
 
-const { loadThemeFromDb } = useTheme()
-const { loadFromDb } = useLibrary()
+const settingsStore = useSettingsStore()
+const libraryStore = useLibraryStore()
+const playerStore = usePlayerStore()
 const { toastMessage, toastVisible, toastColor } = useToast()
 
 onMounted(async () => {
-  await Promise.all([loadThemeFromDb(), loadFromDb()])
+  await Promise.all([
+    settingsStore.loadThemeFromDb(),
+    libraryStore.loadFromDb()
+  ])
+  await playerStore.setupListeners()
+})
+
+onUnmounted(() => {
+  playerStore.cleanup()
 })
 
 const activeView = ref('library')

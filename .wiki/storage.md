@@ -30,11 +30,11 @@
 ### settings
 **作用：** 存储应用设置键值对
 **关键字段：** key (PRIMARY KEY), value
-**常用设置：** theme, output_device, currentSongId, viewMode
+**常用设置：** theme_color, theme_mode, output_device, currentSongId, viewMode, displayMode
 
 ## Cache
 
-**前端：** 无额外缓存，直接从数据库加载到 Vue 状态
+**前端：** Pinia Store 状态缓存，虚拟滚动优化大量数据渲染
 **后端：** 无缓存层，直接查询 SQLite
 
 ## App Data
