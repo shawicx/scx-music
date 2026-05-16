@@ -21,15 +21,15 @@ const materialColors: Record<string, MaterialColor> = {
   amber:       { base: '#FFC107', darken1: '#FFB300', lighten1: '#FFD54F', lighten2: '#FFE082' },
 }
 
-function createTheme(c: MaterialColor) {
+function createTheme(c: MaterialColor, dark: boolean = true) {
   const [r, g, b] = [parseInt(c.base.slice(1, 3), 16), parseInt(c.base.slice(3, 5), 16), parseInt(c.base.slice(5, 7), 16)]
   return {
-    dark: true,
+    dark: dark,
     colors: {
-      background: '#1a1a2e',
-      surface: '#1e1e32',
-      'surface-variant': '#2a2a3e',
-      'surface-bright': '#0f0f1a',
+      background: dark ? '#1a1a2e' : '#ffffff',
+      surface: dark ? '#1e1e32' : '#f5f5f5',
+      'surface-variant': dark ? '#2a2a3e' : '#e0e0e0',
+      'surface-bright': dark ? '#0f0f1a' : '#ffffff',
       primary: c.base,
       'primary-darken-1': c.darken1,
       secondary: c.lighten1,
@@ -40,9 +40,9 @@ function createTheme(c: MaterialColor) {
       warning: '#FFC107',
     },
     variables: {
-      'border-color': '#2a2a3e',
-      'text-secondary': '#888888',
-      'text-muted': '#555555',
+      'border-color': dark ? '#2a2a3e' : '#e0e0e0',
+      'text-secondary': dark ? '#888888' : '#666666',
+      'text-muted': dark ? '#555555' : '#999999',
       'accent-bg': `rgba(${r}, ${g}, ${b}, 0.12)`,
       'accent-glow': `rgba(${r}, ${g}, ${b}, 0.25)`,
       'accent-shadow': `rgba(${r}, ${g}, ${b}, 0.4)`,
@@ -62,7 +62,18 @@ export const themeMeta: Record<string, { label: string; color: string }> = {
   amber:      { label: '琥珀',   color: materialColors.amber.base },
 }
 
-export type ThemeName = keyof typeof themeMeta
+export type ThemeColor = keyof typeof themeMeta
+export type ThemeMode = 'light' | 'dark' | 'system'
+export type ThemeName = `${ThemeColor}-${ThemeMode}` | ThemeColor
+
+// Generate all theme combinations (both light and dark variants)
+const themes: Record<string, any> = {}
+for (const [colorName, colorData] of Object.entries(materialColors)) {
+  themes[`${colorName}-light`] = createTheme(colorData, false)
+  themes[`${colorName}-dark`] = createTheme(colorData, true)
+  // Keep legacy theme names for backward compatibility
+  themes[colorName] = createTheme(colorData, true)
+}
 
 export default createVuetify({
   components,
@@ -73,9 +84,7 @@ export default createVuetify({
     sets: { mdi },
   },
   theme: {
-    defaultTheme: 'teal',
-    themes: Object.fromEntries(
-      Object.entries(materialColors).map(([name, c]) => [name, createTheme(c)]),
-    ),
+    defaultTheme: 'teal-dark',
+    themes,
   },
 })

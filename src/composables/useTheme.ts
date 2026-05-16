@@ -1,37 +1,96 @@
-import { ref } from 'vue'
-import { watch } from 'vue'
+import { ref, watch, computed } from 'vue'
 import { useTheme as useVuetifyTheme } from 'vuetify'
 import { invoke } from '@tauri-apps/api/core'
-import type { ThemeName } from '../plugins/vuetify'
+import { usePreferredDark } from '@vueuse/core'
+import type { ThemeColor, ThemeMode } from '../plugins/vuetify'
 
-const themeName = ref<ThemeName>('teal')
+// Color theme management
+export function useColorTheme() {
+  const colorName = ref<ThemeColor>('teal')
 
-async function loadThemeFromDb() {
-  const value = await invoke<string | null>('get_setting', { key: 'theme' })
-  if (value) {
-    themeName.value = value as ThemeName
+  async function loadColorFromDb() {
+    const value = await invoke<string | null>('get_setting', { key: 'theme_color' })
+    if (value) {
+      colorName.value = value as ThemeColor
+    } else {
+      // Migrate old theme setting
+      const oldTheme = await invoke<string | null>('get_setting', { key: 'theme' })
+      if (oldTheme) {
+        colorName.value = oldTheme as ThemeColor
+        // Save to new key
+        await invoke('set_setting', { key: 'theme_color', value: oldTheme })
+      }
+    }
   }
+
+  function setColorTheme(name: ThemeColor) {
+    colorName.value = name
+    invoke('set_setting', { key: 'theme_color', value: name }).catch(console.error)
+  }
+
+  return { colorName, setColorTheme, loadColorFromDb }
 }
 
-function saveThemeToDb(name: ThemeName) {
-  invoke('set_setting', { key: 'theme', value: name }).catch(console.error)
+// Mode management (light/dark/system)
+export function useThemeMode() {
+  const mode = ref<ThemeMode>('system')
+  const preferredDark = usePreferredDark()
+
+  async function loadModeFromDb() {
+    const value = await invoke<string | null>('get_setting', { key: 'theme_mode' })
+    if (value) {
+      mode.value = value as ThemeMode
+    } else {
+      // First time user - check if they have old theme setting
+      const oldTheme = await invoke<string | null>('get_setting', { key: 'theme' })
+      if (oldTheme) {
+        // Existing users default to dark mode
+        mode.value = 'dark'
+        await invoke('set_setting', { key: 'theme_mode', value: 'dark' })
+      } else {
+        // New users default to system mode
+        mode.value = 'system'
+      }
+    }
+  }
+
+  function setMode(newMode: ThemeMode) {
+    mode.value = newMode
+    invoke('set_setting', { key: 'theme_mode', value: newMode }).catch(console.error)
+  }
+
+  const isDark = computed(() => {
+    if (mode.value === 'system') {
+      return preferredDark.value
+    }
+    return mode.value === 'dark'
+  })
+
+  return { mode, setMode, loadModeFromDb, isDark }
 }
 
+// Main theme orchestration
 export function useTheme() {
   const vuetifyTheme = useVuetifyTheme()
+  const { colorName, setColorTheme, loadColorFromDb } = useColorTheme()
+  const { mode, setMode, loadModeFromDb, isDark } = useThemeMode()
 
-  function setTheme(name: ThemeName) {
-    themeName.value = name
-    saveThemeToDb(name)
+  // Watch for changes and update Vuetify theme
+  watch([colorName, isDark], ([color, dark]) => {
+    const themeName = `${color}-${dark ? 'dark' : 'light'}`
+    vuetifyTheme.global.name.value = themeName
+  }, { immediate: true })
+
+  async function loadThemeFromDb() {
+    await Promise.all([loadColorFromDb(), loadModeFromDb()])
   }
 
-  watch(
-    themeName,
-    (name) => {
-      vuetifyTheme.global.name.value = name
-    },
-    { immediate: true },
-  )
-
-  return { themeName, setTheme, loadThemeFromDb }
+  return {
+    colorName,
+    mode,
+    isDark,
+    setColorTheme,
+    setMode,
+    loadThemeFromDb,
+  }
 }

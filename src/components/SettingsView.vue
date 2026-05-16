@@ -3,12 +3,18 @@ import { ref, onMounted } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { useTheme } from '../composables/useTheme'
 import { showToast } from '../composables/usePlayer'
-import { themeMeta, type ThemeName } from '../plugins/vuetify'
+import { themeMeta, type ThemeColor } from '../plugins/vuetify'
 
 const emit = defineEmits<{ back: [] }>()
-const { themeName, setTheme } = useTheme()
+const { colorName, mode, setColorTheme, setMode } = useTheme()
 
-const themes = Object.entries(themeMeta) as [ThemeName, { label: string; color: string }][]
+const themes = Object.entries(themeMeta) as [ThemeColor, { label: string; color: string }][]
+
+const themeModes = [
+  { value: 'light' as const, label: '浅色', icon: 'mdi-white-balance-sunny' },
+  { value: 'system' as const, label: '跟随系统', icon: 'mdi-desktop-mac' },
+  { value: 'dark' as const, label: '深色', icon: 'mdi-moon-waning-crescent' },
+]
 
 interface AudioDeviceInfo {
   name: string
@@ -56,6 +62,25 @@ onMounted(loadDevices)
 
     <v-card class="settings-card" variant="flat" color="surface">
       <div class="card-header">
+        <v-icon icon="mdi-theme-light-dark" size="18" class="card-icon" />
+        <span class="card-title">主题模式</span>
+      </div>
+
+      <div class="mode-toggle">
+        <button
+          v-for="modeOption in themeModes"
+          :key="modeOption.value"
+          :class="['mode-button', { active: mode === modeOption.value }]"
+          @click="setMode(modeOption.value)"
+        >
+          <v-icon :icon="modeOption.icon" size="16" />
+          <span class="mode-label">{{ modeOption.label }}</span>
+        </button>
+      </div>
+    </v-card>
+
+    <v-card class="settings-card" variant="flat" color="surface">
+      <div class="card-header">
         <v-icon icon="mdi-palette" size="18" class="card-icon" />
         <span class="card-title">主题颜色</span>
       </div>
@@ -64,8 +89,8 @@ onMounted(loadDevices)
         <button
           v-for="[key, meta] in themes"
           :key="key"
-          :class="['theme-option', { active: themeName === key }]"
-          @click="setTheme(key)"
+          :class="['theme-option', { active: colorName === key }]"
+          @click="setColorTheme(key)"
         >
           <span class="theme-swatch" :style="{ background: meta.color }" />
           <span class="theme-label">{{ meta.label }}</span>
@@ -142,6 +167,43 @@ onMounted(loadDevices)
 .card-title {
   font-size: var(--text-md);
   font-weight: 600;
+}
+
+.mode-toggle {
+  display: flex;
+  gap: 8px;
+  padding: 4px;
+  background: rgb(var(--v-theme-surface-variant));
+  border-radius: 10px;
+  border: 1px solid rgb(var(--v-theme-border));
+}
+
+.mode-button {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.2s;
+  color: rgb(var(--v-theme-on-background));
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+.mode-button:hover {
+  background: rgba(var(--v-theme-primary), 0.1);
+}
+
+.mode-button.active {
+  background: rgb(var(--v-theme-primary));
+  color: rgb(var(--v-theme-on-primary));
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
 .theme-grid {
