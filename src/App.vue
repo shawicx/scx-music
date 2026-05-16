@@ -2,16 +2,16 @@
 import { ref, onMounted } from 'vue'
 import { useTheme } from './composables/useTheme'
 import { useLibrary } from './composables/useLibrary'
-import { usePlayer } from './composables/usePlayer'
 import AppSidebar from './components/AppSidebar.vue'
 import LibraryView from './components/LibraryView.vue'
 import SettingsView from './components/SettingsView.vue'
 import PlayerBar from './components/PlayerBar.vue'
 import NowPlayingOverlay from './components/NowPlayingOverlay.vue'
+import { useToast } from './composables/useToast'
 
 const { loadThemeFromDb } = useTheme()
 const { loadFromDb } = useLibrary()
-const { toastMsg, toastVisible } = usePlayer()
+const { toastMessage, toastVisible, toastColor } = useToast()
 
 onMounted(async () => {
   await Promise.all([loadThemeFromDb(), loadFromDb()])
@@ -41,15 +41,15 @@ const showNowPlaying = ref(false)
     </div>
     <v-snackbar
       v-model="toastVisible"
+      :color="toastColor"
       :timeout="3000"
-      color="error"
       contained
       location="bottom right"
       density="compact"
       rounded="lg"
       elevation="4"
     >
-      {{ toastMsg }}
+      {{ toastMessage }}
     </v-snackbar>
   </v-app>
 </template>

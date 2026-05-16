@@ -2,11 +2,12 @@
 import { ref, onMounted } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { useTheme } from '../composables/useTheme'
-import { showToast } from '../composables/usePlayer'
+import { useToast } from '../composables/useToast'
 import { themeMeta, type ThemeColor } from '../plugins/vuetify'
 
 const emit = defineEmits<{ back: [] }>()
 const { colorName, mode, setColorTheme, setMode } = useTheme()
+const { showToast } = useToast()
 
 const themes = Object.entries(themeMeta) as [ThemeColor, { label: string; color: string }][]
 

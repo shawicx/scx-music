@@ -1,10 +1,8 @@
 import { ref } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
-import type { Song } from './useLibrary'
-
-export type PlaybackMode = 'sequential' | 'repeat_all' | 'repeat_one' | 'shuffle'
-export type PlaybackState = 'playing' | 'paused' | 'stopped'
+import type { Song, PlaybackMode, PlaybackState } from '../types'
+import { invokeCommand } from '../utils/errorHandler'
+import { useToast } from './useToast'
 
 const currentSong = ref<Song | null>(null)
 const isPlaying = ref(false)
@@ -15,17 +13,8 @@ const playbackMode = ref<PlaybackMode>('sequential')
 const queue = ref<Song[]>([])
 const queueIndex = ref(0)
 
-// Global toast state
-const toastMsg = ref('')
-const toastVisible = ref(false)
-let toastTimer: ReturnType<typeof setTimeout> | null = null
-
-export function showToast(msg: string) {
-  toastMsg.value = msg
-  toastVisible.value = true
-  if (toastTimer) clearTimeout(toastTimer)
-  toastTimer = setTimeout(() => { toastVisible.value = false }, 2000)
-}
+// 使用新的 Toast 系统
+const { showToast, showWarning } = useToast()
 
 let listenersSetup = false
 
@@ -87,62 +76,102 @@ export function usePlayer() {
   setupListeners()
 
   async function playFromQueue(songs: Song[], index: number) {
-    queue.value = songs
-    queueIndex.value = index
-    const mapped = songs.map((s) => ({
-      id: s.id,
-      title: s.title,
-      artist: s.artist,
-      album: s.album,
-      durationSecs: s.durationSecs,
-      quality: s.quality,
-      filePath: s.filePath,
-    }))
-    await invoke('player_set_queue', { songs: mapped, index })
+    try {
+      queue.value = songs
+      queueIndex.value = index
+      const mapped = songs.map((s) => ({
+        id: s.id,
+        title: s.title,
+        artist: s.artist,
+        album: s.album,
+        durationSecs: s.durationSecs,
+        quality: s.quality,
+        filePath: s.filePath,
+      }))
+      await invokeCommand('player_set_queue', { songs: mapped, index })
+    } catch (error) {
+      showToast('播放失败，请重试')
+      throw error
+    }
   }
 
   async function togglePlayPause() {
-    if (isPlaying.value) {
-      await invoke('player_pause')
-    } else {
-      await invoke('player_resume')
+    try {
+      if (isPlaying.value) {
+        await invokeCommand('player_pause')
+      } else {
+        await invokeCommand('player_resume')
+      }
+    } catch (error) {
+      showToast('播放控制失败')
+      throw error
     }
   }
 
   async function seek(positionSecs: number) {
-    await invoke('player_seek', { positionSecs })
+    try {
+      await invokeCommand('player_seek', { positionSecs })
+    } catch (error) {
+      showToast('进度调整失败')
+      throw error
+    }
   }
 
   async function setVolume(v: number) {
-    volume.value = v
-    await invoke('player_set_volume', { volume: v })
+    try {
+      volume.value = v
+      await invokeCommand('player_set_volume', { volume: v })
+    } catch (error) {
+      showToast('音量设置失败')
+      throw error
+    }
   }
 
   async function next() {
     if (queue.value.length === 0) return
     if (queueIndex.value >= queue.value.length - 1 && playbackMode.value === 'sequential') {
-      showToast('已经是最后一首了')
+      showWarning('已经是最后一首了')
       return
     }
-    await invoke('player_next')
+    try {
+      await invokeCommand('player_next')
+    } catch (error) {
+      showToast('切换下一首失败')
+      throw error
+    }
   }
 
   async function previous() {
     if (queue.value.length === 0) return
     if (queueIndex.value === 0) {
-      showToast('已经是第一首了')
+      showWarning('已经是第一首了')
       return
     }
-    await invoke('player_previous')
+    try {
+      await invokeCommand('player_previous')
+    } catch (error) {
+      showToast('切换上一首失败')
+      throw error
+    }
   }
 
   async function setMode(mode: PlaybackMode) {
-    playbackMode.value = mode
-    await invoke('player_set_mode', { mode })
+    try {
+      playbackMode.value = mode
+      await invokeCommand('player_set_mode', { mode })
+    } catch (error) {
+      showToast('播放模式设置失败')
+      throw error
+    }
   }
 
   async function stop() {
-    await invoke('player_stop')
+    try {
+      await invokeCommand('player_stop')
+    } catch (error) {
+      showToast('停止播放失败')
+      throw error
+    }
   }
 
   return {
@@ -154,8 +183,6 @@ export function usePlayer() {
     playbackMode,
     queue,
     queueIndex,
-    toastMsg,
-    toastVisible,
     playFromQueue,
     togglePlayPause,
     seek,
