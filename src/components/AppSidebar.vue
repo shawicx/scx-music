@@ -2,11 +2,13 @@
 import { ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useLibraryStore } from '../stores/library'
+import { useToast } from '../composables/useToast'
 
 defineProps<{ activeView: string }>()
 const emit = defineEmits<{ navigate: [view: string] }>()
 
 const libraryStore = useLibraryStore()
+const { showSuccess, showWarning } = useToast()
 
 const {
   playlists,
@@ -23,9 +25,6 @@ const {
 
 const showAddDialog = ref(false)
 const newPlaylistName = ref('')
-const showSnackbar = ref(false)
-const snackbarText = ref('')
-const snackbarColor = ref('success')
 const contextMenu = ref<{ show: boolean; x: number; y: number; playlistId: string; playlistName: string }>({
   show: false, x: 0, y: 0, playlistId: '', playlistName: '',
 })
@@ -55,9 +54,7 @@ async function handleAddPlaylist() {
   newPlaylistName.value = ''
   showAddDialog.value = false
   setActivePlaylist(id)
-  snackbarText.value = `歌单「${name}」已创建`
-  snackbarColor.value = 'success'
-  showSnackbar.value = true
+  showSuccess(`歌单「${name}」已创建`)
 }
 
 function startRename() {
@@ -79,9 +76,7 @@ function handleDelete() {
   if (playlistId === 'fav') return
   contextMenu.value.show = false
   deletePlaylist(playlistId)
-  snackbarText.value = `歌单「${playlistName}」已删除`
-  snackbarColor.value = 'warning'
-  showSnackbar.value = true
+  showWarning(`歌单「${playlistName}」已删除`)
 }
 
 async function handleImport() {
@@ -91,9 +86,11 @@ async function handleImport() {
   try {
     const count = await importToPlaylist(pid)
     if (count !== undefined) {
-      snackbarText.value = `已导入 ${count} 首歌曲`
-      snackbarColor.value = count > 0 ? 'success' : 'warning'
-      showSnackbar.value = true
+      if (count > 0) {
+        showSuccess(`已导入 ${count} 首歌曲`)
+      } else {
+        showWarning('没有找到可导入的歌曲')
+      }
     }
   } finally {
     isImporting.value = null
@@ -165,16 +162,6 @@ async function handleImport() {
         <v-list-item v-if="contextMenu.playlistId !== 'fav'" prepend-icon="mdi-delete" title="删除" @click="handleDelete" />
       </v-list>
     </v-menu>
-
-    <!-- Snackbar -->
-    <v-snackbar
-      v-model="showSnackbar"
-      :color="snackbarColor"
-      :timeout="3000"
-      location="bottom"
-    >
-      {{ snackbarText }}
-    </v-snackbar>
 
     <!-- Add dialog -->
     <v-dialog v-model="showAddDialog" width="400">

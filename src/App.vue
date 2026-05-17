@@ -21,6 +21,8 @@ onMounted(async () => {
     libraryStore.loadFromDb()
   ])
   await playerStore.setupListeners()
+  // 恢复播放状态（解决刷新后状态丢失的问题）
+  await playerStore.getState()
 })
 
 onUnmounted(() => {

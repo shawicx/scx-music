@@ -5,6 +5,17 @@ import type { Song, PlaybackMode, PlaybackState } from '../types'
 import { invokeCommand } from '../utils/errorHandler'
 import { useToast } from '../composables/useToast'
 
+type PlayerStateReturnType = {
+  currentSong: Song | null
+  state: PlaybackState
+  volume: number
+  mode: PlaybackMode
+  progress: number
+  duration: number
+  queueLength: number
+  queueIndex: number
+}
+
 export const usePlayerStore = defineStore('player', () => {
   // State
   const currentSong = ref<Song | null>(null)
@@ -166,6 +177,26 @@ export const usePlayerStore = defineStore('player', () => {
     }
   }
 
+  async function getState() {
+    try {
+      const state = await invokeCommand<PlayerStateReturnType>('player_get_state')
+      console.log('从后端获取播放状态:', state)
+      if (state.currentSong) {
+        currentSong.value = state.currentSong
+      }
+      isPlaying.value = state.state === 'playing'
+      progress.value = state.progress
+      duration.value = state.duration
+      queueIndex.value = state.queueIndex
+      playbackMode.value = state.mode
+      volume.value = state.volume
+      console.log('播放状态已恢复')
+    } catch (error) {
+      console.log('获取播放状态失败（可能还未开始播放）:', error)
+      // 如果还未开始播放，保持初始状态即可
+    }
+  }
+
   // Utility functions
   function formatTime(secs: number): string {
     if (isNaN(secs) || !isFinite(secs)) return '0:00'
@@ -205,6 +236,7 @@ export const usePlayerStore = defineStore('player', () => {
     previous,
     setMode,
     stop,
+    getState,
     formatTime,
     cleanup,
 

@@ -72,7 +72,7 @@ const upNext = computed(() => {
 </script>
 
 <template>
-  <div class="overlay" @click.self="$emit('close')">
+  <div class="overlay">
     <div class="glow glow-primary" />
     <div class="glow glow-secondary" />
     <v-btn variant="text" size="small" class="close-btn" @click="$emit('close')">
