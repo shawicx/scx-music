@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { storeToRefs } from 'pinia'
+import { useMouse } from '@vueuse/core'
 import { useLibraryStore } from '../stores/library'
 import { useToast } from '../composables/useToast'
 
@@ -32,6 +33,45 @@ const showRenameDialog = ref(false)
 const renameValue = ref('')
 const renamingPlaylistId = ref('')
 const isImporting = ref<string | null>(null)
+
+// 拖拽调整宽度
+const { x: mouseX } = useMouse()
+const isDragging = ref(false)
+const dragStartX = ref(0)
+const dragStartWidth = ref(200)
+const sidebarWidth = ref(200)
+const minWidth = 160
+const maxWidth = 400
+
+function startDrag(e: MouseEvent) {
+  e.preventDefault()
+  isDragging.value = true
+  dragStartX.value = e.clientX
+  dragStartWidth.value = sidebarWidth.value
+}
+
+// 监听鼠标移动来调整宽度
+const currentWidth = computed(() => {
+  if (!isDragging.value) return sidebarWidth.value
+  const delta = mouseX.value - dragStartX.value
+  return Math.min(Math.max(dragStartWidth.value + delta, minWidth), maxWidth)
+})
+
+function stopDrag() {
+  if (isDragging.value) {
+    sidebarWidth.value = currentWidth.value
+    isDragging.value = false
+  }
+}
+
+// 监听鼠标释放
+onMounted(() => {
+  document.addEventListener('mouseup', stopDrag)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('mouseup', stopDrag)
+})
 
 function handlePlaylistClick(id: string) {
   setActivePlaylist(id)
@@ -99,7 +139,14 @@ async function handleImport() {
 </script>
 
 <template>
-  <aside class="sidebar" @click="closeContextMenu">
+  <aside
+    class="sidebar"
+    :class="{ dragging: isDragging }"
+    :style="{ width: `${currentWidth}px` }"
+    @click="closeContextMenu"
+  >
+    <!-- 拖拽手柄 -->
+    <div class="resize-handle" @mousedown.stop="startDrag" />
     <!-- Logo -->
     <div class="sidebar-logo">
       <span class="logo-icon"><v-icon icon="mdi-music" size="14"></v-icon></span>
@@ -213,7 +260,6 @@ async function handleImport() {
 
 <style scoped>
 .sidebar {
-  width: 200px;
   background: rgb(var(--v-theme-surface-bright));
   border-right: 1px solid var(--v-border-color);
   display: flex;
@@ -221,6 +267,25 @@ async function handleImport() {
   padding: 16px 0;
   flex-shrink: 0;
   overflow-y: auto;
+  position: relative;
+}
+
+.sidebar.dragging {
+  user-select: none;
+}
+
+.resize-handle {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  cursor: col-resize;
+  transition: background-color 0.2s;
+}
+
+.resize-handle:hover {
+  background-color: rgb(var(--v-theme-primary));
 }
 
 .sidebar-logo {

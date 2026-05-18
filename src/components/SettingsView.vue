@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
+import { storeToRefs } from 'pinia'
 import { useSettingsStore } from '../stores/settings'
 import { useToast } from '../composables/useToast'
 import { themeMeta } from '../plugins/vuetify'
@@ -9,7 +10,8 @@ const emit = defineEmits<{ back: [] }>()
 const settingsStore = useSettingsStore()
 const { showToast } = useToast()
 
-const { colorName, mode, setColorTheme, setMode } = settingsStore
+const { colorName, mode } = storeToRefs(settingsStore)
+const { setColorTheme, setMode } = settingsStore
 
 const themes = Object.entries(themeMeta) as Array<[string, { label: string; color: string }]>
 

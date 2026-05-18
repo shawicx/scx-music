@@ -15,8 +15,6 @@ const {
   progress,
   duration,
   playbackMode,
-  queue,
-  queueIndex,
 } = storeToRefs(playerStore)
 
 const {
@@ -64,11 +62,6 @@ const modeIcons: Record<string, string> = {
   repeat_one: 'mdi-repeat-once',
   shuffle: 'mdi-shuffle',
 }
-
-const upNext = computed(() => {
-  const start = queueIndex.value + 1
-  return queue.value.slice(start, start + 3)
-})
 </script>
 
 <template>
@@ -118,16 +111,6 @@ const upNext = computed(() => {
       <v-btn icon variant="plain" :disabled="!currentSong" @click="toggleLike">
         <v-icon :icon="isLiked ? 'mdi-heart' : 'mdi-heart-outline'" :color="isLiked ? 'secondary' : undefined"></v-icon>
       </v-btn>
-    </div>
-    <div v-if="upNext.length" class="up-next">
-      <div class="up-next-label">接下来</div>
-      <div v-for="song in upNext" :key="song.id" class="up-next-item">
-        <div class="up-next-art" :style="{ background: song.artGradient }" />
-        <div>
-          <div class="up-next-title">{{ song.title }}</div>
-          <div class="up-next-artist">{{ song.artist }}</div>
-        </div>
-      </div>
     </div>
   </div>
 </template>
@@ -185,17 +168,4 @@ const upNext = computed(() => {
 @keyframes fade-up {
   from { opacity: 0; transform: translateY(16px); }
 }
-
-.up-next { animation: fade-up 0.4s 0.25s cubic-bezier(0.16, 1, 0.3, 1) both;
-  position: absolute; bottom: 16px; right: 20px; width: 180px;
-  background: rgb(var(--v-theme-surface)); opacity: 0.92;
-  backdrop-filter: blur(10px); border: 1px solid var(--v-border-color);
-  border-radius: 10px; padding: 12px; z-index: 1;
-}
-.up-next-label { font-size: var(--text-xs); color: var(--v-text-muted); margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
-.up-next-item { display: flex; align-items: center; gap: 10px; padding: 6px 0; }
-.up-next-item + .up-next-item { border-top: 1px solid var(--v-border-color); padding-top: 8px; }
-.up-next-art { width: 32px; height: 32px; border-radius: 6px; flex-shrink: 0; }
-.up-next-title { font-size: var(--text-sm); color: rgb(var(--v-theme-on-background)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.up-next-artist { font-size: var(--text-xs); color: var(--v-text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 </style>
