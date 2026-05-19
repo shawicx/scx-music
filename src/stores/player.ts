@@ -27,6 +27,8 @@ export const usePlayerStore = defineStore('player', () => {
   const queue = ref<Song[]>([])
   const queueIndex = ref(0)
   const listenersSetup = ref(false)
+  const shuffle = ref(false)
+  const repeat = ref(false)
 
   // Toast
   const { showToast, showWarning } = useToast()
@@ -207,6 +209,14 @@ export const usePlayerStore = defineStore('player', () => {
   const progressFormatted = computed(() => formatTime(progress.value))
   const durationFormatted = computed(() => formatTime(duration.value))
 
+  function toggleShuffle() {
+    shuffle.value = !shuffle.value
+  }
+
+  function toggleRepeat() {
+    repeat.value = !repeat.value
+  }
+
   // Cleanup
   function cleanup() {
     unlisteners.forEach(unlisten => unlisten())
@@ -225,6 +235,8 @@ export const usePlayerStore = defineStore('player', () => {
     queue,
     queueIndex,
     listenersSetup,
+    shuffle,
+    repeat,
 
     // Actions
     setupListeners,
@@ -238,6 +250,8 @@ export const usePlayerStore = defineStore('player', () => {
     stop,
     getState,
     formatTime,
+    toggleShuffle,
+    toggleRepeat,
     cleanup,
 
     // Computed
