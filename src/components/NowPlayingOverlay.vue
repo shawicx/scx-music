@@ -62,12 +62,48 @@ const modeIcons: Record<string, string> = {
   repeat_one: 'mdi-repeat-once',
   shuffle: 'mdi-shuffle',
 }
+
+const repeatModeLabel = computed(() => {
+  switch (playbackMode.value) {
+    case 'repeat_all':
+      return '列表循环'
+    case 'repeat_one':
+      return '单曲循环'
+    case 'shuffle':
+      return '随机播放'
+    default:
+      return '顺序播放'
+  }
+})
+
+const modeIcon = computed(() => {
+  switch (playbackMode.value) {
+    case 'repeat_all':
+      return 'mdi-repeat'
+    case 'repeat_one':
+      return 'mdi-repeat-once'
+    case 'shuffle':
+      return 'mdi-shuffle'
+    default:
+      return 'mdi-playlist-play'
+  }
+})
+
+const showModeStatus = computed(() => {
+  return playbackMode.value !== 'sequential'
+})
 </script>
 
 <template>
   <div class="overlay">
     <div class="glow glow-primary" />
     <div class="glow glow-secondary" />
+    <div class="mode-status-bar" v-if="showModeStatus">
+      <div class="status-item">
+        <v-icon :icon="modeIcon" size="14" :color="playbackMode === 'sequential' ? undefined : 'secondary'"></v-icon>
+        <span>{{ repeatModeLabel }}</span>
+      </div>
+    </div>
     <v-btn variant="text" size="small" class="close-btn" @click="$emit('close')">
       <v-icon icon="mdi-close" size="16"></v-icon>
       收起
@@ -140,6 +176,25 @@ const modeIcons: Record<string, string> = {
 }
 
 .close-btn { position: absolute; top: 16px; left: 20px; z-index: 1; color: var(--v-text-secondary); animation: fade-up 0.4s 0.05s cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+.mode-status-bar {
+  position: absolute;
+  top: 16px;
+  right: 20px;
+  z-index: 1;
+  animation: fade-up 0.4s 0.05s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.status-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: rgb(var(--v-theme-surface-variant) / 0.3);
+  border-radius: 16px;
+  font-size: var(--text-xs);
+  color: var(--v-text-secondary);
+}
 
 .album-art {
   width: 200px; height: 200px;

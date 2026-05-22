@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { usePlayerStore } from '../stores/player'
 import { useLibraryStore } from '../stores/library'
+import IconButtonWithTooltip from './IconButtonWithTooltip.vue'
 
 defineEmits<{ expand: [] }>()
 
@@ -15,6 +16,7 @@ const {
   progress,
   duration,
   volume,
+  playbackMode,
 } = storeToRefs(playerStore)
 
 const {
@@ -23,6 +25,7 @@ const {
   setVolume,
   next,
   previous,
+  setMode,
   formatTime,
 } = playerStore
 
@@ -42,6 +45,13 @@ async function toggleLike() {
   } else {
     await addSong('fav', currentSong.value.id)
   }
+}
+
+function cycleMode() {
+  const modes: Array<'sequential' | 'repeat_all' | 'repeat_one' | 'shuffle'> =
+    ['sequential', 'repeat_all', 'repeat_one', 'shuffle']
+  const idx = modes.indexOf(playbackMode.value)
+  setMode(modes[(idx + 1) % modes.length])
 }
 
 // Local state for dragging
@@ -80,6 +90,32 @@ const displayProgress = computed(() => {
   }
   return progress.value
 })
+
+const repeatTooltip = computed(() => {
+  switch (playbackMode.value) {
+    case 'repeat_all':
+      return '列表循环'
+    case 'repeat_one':
+      return '单曲循环'
+    case 'shuffle':
+      return '随机播放'
+    default:
+      return '顺序播放'
+  }
+})
+
+const modeIcons: Record<string, string> = {
+  sequential: 'mdi-arrow-right',
+  repeat_all: 'mdi-repeat',
+  repeat_one: 'mdi-repeat-once',
+  shuffle: 'mdi-shuffle',
+}
+
+const repeatIcon = computed(() => modeIcons[playbackMode.value] ?? 'mdi-arrow-right')
+
+const isRepeatActive = computed(() => {
+  return playbackMode.value === 'repeat_all' || playbackMode.value === 'repeat_one' || playbackMode.value === 'shuffle'
+})
 </script>
 
 <template>
@@ -92,27 +128,50 @@ const displayProgress = computed(() => {
         <div class="song-name">{{ currentSong?.title ?? '未在播放' }}</div>
         <div class="song-artist">{{ currentSong?.artist ?? '--' }}</div>
       </div>
-      <v-btn icon size="x-small" variant="plain" class="like-btn" :disabled="!currentSong" @click.stop="toggleLike">
-        <v-icon :icon="isLiked ? 'mdi-heart' : 'mdi-heart-outline'" size="16" :color="isLiked ? 'secondary' : undefined"></v-icon>
-      </v-btn>
+      <IconButtonWithTooltip
+        :icon="isLiked ? 'mdi-heart' : 'mdi-heart-outline'"
+        icon-active="mdi-heart"
+        :active="isLiked"
+        :tooltip="() => isLiked ? '取消喜欢' : '添加到喜欢'"
+        :disabled="!currentSong"
+        size="x-small"
+        class="like-btn"
+        @click.stop="toggleLike"
+      />
     </div>
     <div class="player-center">
       <div class="controls">
-        <v-btn icon size="small" variant="plain" density="compact" disabled>
-          <v-icon icon="mdi-shuffle" ></v-icon>
-        </v-btn>
-        <v-btn icon size="small" variant="plain" density="compact" @click.stop="previous">
-          <v-icon icon="mdi-skip-previous"></v-icon>
-        </v-btn>
-        <v-btn icon size="small" color="secondary" elevation="4" class="play-btn" :disabled="!currentSong" @click.stop="togglePlayPause">
-          <v-icon :icon="isPlaying ? 'mdi-pause' : 'mdi-play'"  color="white"></v-icon>
-        </v-btn>
-        <v-btn icon size="small" variant="plain" density="compact" @click.stop="next">
-          <v-icon icon="mdi-skip-next"></v-icon>
-        </v-btn>
-        <v-btn icon size="small" variant="plain" density="compact" disabled>
-          <v-icon icon="mdi-repeat"></v-icon>
-        </v-btn>
+        <IconButtonWithTooltip
+        icon="mdi-skip-previous"
+        tooltip="上一曲"
+        @click.stop="previous"
+      />
+
+      <IconButtonWithTooltip
+        :icon="isPlaying ? 'mdi-pause' : 'mdi-play'"
+        icon-active="mdi-pause"
+        :active="isPlaying"
+        tooltip="播放"
+        color="secondary"
+        size="small"
+        class="play-btn"
+        :disabled="!currentSong"
+        @click.stop="togglePlayPause"
+      />
+
+      <IconButtonWithTooltip
+        icon="mdi-skip-next"
+        tooltip="下一曲"
+        @click.stop="next"
+      />
+
+      <IconButtonWithTooltip
+        :icon="repeatIcon"
+        :active="isRepeatActive"
+        :tooltip="repeatTooltip"
+        color="secondary"
+        @click.stop="cycleMode"
+      />
       </div>
       <div class="progress-row">
         <span class="time">{{ formatTime(displayProgress) }}</span>
@@ -132,9 +191,11 @@ const displayProgress = computed(() => {
       </div>
     </div>
     <div class="player-right">
-      <v-btn icon size="x-small" variant="plain" density="compact">
-        <v-icon icon="mdi-playlist-music" size="14"></v-icon>
-      </v-btn>
+      <IconButtonWithTooltip
+        icon="mdi-playlist-music"
+        tooltip="播放列表"
+        size="x-small"
+      />
       <!-- <v-icon size="14" class="volume-icon">mdi-volume-high</v-icon> -->
       <v-slider
         v-model="volumeModel"
