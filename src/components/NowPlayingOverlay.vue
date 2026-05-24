@@ -3,18 +3,19 @@ import { computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { usePlayerStore } from '../stores/player'
 import { useLibraryStore } from '../stores/library'
+import { usePlaybackMode } from '../composables/usePlaybackMode'
 
 defineEmits<{ close: [] }>()
 
 const playerStore = usePlayerStore()
 const libraryStore = useLibraryStore()
+const { modeIcon, modeLabel, isModeActive, cycleMode } = usePlaybackMode()
 
 const {
   currentSong,
   isPlaying,
   progress,
   duration,
-  playbackMode,
 } = storeToRefs(playerStore)
 
 const {
@@ -22,7 +23,6 @@ const {
   seek,
   next,
   previous,
-  setMode,
   formatTime,
 } = playerStore
 
@@ -48,60 +48,16 @@ const progressModel = computed({
   get: () => duration.value > 0 ? (progress.value / duration.value) * 100 : 0,
   set: (val: number) => { if (duration.value > 0) seek((val / 100) * duration.value) },
 })
-
-function cycleMode() {
-  const modes: Array<'sequential' | 'repeat_all' | 'repeat_one' | 'shuffle'> =
-    ['sequential', 'repeat_all', 'repeat_one', 'shuffle']
-  const idx = modes.indexOf(playbackMode.value)
-  setMode(modes[(idx + 1) % modes.length])
-}
-
-const modeIcons: Record<string, string> = {
-  sequential: 'mdi-arrow-right',
-  repeat_all: 'mdi-repeat',
-  repeat_one: 'mdi-repeat-once',
-  shuffle: 'mdi-shuffle',
-}
-
-const repeatModeLabel = computed(() => {
-  switch (playbackMode.value) {
-    case 'repeat_all':
-      return '列表循环'
-    case 'repeat_one':
-      return '单曲循环'
-    case 'shuffle':
-      return '随机播放'
-    default:
-      return '顺序播放'
-  }
-})
-
-const modeIcon = computed(() => {
-  switch (playbackMode.value) {
-    case 'repeat_all':
-      return 'mdi-repeat'
-    case 'repeat_one':
-      return 'mdi-repeat-once'
-    case 'shuffle':
-      return 'mdi-shuffle'
-    default:
-      return 'mdi-playlist-play'
-  }
-})
-
-const showModeStatus = computed(() => {
-  return playbackMode.value !== 'sequential'
-})
 </script>
 
 <template>
   <div class="overlay">
     <div class="glow glow-primary" />
     <div class="glow glow-secondary" />
-    <div class="mode-status-bar" v-if="showModeStatus">
+    <div class="mode-status-bar" v-if="isModeActive">
       <div class="status-item">
-        <v-icon :icon="modeIcon" size="14" :color="playbackMode === 'sequential' ? undefined : 'secondary'"></v-icon>
-        <span>{{ repeatModeLabel }}</span>
+        <v-icon :icon="modeIcon" size="14" color="secondary"></v-icon>
+        <span>{{ modeLabel }}</span>
       </div>
     </div>
     <v-btn variant="text" size="small" class="close-btn" @click="$emit('close')">
@@ -132,8 +88,8 @@ const showModeStatus = computed(() => {
       </div>
     </div>
     <div class="controls">
-      <v-btn icon variant="plain" :class="{ muted: playbackMode === 'sequential' }" @click="cycleMode">
-        <v-icon :icon="modeIcons[playbackMode] || 'mdi-arrow-right'"></v-icon>
+      <v-btn icon variant="plain" :class="{ muted: !isModeActive }" @click="cycleMode">
+        <v-icon :icon="modeIcon"></v-icon>
       </v-btn>
       <v-btn icon variant="plain" @click="previous">
         <v-icon icon="mdi-skip-previous"></v-icon>

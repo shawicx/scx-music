@@ -5,8 +5,6 @@ import type { Song, PlaybackMode, PlaybackState } from '../types'
 import { invokeCommand } from '../utils/errorHandler'
 import { useToast } from '../composables/useToast'
 
-type RepeatMode = 'off' | 'all' | 'one'
-
 type PlayerStateReturnType = {
   currentSong: Song | null
   state: PlaybackState
@@ -29,9 +27,6 @@ export const usePlayerStore = defineStore('player', () => {
   const queue = ref<Song[]>([])
   const queueIndex = ref(0)
   const listenersSetup = ref(false)
-  const shuffle = ref(false)
-  const repeat = ref(false)
-  const repeatMode = ref<RepeatMode>('off')
 
   // Toast
   const { showToast, showWarning } = useToast()
@@ -63,22 +58,6 @@ export const usePlayerStore = defineStore('player', () => {
         }
         queueIndex.value = e.payload.queueIndex
         playbackMode.value = e.payload.mode
-
-        // 同步 UI 状态
-        shuffle.value = e.payload.mode === 'shuffle'
-        switch (e.payload.mode) {
-          case 'repeat_all':
-            repeatMode.value = 'all'
-            break
-          case 'repeat_one':
-            repeatMode.value = 'one'
-            break
-          case 'shuffle':
-            // repeatMode 保持不变
-            break
-          default:
-            repeatMode.value = 'off'
-        }
       }),
     )
 
@@ -180,10 +159,12 @@ export const usePlayerStore = defineStore('player', () => {
   }
 
   async function setMode(mode: PlaybackMode) {
+    const previousMode = playbackMode.value
     try {
       playbackMode.value = mode
       await invokeCommand('player_set_mode', { mode })
     } catch (error) {
+      playbackMode.value = previousMode
       showToast('播放模式设置失败')
       throw error
     }
@@ -228,51 +209,6 @@ export const usePlayerStore = defineStore('player', () => {
   const progressFormatted = computed(() => formatTime(progress.value))
   const durationFormatted = computed(() => formatTime(duration.value))
 
-  async function toggleShuffle() {
-    shuffle.value = !shuffle.value
-    await syncModeToBackend()
-  }
-
-  async function syncModeToBackend() {
-    let targetMode: PlaybackMode
-
-    if (shuffle.value) {
-      // shuffle 开启时，repeatMode 决定是否循环
-      targetMode = 'shuffle'
-    } else {
-      // shuffle 关闭时，repeatMode 决定模式
-      switch (repeatMode.value) {
-        case 'all':
-          targetMode = 'repeat_all'
-          break
-        case 'one':
-          targetMode = 'repeat_one'
-          break
-        default:
-          targetMode = 'sequential'
-      }
-    }
-
-    await setMode(targetMode)
-  }
-
-  async function cycleRepeat() {
-    const modeMap: Record<RepeatMode, RepeatMode> = {
-      off: 'all',
-      all: 'one',
-      one: 'off',
-    }
-    const next = modeMap[repeatMode.value]
-
-    // 如果即将切换到 repeat_one 且 shuffle 开启，先关闭 shuffle
-    if (next === 'one' && shuffle.value) {
-      shuffle.value = false
-    }
-
-    repeatMode.value = next
-    await syncModeToBackend()
-  }
-
   // Cleanup
   function cleanup() {
     unlisteners.forEach(unlisten => unlisten())
@@ -291,9 +227,6 @@ export const usePlayerStore = defineStore('player', () => {
     queue,
     queueIndex,
     listenersSetup,
-    shuffle,
-    repeat,
-    repeatMode,
 
     // Actions
     setupListeners,
@@ -307,9 +240,6 @@ export const usePlayerStore = defineStore('player', () => {
     stop,
     getState,
     formatTime,
-    toggleShuffle,
-    syncModeToBackend,
-    cycleRepeat,
     cleanup,
 
     // Computed

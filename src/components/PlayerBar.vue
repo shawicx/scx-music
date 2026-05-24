@@ -4,11 +4,13 @@ import { storeToRefs } from 'pinia'
 import { usePlayerStore } from '../stores/player'
 import { useLibraryStore } from '../stores/library'
 import IconButtonWithTooltip from './IconButtonWithTooltip.vue'
+import { usePlaybackMode } from '../composables/usePlaybackMode'
 
 defineEmits<{ expand: [] }>()
 
 const playerStore = usePlayerStore()
 const libraryStore = useLibraryStore()
+const { modeIcon, modeLabel, isModeActive, cycleMode } = usePlaybackMode()
 
 const {
   currentSong,
@@ -16,7 +18,6 @@ const {
   progress,
   duration,
   volume,
-  playbackMode,
 } = storeToRefs(playerStore)
 
 const {
@@ -25,7 +26,6 @@ const {
   setVolume,
   next,
   previous,
-  setMode,
   formatTime,
 } = playerStore
 
@@ -45,13 +45,6 @@ async function toggleLike() {
   } else {
     await addSong('fav', currentSong.value.id)
   }
-}
-
-function cycleMode() {
-  const modes: Array<'sequential' | 'repeat_all' | 'repeat_one' | 'shuffle'> =
-    ['sequential', 'repeat_all', 'repeat_one', 'shuffle']
-  const idx = modes.indexOf(playbackMode.value)
-  setMode(modes[(idx + 1) % modes.length])
 }
 
 // Local state for dragging
@@ -89,32 +82,6 @@ const displayProgress = computed(() => {
     return isNaN(result) ? progress.value : result
   }
   return progress.value
-})
-
-const repeatTooltip = computed(() => {
-  switch (playbackMode.value) {
-    case 'repeat_all':
-      return '列表循环'
-    case 'repeat_one':
-      return '单曲循环'
-    case 'shuffle':
-      return '随机播放'
-    default:
-      return '顺序播放'
-  }
-})
-
-const modeIcons: Record<string, string> = {
-  sequential: 'mdi-arrow-right',
-  repeat_all: 'mdi-repeat',
-  repeat_one: 'mdi-repeat-once',
-  shuffle: 'mdi-shuffle',
-}
-
-const repeatIcon = computed(() => modeIcons[playbackMode.value] ?? 'mdi-arrow-right')
-
-const isRepeatActive = computed(() => {
-  return playbackMode.value === 'repeat_all' || playbackMode.value === 'repeat_one' || playbackMode.value === 'shuffle'
 })
 </script>
 
@@ -166,9 +133,9 @@ const isRepeatActive = computed(() => {
       />
 
       <IconButtonWithTooltip
-        :icon="repeatIcon"
-        :active="isRepeatActive"
-        :tooltip="repeatTooltip"
+        :icon="modeIcon"
+        :active="isModeActive"
+        :tooltip="modeLabel"
         color="secondary"
         @click.stop="cycleMode"
       />
@@ -196,7 +163,6 @@ const isRepeatActive = computed(() => {
         tooltip="播放列表"
         size="x-small"
       />
-      <!-- <v-icon size="14" class="volume-icon">mdi-volume-high</v-icon> -->
       <v-slider
         v-model="volumeModel"
         :max="100"
@@ -260,6 +226,5 @@ const isRepeatActive = computed(() => {
 .progress-slider { flex: 1; }
 
 .player-right { display: flex; align-items: center; gap: 4px; min-width: 180px; justify-content: flex-end; }
-.volume-icon { color: var(--v-text-secondary); opacity: 0.7; }
 .volume-slider { width: 80px; }
 </style>
