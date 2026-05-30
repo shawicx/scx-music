@@ -3,6 +3,11 @@ use rusqlite::params;
 use std::collections::HashMap;
 
 #[tauri::command]
+pub fn get_system_locale() -> String {
+    sys_locale::get_locale().unwrap_or_else(|| "zh-CN".to_string())
+}
+
+#[tauri::command]
 pub fn get_all_settings(db: tauri::State<'_, Db>) -> Result<HashMap<String, String>, String> {
     let conn = db.0.lock().map_err(|e| e.to_string())?;
     let mut stmt = conn

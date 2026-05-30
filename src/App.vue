@@ -9,19 +9,21 @@ import SettingsView from './components/SettingsView.vue'
 import PlayerBar from './components/PlayerBar.vue'
 import NowPlayingOverlay from './components/NowPlayingOverlay.vue'
 import { useToast } from './composables/useToast'
+import { useI18n } from './composables/useI18n'
 
 const settingsStore = useSettingsStore()
 const libraryStore = useLibraryStore()
 const playerStore = usePlayerStore()
 const { toastMessage, toastVisible, toastColor } = useToast()
+const { initLocale } = useI18n()
 
 onMounted(async () => {
+  await initLocale()
   await Promise.all([
     settingsStore.loadThemeFromDb(),
     libraryStore.loadFromDb()
   ])
   await playerStore.setupListeners()
-  // 恢复播放状态（解决刷新后状态丢失的问题）
   await playerStore.getState()
 })
 

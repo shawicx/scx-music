@@ -5,10 +5,13 @@ import { storeToRefs } from 'pinia'
 import { useSettingsStore } from '../stores/settings'
 import { useToast } from '../composables/useToast'
 import { themeMeta } from '../plugins/vuetify'
+import { useI18n } from '../composables/useI18n'
+import type { LocaleSetting } from '../composables/useI18n'
 
 const emit = defineEmits<{ back: [] }>()
 const settingsStore = useSettingsStore()
 const { showToast } = useToast()
+const { t, setLocale, getLocaleSetting } = useI18n()
 
 const { colorName, mode } = storeToRefs(settingsStore)
 const { setColorTheme, setMode } = settingsStore
@@ -16,10 +19,27 @@ const { setColorTheme, setMode } = settingsStore
 const themes = Object.entries(themeMeta) as Array<[string, { label: string; color: string }]>
 
 const themeModes = [
-  { value: 'light' as const, label: '浅色', icon: 'mdi-white-balance-sunny' },
-  { value: 'system' as const, label: '跟随系统', icon: 'mdi-desktop-mac' },
-  { value: 'dark' as const, label: '深色', icon: 'mdi-moon-waning-crescent' },
+  { value: 'light' as const, labelKey: 'settings.light', icon: 'mdi-white-balance-sunny' },
+  { value: 'system' as const, labelKey: 'settings.system', icon: 'mdi-desktop-mac' },
+  { value: 'dark' as const, labelKey: 'settings.dark', icon: 'mdi-moon-waning-crescent' },
 ]
+
+const languageOptions: { value: LocaleSetting; labelKey: string }[] = [
+  { value: 'system', labelKey: 'settings.system' },
+  { value: 'zh-CN', labelKey: 'settings.chinese' },
+  { value: 'en', labelKey: 'settings.english' },
+]
+
+const currentLanguage = ref<LocaleSetting>('system')
+
+onMounted(async () => {
+  currentLanguage.value = await getLocaleSetting()
+})
+
+async function handleSetLocale(value: LocaleSetting) {
+  currentLanguage.value = value
+  await setLocale(value)
+}
 
 interface AudioDeviceInfo {
   name: string
@@ -62,13 +82,31 @@ onMounted(loadDevices)
       <v-btn icon variant="plain" size="small" @click="emit('back')">
         <v-icon icon="mdi-arrow-left" size="20" />
       </v-btn>
-      <h2 class="settings-title">设置</h2>
+      <h2 class="settings-title">{{ t('settings.title') }}</h2>
     </div>
+
+
+    <v-card class="settings-card" variant="flat" color="surface">
+      <div class="card-header">
+        <v-icon icon="mdi-translate" size="18" class="card-icon" />
+        <span class="card-title">{{ t('settings.language') }}</span>
+      </div>
+      <div class="mode-toggle">
+        <button
+          v-for="lang in languageOptions"
+          :key="lang.value"
+          :class="['mode-button', { active: currentLanguage === lang.value }]"
+          @click="handleSetLocale(lang.value)"
+        >
+          <span class="mode-label">{{ t(lang.labelKey) }}</span>
+        </button>
+      </div>
+    </v-card>
 
     <v-card class="settings-card" variant="flat" color="surface">
       <div class="card-header">
         <v-icon icon="mdi-theme-light-dark" size="18" class="card-icon" />
-        <span class="card-title">主题模式</span>
+        <span class="card-title">{{ t('settings.themeMode') }}</span>
       </div>
 
       <div class="mode-toggle">
@@ -79,7 +117,7 @@ onMounted(loadDevices)
           @click="setMode(modeOption.value)"
         >
           <v-icon :icon="modeOption.icon" size="16" />
-          <span class="mode-label">{{ modeOption.label }}</span>
+          <span class="mode-label">{{ t(modeOption.labelKey) }}</span>
         </button>
       </div>
     </v-card>
@@ -87,7 +125,7 @@ onMounted(loadDevices)
     <v-card class="settings-card" variant="flat" color="surface">
       <div class="card-header">
         <v-icon icon="mdi-palette" size="18" class="card-icon" />
-        <span class="card-title">主题颜色</span>
+        <span class="card-title">{{ t('settings.themeColor') }}</span>
       </div>
 
       <div class="theme-grid">
@@ -98,7 +136,7 @@ onMounted(loadDevices)
           @click="setColorTheme(key as any)"
         >
           <span class="theme-swatch" :style="{ background: meta.color }" />
-          <span class="theme-label">{{ meta.label }}</span>
+          <span class="theme-label">{{ t(`settings.${key}`) }}</span>
         </button>
       </div>
     </v-card>
@@ -106,17 +144,17 @@ onMounted(loadDevices)
     <v-card class="settings-card" variant="flat" color="surface">
       <div class="card-header">
         <v-icon icon="mdi-speaker" size="18" class="card-icon" />
-        <span class="card-title">输出设备</span>
+        <span class="card-title">{{ t('settings.outputDevice') }}</span>
       </div>
 
-      <div v-if="devices.length === 0" class="device-empty">未检测到输出设备</div>
+      <div v-if="devices.length === 0" class="device-empty">{{ t('settings.noDevices') }}</div>
       <div v-else class="device-list">
         <button
           :class="['device-option', { active: selectedDevice === null }]"
           @click="selectDevice(null)"
         >
           <v-icon icon="mdi-speaker" size="16" />
-          <span class="device-name">默认设备<span v-if="defaultDeviceName" class="device-sub">（{{ defaultDeviceName }}）</span></span>
+          <span class="device-name">{{ t('settings.defaultDevice') }}<span v-if="defaultDeviceName" class="device-sub">（{{ defaultDeviceName }}）</span></span>
         </button>
         <button
           v-for="device in devices"

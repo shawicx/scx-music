@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { getGradientForString } from '../../constants/gradients'
+import { useI18n } from '../../composables/useI18n'
 
 export interface CardData {
   name: string
@@ -14,6 +15,8 @@ defineProps<{
 const emit = defineEmits<{
   'cardClick': [name: string]
 }>()
+
+const { t } = useI18n()
 </script>
 
 <template>
@@ -32,7 +35,7 @@ const emit = defineEmits<{
         <v-icon :icon="type === 'albums' ? 'mdi-album' : 'mdi-account-music'" size="32" color="white"></v-icon>
       </div>
       <div class="browse-title">{{ card.name }}</div>
-      <div class="browse-sub">{{ card.count }} 首</div>
+      <div class="browse-sub">{{ t('common.songs', { count: card.count }) }}</div>
     </div>
   </div>
 </template>

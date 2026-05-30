@@ -4,12 +4,14 @@ import { storeToRefs } from 'pinia'
 import { useMouse } from '@vueuse/core'
 import { useLibraryStore } from '../stores/library'
 import { useToast } from '../composables/useToast'
+import { useI18n } from '../composables/useI18n'
 
 defineProps<{ activeView: string }>()
 const emit = defineEmits<{ navigate: [view: string] }>()
 
 const libraryStore = useLibraryStore()
 const { showSuccess, showWarning } = useToast()
+const { t } = useI18n()
 
 const {
   playlists,
@@ -94,7 +96,7 @@ async function handleAddPlaylist() {
   newPlaylistName.value = ''
   showAddDialog.value = false
   setActivePlaylist(id)
-  showSuccess(`歌单「${name}」已创建`)
+  showSuccess(t('toast.playlistCreated', { name }))
 }
 
 function startRename() {
@@ -116,7 +118,7 @@ function handleDelete() {
   if (playlistId === 'fav') return
   contextMenu.value.show = false
   deletePlaylist(playlistId)
-  showWarning(`歌单「${playlistName}」已删除`)
+  showWarning(t('toast.playlistDeletedMsg', { name: playlistName }))
 }
 
 async function handleImport() {
@@ -127,9 +129,9 @@ async function handleImport() {
     const count = await importToPlaylist(pid)
     if (count !== undefined) {
       if (count > 0) {
-        showSuccess(`已导入 ${count} 首歌曲`)
+        showSuccess(t('toast.songsImported', { count }))
       } else {
-        showWarning('没有找到可导入的歌曲')
+        showWarning(t('toast.noSongsFound'))
       }
     }
   } finally {
@@ -156,7 +158,7 @@ async function handleImport() {
     <!-- Playlists -->
     <div class="sidebar-section">
       <div class="section-header">
-        <span class="section-title">歌单</span>
+        <span class="section-title">{{ t('sidebar.playlists') }}</span>
         <v-btn icon size="x-small" variant="plain" density="compact" @click="showAddDialog = true">
           <v-icon icon="mdi-plus" size="20"></v-icon>
         </v-btn>
@@ -193,7 +195,7 @@ async function handleImport() {
         :class="['settings-btn', { active: activeView === 'settings' }]"
         @click="emit('navigate', 'settings')"
       >
-        设置
+        {{ t('sidebar.settings') }}
       </v-btn>
     </div>
 
@@ -204,20 +206,20 @@ async function handleImport() {
       :close-on-content-click="false"
     >
       <v-list density="compact" min-width="140">
-        <v-list-item prepend-icon="mdi-folder-open" title="导入文件夹" @click="handleImport" />
-        <v-list-item v-if="contextMenu.playlistId !== 'fav'" prepend-icon="mdi-pencil" title="重命名" @click="startRename" />
-        <v-list-item v-if="contextMenu.playlistId !== 'fav'" prepend-icon="mdi-delete" title="删除" @click="handleDelete" />
+        <v-list-item prepend-icon="mdi-folder-open" :title="t('sidebar.importFolder')" @click="handleImport" />
+        <v-list-item v-if="contextMenu.playlistId !== 'fav'" prepend-icon="mdi-pencil" :title="t('sidebar.rename')" @click="startRename" />
+        <v-list-item v-if="contextMenu.playlistId !== 'fav'" prepend-icon="mdi-delete" :title="t('common.delete')" @click="handleDelete" />
       </v-list>
     </v-menu>
 
     <!-- Add dialog -->
     <v-dialog v-model="showAddDialog" width="400">
       <v-card>
-        <v-card-title>新建歌单</v-card-title>
+        <v-card-title>{{ t('sidebar.newPlaylist') }}</v-card-title>
         <v-card-text>
           <v-text-field
             v-model="newPlaylistName"
-            label="歌单名称"
+            :label="t('sidebar.playlistName')"
             density="compact"
             variant="outlined"
             hide-details
@@ -227,8 +229,8 @@ async function handleImport() {
         </v-card-text>
         <v-card-actions>
           <v-spacer />
-          <v-btn variant="text" @click="showAddDialog = false">取消</v-btn>
-          <v-btn variant="flat" color="primary" @click="handleAddPlaylist">创建</v-btn>
+          <v-btn variant="text" @click="showAddDialog = false">{{ t('common.cancel') }}</v-btn>
+          <v-btn variant="flat" color="primary" @click="handleAddPlaylist">{{ t('common.create') }}</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -236,11 +238,11 @@ async function handleImport() {
     <!-- Rename dialog -->
     <v-dialog v-model="showRenameDialog" width="400">
       <v-card>
-        <v-card-title>重命名歌单</v-card-title>
+        <v-card-title>{{ t('sidebar.renamePlaylist') }}</v-card-title>
         <v-card-text>
           <v-text-field
             v-model="renameValue"
-            label="歌单名称"
+            :label="t('sidebar.playlistName')"
             density="compact"
             variant="outlined"
             hide-details
@@ -250,8 +252,8 @@ async function handleImport() {
         </v-card-text>
         <v-card-actions>
           <v-spacer />
-          <v-btn variant="text" @click="showRenameDialog = false">取消</v-btn>
-          <v-btn variant="flat" color="primary" @click="handleRename">确定</v-btn>
+          <v-btn variant="text" @click="showRenameDialog = false">{{ t('common.cancel') }}</v-btn>
+          <v-btn variant="flat" color="primary" @click="handleRename">{{ t('common.confirm') }}</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>

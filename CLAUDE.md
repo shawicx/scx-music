@@ -54,5 +54,3 @@ This project maintains a `.wiki/` directory as the knowledge base. Two rules app
 
 1. **Before developing a feature**: read the relevant `.wiki/` pages to understand current architecture and design decisions.
 2. **After completing a feature**: update the affected `.wiki/` pages to keep documentation in sync with code.
-
-The wiki index is at `.wiki/Home.md`. Key pages: Architecture.md, Frontend.md, Backend.md, DataModel.md, TechStack.md, Development.md..

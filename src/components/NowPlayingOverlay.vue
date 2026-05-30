@@ -4,10 +4,12 @@ import { storeToRefs } from 'pinia'
 import { usePlayerStore } from '../stores/player'
 import { useLibraryStore } from '../stores/library'
 import { usePlaybackMode } from '../composables/usePlaybackMode'
+import { useI18n } from '../composables/useI18n'
 
 defineEmits<{ close: [] }>()
 
 const playerStore = usePlayerStore()
+const { t } = useI18n()
 const libraryStore = useLibraryStore()
 const { modeIcon, modeLabel, isModeActive, cycleMode } = usePlaybackMode()
 
@@ -62,13 +64,13 @@ const progressModel = computed({
     </div>
     <v-btn variant="text" size="small" class="close-btn" @click="$emit('close')">
       <v-icon icon="mdi-close" size="16"></v-icon>
-      收起
+      {{ t('player.collapse') }}
     </v-btn>
     <div class="album-art">
       <v-icon icon="mdi-music-note" size="56" color="rgba(255,255,255,0.6)"></v-icon>
     </div>
     <div class="song-info">
-      <div class="song-title">{{ currentSong?.title ?? '未在播放' }}</div>
+      <div class="song-title">{{ currentSong?.title ?? t('player.notPlaying') }}</div>
       <div class="song-artist">{{ currentSong ? `${currentSong.artist} · ${currentSong.album}` : '--' }}</div>
     </div>
     <div class="progress-section">

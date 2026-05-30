@@ -5,12 +5,14 @@ import { usePlayerStore } from '../stores/player'
 import { useLibraryStore } from '../stores/library'
 import IconButtonWithTooltip from './IconButtonWithTooltip.vue'
 import { usePlaybackMode } from '../composables/usePlaybackMode'
+import { useI18n } from '../composables/useI18n'
 
 defineEmits<{ expand: [] }>()
 
 const playerStore = usePlayerStore()
 const libraryStore = useLibraryStore()
 const { modeIcon, modeLabel, isModeActive, cycleMode } = usePlaybackMode()
+const { t } = useI18n()
 
 const {
   currentSong,
@@ -92,14 +94,14 @@ const displayProgress = computed(() => {
         <v-icon v-if="!currentSong" icon="mdi-music-note" size="20" color="rgba(255,255,255,0.6)"></v-icon>
       </div>
       <div class="song-meta">
-        <div class="song-name">{{ currentSong?.title ?? '未在播放' }}</div>
+        <div class="song-name">{{ currentSong?.title ?? t('player.notPlaying') }}</div>
         <div class="song-artist">{{ currentSong?.artist ?? '--' }}</div>
       </div>
       <IconButtonWithTooltip
         :icon="isLiked ? 'mdi-heart' : 'mdi-heart-outline'"
         icon-active="mdi-heart"
         :active="isLiked"
-        :tooltip="() => isLiked ? '取消喜欢' : '添加到喜欢'"
+        :tooltip="() => isLiked ? t('player.unlike') : t('player.addToFavorite')"
         :disabled="!currentSong"
         size="x-small"
         class="like-btn"
@@ -110,7 +112,7 @@ const displayProgress = computed(() => {
       <div class="controls">
         <IconButtonWithTooltip
         icon="mdi-skip-previous"
-        tooltip="上一曲"
+        :tooltip="t('player.previous')"
         @click.stop="previous"
       />
 
@@ -118,7 +120,7 @@ const displayProgress = computed(() => {
         :icon="isPlaying ? 'mdi-pause' : 'mdi-play'"
         icon-active="mdi-pause"
         :active="isPlaying"
-        tooltip="播放"
+        :tooltip="t('player.play')"
         color="secondary"
         size="small"
         class="play-btn"
@@ -128,7 +130,7 @@ const displayProgress = computed(() => {
 
       <IconButtonWithTooltip
         icon="mdi-skip-next"
-        tooltip="下一曲"
+        :tooltip="t('player.next')"
         @click.stop="next"
       />
 
@@ -160,7 +162,7 @@ const displayProgress = computed(() => {
     <div class="player-right">
       <IconButtonWithTooltip
         icon="mdi-playlist-music"
-        tooltip="播放列表"
+        :tooltip="t('player.playlist')"
         size="x-small"
       />
       <v-slider

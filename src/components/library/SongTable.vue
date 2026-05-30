@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Song } from '../../types'
+import { useI18n } from '../../composables/useI18n'
 
 defineProps<{
   songs: Song[]
@@ -11,16 +12,18 @@ const emit = defineEmits<{
   'songClick': [index: number]
   'songMenu': [event: MouseEvent, songId: string]
 }>()
+
+const { t } = useI18n()
 </script>
 
 <template>
   <div class="table-scroll">
     <div class="table-header">
       <div class="col col-num">#</div>
-      <div class="col col-title">标题</div>
-      <div class="col col-album">专辑</div>
-      <div class="col col-artist">艺术家</div>
-      <div class="col col-duration">时长</div>
+      <div class="col col-title">{{ t('library.title') }}</div>
+      <div class="col col-album">{{ t('library.album') }}</div>
+      <div class="col col-artist">{{ t('library.artist') }}</div>
+      <div class="col col-duration">{{ t('library.duration') }}</div>
       <div class="col col-actions"></div>
     </div>
     <div class="table-body">

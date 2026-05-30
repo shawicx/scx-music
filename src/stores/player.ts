@@ -4,6 +4,7 @@ import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import type { Song, PlaybackMode, PlaybackState } from '../types'
 import { invokeCommand } from '../utils/errorHandler'
 import { useToast } from '../composables/useToast'
+import i18n from '../i18n'
 
 type PlayerStateReturnType = {
   currentSong: Song | null
@@ -30,6 +31,7 @@ export const usePlayerStore = defineStore('player', () => {
 
   // Toast
   const { showToast, showWarning } = useToast()
+  const t = i18n.global.t
 
   // Listeners management
   const unlisteners: UnlistenFn[] = []
@@ -93,7 +95,7 @@ export const usePlayerStore = defineStore('player', () => {
       }))
       await invokeCommand('player_set_queue', { songs: mapped, index })
     } catch (error) {
-      showToast('播放失败，请重试')
+      showToast(t('toast.playbackFailed'))
       throw error
     }
   }
@@ -106,7 +108,7 @@ export const usePlayerStore = defineStore('player', () => {
         await invokeCommand('player_resume')
       }
     } catch (error) {
-      showToast('播放控制失败')
+      showToast(t('toast.playbackControlFailed'))
       throw error
     }
   }
@@ -115,7 +117,7 @@ export const usePlayerStore = defineStore('player', () => {
     try {
       await invokeCommand('player_seek', { positionSecs })
     } catch (error) {
-      showToast('进度调整失败')
+      showToast(t('toast.seekFailed'))
       throw error
     }
   }
@@ -125,7 +127,7 @@ export const usePlayerStore = defineStore('player', () => {
       volume.value = v
       await invokeCommand('player_set_volume', { volume: v })
     } catch (error) {
-      showToast('音量设置失败')
+      showToast(t('toast.volumeFailed'))
       throw error
     }
   }
@@ -133,13 +135,13 @@ export const usePlayerStore = defineStore('player', () => {
   async function next() {
     if (queue.value.length === 0) return
     if (queueIndex.value >= queue.value.length - 1 && playbackMode.value === 'sequential') {
-      showWarning('已经是最后一首了')
+      showWarning(t('toast.lastSong'))
       return
     }
     try {
       await invokeCommand('player_next')
     } catch (error) {
-      showToast('切换下一首失败')
+      showToast(t('toast.nextSongFailed'))
       throw error
     }
   }
@@ -147,13 +149,13 @@ export const usePlayerStore = defineStore('player', () => {
   async function previous() {
     if (queue.value.length === 0) return
     if (queueIndex.value === 0) {
-      showWarning('已经是第一首了')
+      showWarning(t('toast.firstSong'))
       return
     }
     try {
       await invokeCommand('player_previous')
     } catch (error) {
-      showToast('切换上一首失败')
+      showToast(t('toast.previousSongFailed'))
       throw error
     }
   }
@@ -165,7 +167,7 @@ export const usePlayerStore = defineStore('player', () => {
       await invokeCommand('player_set_mode', { mode })
     } catch (error) {
       playbackMode.value = previousMode
-      showToast('播放模式设置失败')
+      showToast(t('toast.modeFailed'))
       throw error
     }
   }
@@ -174,7 +176,7 @@ export const usePlayerStore = defineStore('player', () => {
     try {
       await invokeCommand('player_stop')
     } catch (error) {
-      showToast('停止播放失败')
+      showToast(t('toast.stopFailed'))
       throw error
     }
   }
