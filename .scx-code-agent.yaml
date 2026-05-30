@@ -1,0 +1,5 @@
+provider:
+  name: deepseek
+  model: deepseek-v4-flash
+  api_key: ${LLM_API_KEY}
+  base_url: https://api.deepseek.com
