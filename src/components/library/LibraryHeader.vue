@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { DisplayMode, SortBy, SortOrder } from '../../types'
+import { useI18n } from '../../composables/useI18n'
 
 const props = defineProps<{
   pageTitle: string
@@ -22,19 +23,22 @@ const emit = defineEmits<{
   'back': []
 }>()
 
+const { t } = useI18n()
+
 const sortOptions = [
-  { value: 'default' as const, label: '默认排序', icon: 'mdi-sort-variant' },
-  { value: 'title' as const, label: '按标题', icon: 'mdi-format-title' },
-  { value: 'artist' as const, label: '按艺术家', icon: 'mdi-account-music' },
-  { value: 'album' as const, label: '按专辑', icon: 'mdi-album' },
-  { value: 'duration' as const, label: '按时长', icon: 'mdi-clock-outline' },
+  { value: 'default' as const, labelKey: 'library.sortDefault', icon: 'mdi-sort-variant' },
+  { value: 'title' as const, labelKey: 'library.sortByTitle', icon: 'mdi-format-title' },
+  { value: 'artist' as const, labelKey: 'library.sortByArtist', icon: 'mdi-account-music' },
+  { value: 'album' as const, labelKey: 'library.sortByAlbum', icon: 'mdi-album' },
+  { value: 'duration' as const, labelKey: 'library.sortByDuration', icon: 'mdi-clock-outline' },
 ]
 
 const sortLabel = computed(() => {
   const option = sortOptions.find(o => o.value === props.sortBy)
-  if (!option) return '排序'
-  if (props.sortBy === 'default') return option.label
-  return `${option.label} ${props.sortOrder === 'asc' ? '↑' : '↓'}`
+  if (!option) return t('library.sort')
+  const label = t(option.labelKey)
+  if (props.sortBy === 'default') return label
+  return `${label} ${props.sortOrder === 'asc' ? '↑' : '↓'}`
 })
 </script>
 
@@ -49,7 +53,7 @@ const sortLabel = computed(() => {
         <span v-if="pageSubtitle" class="page-subtitle">{{ pageSubtitle }}</span>
       </div>
       <v-chip v-if="songCount > 0" size="x-small" variant="flat" color="surface">
-        {{ songCount }} 首
+        {{ t('common.songs', { count: songCount }) }}
       </v-chip>
     </div>
     <div class="top-bar-right">
@@ -57,7 +61,7 @@ const sortLabel = computed(() => {
         :model-value="searchQuery"
         @update:model-value="emit('update:searchQuery', $event)"
         prepend-inner-icon="mdi-magnify"
-        placeholder="搜索歌曲..."
+        :placeholder="t('library.searchSongs')"
         density="compact"
         variant="solo-filled"
         hide-details

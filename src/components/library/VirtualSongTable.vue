@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import type { Song } from '../../types'
 import { useVirtualScroll } from '../../utils/virtualScroll'
+import { useI18n } from '../../composables/useI18n'
 
 const props = defineProps<{
   songs: Song[]
@@ -15,7 +16,9 @@ const emit = defineEmits<{
   'songMenu': [event: MouseEvent, songId: string]
 }>()
 
-const ITEM_HEIGHT = 60 // 每行高度
+const { t } = useI18n()
+
+const ITEM_HEIGHT = 60
 const OVERSCAN = 3 // 预渲染行数
 
 const currentContainerHeight = ref(props.containerHeight || 600)
@@ -58,10 +61,10 @@ defineExpose({
       <!-- Header -->
       <div class="table-header">
         <div class="col col-num">#</div>
-        <div class="col col-title">标题</div>
-        <div class="col col-album">专辑</div>
-        <div class="col col-artist">艺术家</div>
-        <div class="col col-duration">时长</div>
+        <div class="col col-title">{{ t('library.title') }}</div>
+        <div class="col col-album">{{ t('library.album') }}</div>
+        <div class="col col-artist">{{ t('library.artist') }}</div>
+        <div class="col col-duration">{{ t('library.duration') }}</div>
         <div class="col col-actions"></div>
       </div>
 

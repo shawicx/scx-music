@@ -1,5 +1,3 @@
-<div align="center">
-
 # scx-music
 
 **本地音乐播放器桌面应用**

@@ -138,6 +138,8 @@
 
 保留的 composables 用于 UI 交互：
 - **composables/useToast.ts** - Toast 通知封装（全局消息提示）
+- **composables/useI18n.ts** - 国际化封装（语言初始化、切换、持久化）
+- **composables/usePlaybackMode.ts** - 播放模式切换（含 i18n 标签）
 
 ### useToast 功能
 - `showToast()` - 显示通用通知
@@ -150,6 +152,43 @@
 ## IPC 封装位置
 
 所有 IPC 调用集中在 Pinia Stores 中，组件通过 Store 操作数据，不直接调用 `invoke`。错误处理通过 `utils/errorHandler.ts` 统一管理。
+
+## 国际化 (i18n)
+
+### 架构
+- **前端**: vue-i18n (v11)，支持中文 (zh-CN) 和英文 (en)
+- **后端**: sys-locale (v0.3) 检测系统语言，settings 表持久化语言偏好
+
+### 数据流
+```
+App.vue onMounted
+  ↓ useI18n.initLocale()
+  ↓ invoke('get_setting', { key: 'language' })
+  ├─ 值为 'system' 或 null → invoke('get_system_locale') → 检测系统语言
+  ├─ 值为 'zh-CN' 或 'en' → 直接使用
+  └─ 无效值 → 回退到系统语言
+  ↓ locale.value = resolvedLocale
+```
+
+### 文件结构
+- `src/i18n.ts`: vue-i18n 配置（legacy: false, fallback: zh-CN）
+- `src/locales/zh-CN.ts`: 中文翻译（8 个命名空间）
+- `src/locales/en.ts`: 英文翻译（8 个命名空间）
+- `src/composables/useI18n.ts`: i18n 组合式函数
+
+### 命名空间
+- common / sidebar / library / player / settings / playbackMode / toast / empty
+
+### 使用方式
+```typescript
+// 组件中
+import { useI18n } from '@/composables/useI18n'
+const { t, setLocale } = useI18n()
+
+// Store 中（setup 上下文外）
+import i18n from '../i18n'
+const t = i18n.global.t
+```
 
 ## 关键业务逻辑
 

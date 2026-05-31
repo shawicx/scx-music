@@ -4,6 +4,7 @@ import type { Song, Playlist, ViewMode, DisplayMode, SortBy, SortOrder } from '.
 import { getGradientForIndex } from '../constants/gradients'
 import { invokeCommand } from '../utils/errorHandler'
 import { useToast } from '../composables/useToast'
+import i18n from '../i18n'
 
 export const useLibraryStore = defineStore('library', () => {
   // State
@@ -21,6 +22,7 @@ export const useLibraryStore = defineStore('library', () => {
   const ready = ref(false)
 
   const { showSuccess, showError } = useToast()
+  const t = i18n.global.t
 
   // Computed properties
   const currentPlaylistSongs = computed(() => {
@@ -137,7 +139,7 @@ export const useLibraryStore = defineStore('library', () => {
       ready.value = true
     } catch (error) {
       console.error('Failed to load data from database:', error)
-      showError('加载数据失败')
+      showError(t('toast.loadFailed'))
       throw error
     }
   }
@@ -184,10 +186,10 @@ export const useLibraryStore = defineStore('library', () => {
       const pl = await invokeCommand<{ id: string; name: string; sort_order: number }>('create_playlist', { name })
       playlists.value = [...playlists.value, { id: pl.id, name: pl.name }]
       playlistSongs.value = { ...playlistSongs.value, [pl.id]: [] }
-      showSuccess(`歌单「${name}」已创建`)
+      showSuccess(t('toast.playlistCreated', { name }))
       return pl.id
     } catch (error) {
-      showError('创建歌单失败')
+      showError(t('toast.createPlaylistFailed'))
       throw error
     }
   }
@@ -196,9 +198,9 @@ export const useLibraryStore = defineStore('library', () => {
     try {
       await invokeCommand('rename_playlist', { id, name })
       playlists.value = playlists.value.map((p) => (p.id === id ? { ...p, name } : p))
-      showSuccess('歌单重命名成功')
+      showSuccess(t('toast.playlistRenamed'))
     } catch (error) {
-      showError('重命名失败')
+      showError(t('toast.renameFailed'))
       throw error
     }
   }
@@ -216,9 +218,9 @@ export const useLibraryStore = defineStore('library', () => {
           saveSetting('activePlaylistId', activePlaylistId.value)
         }
       }
-      showSuccess('歌单已删除')
+      showSuccess(t('toast.playlistDeleted'))
     } catch (error) {
-      showError('删除歌单失败')
+      showError(t('toast.deletePlaylistFailed'))
       throw error
     }
   }
@@ -229,10 +231,10 @@ export const useLibraryStore = defineStore('library', () => {
       if (!current.includes(songId)) {
         await invokeCommand('add_songs_to_playlist', { playlistId, songIds: [songId] })
         playlistSongs.value = { ...playlistSongs.value, [playlistId]: [...current, songId] }
-        showSuccess('已添加到歌单')
+        showSuccess(t('toast.addedToPlaylist'))
       }
     } catch (error) {
-      showError('添加到歌单失败')
+      showError(t('toast.addToPlaylistFailed'))
       throw error
     }
   }
@@ -245,9 +247,9 @@ export const useLibraryStore = defineStore('library', () => {
         ...playlistSongs.value,
         [playlistId]: current.filter((id) => id !== songId),
       }
-      showSuccess('已从歌单移除')
+      showSuccess(t('toast.removedFromPlaylist'))
     } catch (error) {
-      showError('移除失败')
+      showError(t('toast.removeFailed'))
       throw error
     }
   }
@@ -258,7 +260,7 @@ export const useLibraryStore = defineStore('library', () => {
       const selected = await open({
         directory: true,
         multiple: false,
-        title: '选择音乐文件夹',
+        title: t('sidebar.importFolder'),
       })
       if (!selected) return 0
 
@@ -305,10 +307,10 @@ export const useLibraryStore = defineStore('library', () => {
         }
       }
 
-      showSuccess(`已导入 ${newIds.length} 首歌曲`)
+      showSuccess(t('toast.songsImported', { count: newIds.length }))
       return newIds.length
     } catch (error) {
-      showError('导入失败')
+      showError(t('toast.importFailed'))
       throw error
     }
   }

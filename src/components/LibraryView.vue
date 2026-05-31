@@ -10,9 +10,11 @@ import SongGrid from './library/SongGrid.vue'
 import BrowseCards from './library/BrowseCards.vue'
 import EmptyStates from './library/EmptyStates.vue'
 import SortMenu from './library/SortMenu.vue'
+import { useI18n } from '../composables/useI18n'
 
 const libraryStore = useLibraryStore()
 const playerStore = usePlayerStore()
+const { t } = useI18n()
 
 const {
   songs,
@@ -49,7 +51,7 @@ const {
 } = playerStore
 
 const pageTitle = computed(() => {
-  if (!activePlaylist.value) return '选择歌单'
+  if (!activePlaylist.value) return t('library.selectPlaylist')
   if (drilldown.value) {
     return drilldown.value.type === 'album' ? drilldown.value.value : drilldown.value.value
   }
@@ -199,7 +201,7 @@ const emptyStateType = computed(() => {
       :close-on-content-click="true"
     >
       <v-list density="compact" min-width="160">
-        <v-list-subheader>添加到歌单</v-list-subheader>
+        <v-list-subheader>{{ t('library.addToPlaylist') }}</v-list-subheader>
         <v-list-item
           v-for="pl in playlists"
           :key="pl.id"

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { SortBy } from '../../types'
+import { useI18n } from '../../composables/useI18n'
 
 const props = defineProps<{
   show: boolean
@@ -14,12 +15,14 @@ const emit = defineEmits<{
   'sort': [value: SortBy]
 }>()
 
+const { t } = useI18n()
+
 const sortOptions = [
-  { value: 'default' as const, label: '默认排序', icon: 'mdi-sort-variant' },
-  { value: 'title' as const, label: '按标题', icon: 'mdi-format-title' },
-  { value: 'artist' as const, label: '按艺术家', icon: 'mdi-account-music' },
-  { value: 'album' as const, label: '按专辑', icon: 'mdi-album' },
-  { value: 'duration' as const, label: '按时长', icon: 'mdi-clock-outline' },
+  { value: 'default' as const, labelKey: 'library.sortDefault', icon: 'mdi-sort-variant' },
+  { value: 'title' as const, labelKey: 'library.sortByTitle', icon: 'mdi-format-title' },
+  { value: 'artist' as const, labelKey: 'library.sortByArtist', icon: 'mdi-account-music' },
+  { value: 'album' as const, labelKey: 'library.sortByAlbum', icon: 'mdi-album' },
+  { value: 'duration' as const, labelKey: 'library.sortByDuration', icon: 'mdi-clock-outline' },
 ]
 
 function handleSortBy(value: SortBy) {
@@ -36,12 +39,12 @@ function handleSortBy(value: SortBy) {
     :close-on-content-click="true"
   >
     <v-list density="compact" min-width="160">
-      <v-list-subheader>排序方式</v-list-subheader>
+      <v-list-subheader>{{ t('library.sortBy') }}</v-list-subheader>
       <v-list-item
         v-for="option in sortOptions"
         :key="option.value"
         :prepend-icon="option.icon"
-        :title="option.label"
+        :title="t(option.labelKey)"
         :active="props.sortBy === option.value"
         @click="handleSortBy(option.value)"
       >

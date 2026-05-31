@@ -174,6 +174,7 @@ pub fn run() {
             commands::settings::get_all_settings,
             commands::settings::get_setting,
             commands::settings::set_setting,
+            commands::settings::get_system_locale,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
