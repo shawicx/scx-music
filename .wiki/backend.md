@@ -33,6 +33,7 @@
 - `player_set_mode` - 设置播放模式 (sequential/repeat_all/repeat_one/shuffle)
 - `player_get_output_devices` - 枚举音频输出设备
 - `player_set_output_device` - 切换音频输出设备
+- `analyzer_start` / `analyzer_stop` - 启动/停止音频频谱分析
 
 **commands/songs.rs** - 歌曲数据操作
 - `get_all_songs` - 获取所有歌曲
@@ -65,11 +66,31 @@
 **作用：** 封装 Rodio 音频播放，提供播放控制 API
 
 **核心结构：**
-- `AudioStateInner` - 音频状态（队列、模式、音量、进度）
+- `AudioStateInner` - 音频状态（队列、模式、音量、进度、分析器）
 - `AudioEngine` - Rodio OutputStream 和 Sink 封装
 - `QueuedSong` - 队列中的歌曲数据结构
 
-**被谁调用：** 所有 `player_*` Commands
+**被谁调用：** 所有 `player_*` Commands 和 `analyzer_*` Commands
+
+### analyzer.rs - FFT 频谱分析器
+
+**文件位置：** `src-tauri/src/analyzer.rs`
+
+**作用：** 从音频流中提取频谱数据，通过 Tauri 事件推送到前端
+
+**核心结构：**
+- `AnalyzerHandle` - 分析器句柄（SampleBuffer + 运行状态）
+- `TeeSource<S>` - Source 包装器，在流经时复制 f32 样本到分析器
+
+**工作流程：**
+1. `TeeSource` 在音频播放时，将 f32 样本批量 (1024个) 推入 SampleBuffer
+2. `AnalyzerHandle::start()` 启动后台线程，每 33ms 从 buffer 读取 256 个样本
+3. 应用 Hann 窗函数 → 256 点 FFT → 计算 64 个频率 bin 的幅度
+4. 缩放到 0-255 并通过 `audio:spectrum` 事件推送到前端
+
+**关键参数：**
+- FFT_SIZE = 256, NUM_BINS = 64, 采样率 ~30fps
+- 依赖 `rustfft` crate
 
 **风险点：**
 - 线程安全：使用 `Arc<Mutex<AudioStateInner>>` 保护共享状态

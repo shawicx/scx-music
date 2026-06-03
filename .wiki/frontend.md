@@ -141,6 +141,39 @@
 - **composables/useI18n.ts** - 国际化封装（语言初始化、切换、持久化）
 - **composables/usePlaybackMode.ts** - 播放模式切换（含 i18n 标签）
 
+## 音频可视化
+
+### 文件结构 (src/visualization/)
+
+| 文件 | 作用 |
+|------|------|
+| `useAudioAnalyzer.ts` | Composable: 监听 `audio:spectrum` 事件，提供响应式频率数据 |
+| `useVisualizationRenderer.ts` | Composable: 管理 Canvas、requestAnimationFrame 渲染循环、DPR 适配 |
+| `AudioVisualizer.vue` | 主组件: Canvas + 风格选择器 + 样式持久化 |
+| `index.ts` | 桶导出 |
+| `renderers/types.ts` | Renderer/RendererContext 类型定义 |
+| `renderers/barRenderer.ts` | 频谱柱状图渲染器（含顶部帽效果） |
+| `renderers/circularRenderer.ts` | 环形放射渲染器 |
+| `renderers/waveRenderer.ts` | 流动波形渲染器（3层叠加） |
+| `renderers/particleRenderer.ts` | 粒子系统渲染器（250个粒子） |
+
+### 数据流
+
+```
+Rust TeeSource (音频流复制样本)
+  ↓ push_samples
+AnalyzerHandle (FFT 线程)
+  ↓ emit('audio:spectrum', 64 bins)
+useAudioAnalyzer (前端监听)
+  ↓ ref<Uint8Array>
+useVisualizationRenderer (Canvas rAF)
+  ↓ Renderer(context)
+Canvas 2D 渲染
+```
+
+### VisualizationStyle 类型
+`'bar' | 'circular' | 'wave' | 'particle'` — 通过设置面板切换，持久化到 settings 表
+
 ### useToast 功能
 - `showToast()` - 显示通用通知
 - `showSuccess()` - 显示成功消息

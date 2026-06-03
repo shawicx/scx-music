@@ -35,6 +35,8 @@ const result = await invokeCommand('command_name', { param: value })
 | `get_setting` | stores/settings.ts | commands/settings.rs | 获取单个设置 |
 | `set_setting` | stores/settings.ts, stores/library.ts | commands/settings.rs | 设置单个键值对 |
 | `scan_music_folder` | stores/library.ts | lib.rs | 扫描音乐文件夹 |
+| `analyzer_start` | visualization/useAudioAnalyzer.ts | audio.rs | 启动频谱分析 |
+| `analyzer_stop` | visualization/useAudioAnalyzer.ts | audio.rs | 停止频谱分析 |
 
 ## 前后端调用链
 
@@ -90,6 +92,7 @@ const result = await invokeCommand('command_name', { param: value })
 | `audio:state_change` | `{state, currentSong, queueIndex, mode}` | 播放状态变化 | stores/player.ts |
 | `audio:track_change` | `Song | null` | 当前曲目变化 | stores/player.ts |
 | `audio:error` | `string` | 音频错误发生 | stores/player.ts |
+| `audio:spectrum` | `number[64]` | 每 33ms (播放时) | visualization/useAudioAnalyzer.ts |
 
 ## 错误处理
 

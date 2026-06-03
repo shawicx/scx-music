@@ -5,6 +5,7 @@ import { usePlayerStore } from '../stores/player'
 import { useLibraryStore } from '../stores/library'
 import { usePlaybackMode } from '../composables/usePlaybackMode'
 import { useI18n } from '../composables/useI18n'
+import { AudioVisualizer } from '../visualization'
 
 defineEmits<{ close: [] }>()
 
@@ -56,6 +57,7 @@ const progressModel = computed({
   <div class="overlay">
     <div class="glow glow-primary" />
     <div class="glow glow-secondary" />
+    <AudioVisualizer />
     <div class="mode-status-bar" v-if="isModeActive">
       <div class="status-item">
         <v-icon :icon="modeIcon" size="14" color="secondary"></v-icon>

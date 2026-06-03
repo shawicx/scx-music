@@ -40,6 +40,11 @@ export default {
     collapse: '收起',
     unlike: '取消喜欢',
     addToFavorite: '添加到喜欢',
+    visualizationBar: '频谱柱状图',
+    visualizationCircular: '环形放射',
+    visualizationWave: '流动波形',
+    visualizationParticle: '粒子系统',
+    visualizationStyle: '可视化风格',
   },
   settings: {
     title: '设置',

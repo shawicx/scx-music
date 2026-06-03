@@ -1,3 +1,4 @@
+mod analyzer;
 mod audio;
 mod commands;
 mod db;
@@ -161,6 +162,8 @@ pub fn run() {
             audio::player_get_output_devices,
             audio::player_set_output_device,
             audio::player_get_current_device,
+            audio::analyzer_start,
+            audio::analyzer_stop,
             commands::songs::get_all_songs,
             commands::songs::upsert_songs,
             commands::songs::delete_songs,

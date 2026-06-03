@@ -9,6 +9,7 @@ use rand::Rng;
 use rodio::cpal::traits::HostTrait;
 use rodio::{Decoder, OutputStream, OutputStreamHandle, Sink, Source};
 use serde::{Deserialize, Serialize};
+use crate::analyzer::{AnalyzerHandle, TeeSource};
 use tauri::{AppHandle, Emitter};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -91,6 +92,7 @@ pub struct AudioStateInner {
     segment_started_at: Option<Instant>,
     progress_stop: Arc<AtomicBool>,
     output_device_name: Option<String>,
+    pub analyzer: AnalyzerHandle,
 }
 
 pub type AudioState = Arc<Mutex<AudioStateInner>>;
@@ -109,6 +111,7 @@ impl AudioStateInner {
             segment_started_at: None,
             progress_stop: Arc::new(AtomicBool::new(false)),
             output_device_name: None,
+            analyzer: AnalyzerHandle::new(),
         }
     }
 
@@ -223,7 +226,8 @@ impl AudioStateInner {
             Decoder::new(BufReader::new(file)).map_err(|e| format!("Decode error: {}", e))?;
 
         sink.set_volume(self.volume);
-        sink.append(source);
+        let teed = TeeSource::new(source.convert_samples::<f32>(), self.analyzer.clone());
+        sink.append(teed);
         self.engine.as_mut().ok_or("No audio engine")?.sink = Some(sink);
 
         self.current_song = Some(song);
@@ -284,10 +288,13 @@ impl AudioStateInner {
         let file = File::open(&song.file_path).map_err(|e| format!("File open error: {}", e))?;
         let source = Decoder::new(BufReader::new(file))
             .map_err(|e| format!("Decode error: {}", e))?
-            .skip_duration(Duration::from_secs_f64(position_secs));
+            .skip_duration(Duration::from_secs_f64(position_secs))
+            .convert_samples::<f32>();
+
+        let teed = TeeSource::new(source, self.analyzer.clone());
 
         sink.set_volume(self.volume);
-        sink.append(source);
+        sink.append(teed);
         engine.sink = Some(sink);
 
         // Restore paused state if it was paused before seek
@@ -668,4 +675,21 @@ pub fn player_get_current_device(
 ) -> Result<Option<String>, String> {
     let s = state.lock().map_err(|e| e.to_string())?;
     Ok(s.output_device_name.clone())
+}
+
+#[tauri::command]
+pub fn analyzer_start(
+    app: AppHandle,
+    state: tauri::State<'_, AudioState>,
+) -> Result<(), String> {
+    let s = state.lock().map_err(|e| e.to_string())?;
+    s.analyzer.start(app);
+    Ok(())
+}
+
+#[tauri::command]
+pub fn analyzer_stop(state: tauri::State<'_, AudioState>) -> Result<(), String> {
+    let s = state.lock().map_err(|e| e.to_string())?;
+    s.analyzer.stop();
+    Ok(())
 }
