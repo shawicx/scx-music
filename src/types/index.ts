@@ -19,6 +19,7 @@ export interface Playlist {
 // 播放器相关类型
 export type PlaybackMode = 'sequential' | 'repeat_all' | 'repeat_one' | 'shuffle'
 export type PlaybackState = 'playing' | 'paused' | 'stopped'
+export type VisualizationStyle = 'bar' | 'circular' | 'wave' | 'particle'
 
 // 主题相关类型
 export type ThemeColor =

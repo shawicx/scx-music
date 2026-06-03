@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted } from 'vue'
+import { onKeyStroke } from '@vueuse/core'
 import { useSettingsStore } from './stores/settings'
 import { useLibraryStore } from './stores/library'
 import { usePlayerStore } from './stores/player'
@@ -17,6 +18,43 @@ const playerStore = usePlayerStore()
 const { toastMessage, toastVisible, toastColor } = useToast()
 const { initLocale } = useI18n()
 
+function isEditable(e: Event) {
+  const el = e.target as HTMLElement
+  const tag = el.tagName
+  return tag === 'INPUT' || tag === 'TEXTAREA' || el.isContentEditable
+}
+
+onKeyStroke(' ', (e) => {
+  if (isEditable(e)) return
+  e.preventDefault()
+  playerStore.togglePlayPause()
+})
+
+onKeyStroke('ArrowRight', (e) => {
+  if (isEditable(e)) return
+  playerStore.seekRelative(5)
+})
+
+onKeyStroke('ArrowLeft', (e) => {
+  if (isEditable(e)) return
+  playerStore.seekRelative(-5)
+})
+
+onKeyStroke('ArrowUp', (e) => {
+  if (isEditable(e)) return
+  e.preventDefault()
+  playerStore.adjustVolume(0.05)
+})
+
+onKeyStroke('ArrowDown', (e) => {
+  if (isEditable(e)) return
+  e.preventDefault()
+  playerStore.adjustVolume(-0.05)
+})
+
+onKeyStroke('MediaTrackNext', () => playerStore.next())
+onKeyStroke('MediaTrackPrevious', () => playerStore.previous())
+
 onMounted(async () => {
   await initLocale()
   await Promise.all([
@@ -25,10 +63,6 @@ onMounted(async () => {
   ])
   await playerStore.setupListeners()
   await playerStore.getState()
-})
-
-onUnmounted(() => {
-  playerStore.cleanup()
 })
 
 const activeView = ref('library')

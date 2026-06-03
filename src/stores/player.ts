@@ -101,6 +101,7 @@ export const usePlayerStore = defineStore('player', () => {
   }
 
   async function togglePlayPause() {
+    if (!currentSong.value) return
     try {
       if (isPlaying.value) {
         await invokeCommand('player_pause')
@@ -130,6 +131,15 @@ export const usePlayerStore = defineStore('player', () => {
       showToast(t('toast.volumeFailed'))
       throw error
     }
+  }
+
+  async function seekRelative(deltaSecs: number) {
+    const pos = Math.max(0, Math.min(duration.value, progress.value + deltaSecs))
+    await seek(pos)
+  }
+
+  async function adjustVolume(delta: number) {
+    await setVolume(Math.max(0, Math.min(1, volume.value + delta)))
   }
 
   async function next() {
@@ -236,6 +246,8 @@ export const usePlayerStore = defineStore('player', () => {
     togglePlayPause,
     seek,
     setVolume,
+    seekRelative,
+    adjustVolume,
     next,
     previous,
     setMode,

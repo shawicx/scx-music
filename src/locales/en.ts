@@ -40,6 +40,11 @@ export default {
     collapse: 'Collapse',
     unlike: 'Unlike',
     addToFavorite: 'Add to Favorites',
+    visualizationBar: 'Spectrum Bars',
+    visualizationCircular: 'Circular Radial',
+    visualizationWave: 'Flowing Wave',
+    visualizationParticle: 'Particles',
+    visualizationStyle: 'Visualization Style',
   },
   settings: {
     title: 'Settings',

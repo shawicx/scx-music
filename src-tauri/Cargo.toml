@@ -29,3 +29,4 @@ rand = "0.8"
 rusqlite = { version = "0.31", features = ["bundled"] }
 sys-locale = "0.3"
 thiserror = "1.0"
+rustfft = "6.2"
