@@ -39,8 +39,18 @@ INSERT OR IGNORE INTO playlists (id, name, sort_order) VALUES
     ('fav', '我喜欢的', 0);
 ";
 
+const V2_SCHEMA: &str = "
+CREATE INDEX IF NOT EXISTS idx_songs_title ON songs(title);
+CREATE INDEX IF NOT EXISTS idx_songs_created_at ON songs(created_at);
+CREATE INDEX IF NOT EXISTS idx_playlist_songs_playlist_position ON playlist_songs(playlist_id, sort_order);
+";
+
 pub fn run_migrations(conn: &rusqlite::Connection) -> Result<(), Box<dyn std::error::Error>> {
     conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;")?;
     conn.execute_batch(V1_SCHEMA)?;
+
+    // V2: Performance indexes
+    conn.execute_batch(V2_SCHEMA)?;
+
     Ok(())
 }

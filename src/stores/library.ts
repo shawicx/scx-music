@@ -4,6 +4,8 @@ import type { Song, Playlist, ViewMode, DisplayMode, SortBy, SortOrder } from '.
 import { getGradientForIndex } from '../constants/gradients'
 import { invokeCommand } from '../utils/errorHandler'
 import { useToast } from '../composables/useToast'
+import { useDebounceSearch } from '../composables/useDebounceSearch'
+import { useOptimizedSort } from '../composables/useOptimizedSort'
 import i18n from '../i18n'
 
 export const useLibraryStore = defineStore('library', () => {
@@ -11,14 +13,13 @@ export const useLibraryStore = defineStore('library', () => {
   const songs = ref<Song[]>([])
   const currentSongId = ref<string | null>(null)
   const searchQuery = ref('')
+  const { debouncedQuery } = useDebounceSearch(searchQuery)
   const viewMode = ref<ViewMode>('list')
   const playlists = ref<Playlist[]>([])
   const playlistSongs = ref<Record<string, string[]>>({})
   const activePlaylistId = ref<string | null>(null)
   const displayMode = ref<DisplayMode>('songs')
   const drilldown = ref<{ type: 'album' | 'artist'; value: string } | null>(null)
-  const sortBy = ref<SortBy>('default')
-  const sortOrder = ref<SortOrder>('asc')
   const ready = ref(false)
 
   const { showSuccess, showError } = useToast()
@@ -36,7 +37,7 @@ export const useLibraryStore = defineStore('library', () => {
 
   const searchedSongs = computed(() => {
     let result = currentPlaylistSongs.value
-    const q = searchQuery.value.toLowerCase()
+    const q = debouncedQuery.value.toLowerCase()
     if (q) {
       result = result.filter(
         (s) =>
@@ -48,7 +49,7 @@ export const useLibraryStore = defineStore('library', () => {
     return result
   })
 
-  const displayedSongs = computed(() => {
+  const drilldownFilter = computed(() => {
     let result = searchedSongs.value
     const d = drilldown.value
     if (d) {
@@ -58,32 +59,12 @@ export const useLibraryStore = defineStore('library', () => {
         result = result.filter((s) => s.artist === d.value)
       }
     }
-
-    // Apply sorting
-    if (sortBy.value !== 'default') {
-      result = [...result].sort((a, b) => {
-        let comparison = 0
-        switch (sortBy.value) {
-          case 'title':
-            comparison = a.title.localeCompare(b.title, 'zh-CN')
-            break
-          case 'artist':
-            comparison = a.artist.localeCompare(b.artist, 'zh-CN')
-            break
-          case 'album':
-            comparison = a.album.localeCompare(b.album, 'zh-CN')
-            break
-          case 'duration':
-            comparison = a.durationSecs - b.durationSecs
-            break
-        }
-        return sortOrder.value === 'asc' ? comparison : -comparison
-      })
-    }
-
     return result
   })
 
+  const { sortBy, sortOrder, sorted: displayedSongs } = useOptimizedSort(drilldownFilter)
+
+  
   const filteredAlbums = computed(() => {
     const source = searchedSongs.value
     const map = new Map<string, number>()
@@ -113,28 +94,21 @@ export const useLibraryStore = defineStore('library', () => {
   // Actions
   async function loadFromDb() {
     try {
-      const [dbSongs, dbPlaylists, settings] = await Promise.all([
-        invokeCommand<Song[]>('get_all_songs'),
-        invokeCommand<{ id: string; name: string; sort_order: number }[]>('get_playlists'),
-        invokeCommand<Record<string, string>>('get_all_settings'),
-      ])
+      const data = await invokeCommand<{
+        songs: Song[]
+        playlists: { id: string; name: string; sort_order: number }[]
+        playlistSongs: Record<string, string[]>
+        settings: Record<string, string>
+      }>('get_bootstrap_data')
 
-      songs.value = dbSongs
-      playlists.value = dbPlaylists.map((p) => ({ id: p.id, name: p.name }))
+      songs.value = data.songs
+      playlists.value = data.playlists.map((p) => ({ id: p.id, name: p.name }))
+      playlistSongs.value = data.playlistSongs
 
-      // Load playlist-song mappings
-      const psMap: Record<string, string[]> = {}
-      for (const p of dbPlaylists) {
-        const pSongs = await invokeCommand<Song[]>('get_playlist_songs', { playlistId: p.id })
-        psMap[p.id] = pSongs.map((s) => s.id)
-      }
-      playlistSongs.value = psMap
-
-      // Restore settings
-      currentSongId.value = settings['currentSongId'] ?? null
-      viewMode.value = (settings['viewMode'] as ViewMode) ?? 'list'
-      activePlaylistId.value = settings['activePlaylistId'] ?? null
-      displayMode.value = (settings['displayMode'] as DisplayMode) ?? 'songs'
+      currentSongId.value = data.settings['currentSongId'] ?? null
+      viewMode.value = (data.settings['viewMode'] as ViewMode) ?? 'list'
+      activePlaylistId.value = data.settings['activePlaylistId'] ?? null
+      displayMode.value = (data.settings['displayMode'] as DisplayMode) ?? 'songs'
 
       ready.value = true
     } catch (error) {

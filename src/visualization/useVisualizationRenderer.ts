@@ -1,4 +1,4 @@
-import { onUnmounted, type Ref } from 'vue'
+import { onMounted, onUnmounted, type Ref } from 'vue'
 import { useTheme } from 'vuetify'
 import type { VisualizationStyle } from '../types'
 import type { Renderer } from './renderers/types'
@@ -74,7 +74,20 @@ export function useVisualizationRenderer(
     }
   }
 
+  function handleVisibility() {
+    if (document.hidden) {
+      stop()
+    } else {
+      start()
+    }
+  }
+
+  onMounted(() => {
+    document.addEventListener('visibilitychange', handleVisibility)
+  })
+
   onUnmounted(() => {
+    document.removeEventListener('visibilitychange', handleVisibility)
     stop()
   })
 

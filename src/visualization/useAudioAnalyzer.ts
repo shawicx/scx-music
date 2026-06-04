@@ -13,7 +13,12 @@ export function useAudioAnalyzer() {
     if (isActive.value) return
 
     unlisten = await listen<number[]>('audio:spectrum', (e) => {
-      frequencyData.value = new Uint8Array(e.payload)
+      const buf = frequencyData.value
+      const payload = e.payload
+      for (let i = 0; i < Math.min(payload.length, NUM_BINS); i++) {
+        buf[i] = payload[i]
+      }
+      frequencyData.value = buf
     })
 
     await invoke('analyzer_start')

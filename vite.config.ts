@@ -1,12 +1,32 @@
 import { defineConfig } from "vite";
 import vue from "@vitejs/plugin-vue";
+import path from "path";
 
-// @ts-expect-error process is a nodejs global
 const host = process.env.TAURI_DEV_HOST;
 
 // https://vite.dev/config/
 export default defineConfig(async () => ({
   plugins: [vue()],
+
+  resolve: {
+    alias: {
+      "@": path.resolve(__dirname, "src"),
+    },
+  },
+
+  build: {
+    // Tauri webview supports modern JS — no need to transpile
+    target: "esnext",
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vue: ["vue", "pinia"],
+          vuetify: ["vuetify"],
+          vueuse: ["@vueuse/core"],
+        },
+      },
+    },
+  },
 
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //

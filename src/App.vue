@@ -1,14 +1,14 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, defineAsyncComponent } from 'vue'
 import { onKeyStroke } from '@vueuse/core'
 import { useSettingsStore } from './stores/settings'
 import { useLibraryStore } from './stores/library'
 import { usePlayerStore } from './stores/player'
 import AppSidebar from './components/AppSidebar.vue'
-import LibraryView from './components/LibraryView.vue'
-import SettingsView from './components/SettingsView.vue'
-import PlayerBar from './components/PlayerBar.vue'
-import NowPlayingOverlay from './components/NowPlayingOverlay.vue'
+const LibraryView = defineAsyncComponent(() => import('./components/LibraryView.vue'))
+const SettingsView = defineAsyncComponent(() => import('./components/SettingsView.vue'))
+const PlayerBar = defineAsyncComponent(() => import('./components/PlayerBar.vue'))
+const NowPlayingOverlay = defineAsyncComponent(() => import('./components/NowPlayingOverlay.vue'))
 import { useToast } from './composables/useToast'
 import { useI18n } from './composables/useI18n'
 
@@ -56,13 +56,17 @@ onKeyStroke('MediaTrackNext', () => playerStore.next())
 onKeyStroke('MediaTrackPrevious', () => playerStore.previous())
 
 onMounted(async () => {
+  const t0 = performance.now()
   await initLocale()
+
+  // Run all init tasks concurrently — bootstrap command fetches everything in one IPC
   await Promise.all([
     settingsStore.loadThemeFromDb(),
-    libraryStore.loadFromDb()
+    libraryStore.loadFromDb(),
+    playerStore.setupListeners().then(() => playerStore.getState()),
   ])
-  await playerStore.setupListeners()
-  await playerStore.getState()
+
+  console.log(`[perf] App initialized in ${(performance.now() - t0).toFixed(0)}ms`)
 })
 
 const activeView = ref('library')
