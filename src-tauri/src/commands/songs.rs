@@ -29,19 +29,34 @@ pub fn get_all_songs(db: tauri::State<'_, Db>) -> Result<Vec<Song>, String> {
 }
 
 #[tauri::command]
-pub fn upsert_songs(db: tauri::State<'_, Db>, songs: Vec<Song>) -> Result<(), String> {
+pub fn upsert_songs(db: tauri::State<'_, Db>, songs: Vec<Song>) -> Result<Vec<String>, String> {
     let conn = db.0.lock().map_err(|e| e.to_string())?;
     let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
     for s in &songs {
         tx.execute(
-            "INSERT OR IGNORE INTO songs (id, title, artist, album, duration, duration_secs, quality, file_path, art_gradient)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+            "INSERT INTO songs (id, title, artist, album, duration, duration_secs, quality, file_path, art_gradient)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+             ON CONFLICT(file_path) DO UPDATE SET
+               title = excluded.title,
+               artist = excluded.artist,
+               album = excluded.album,
+               duration = excluded.duration,
+               duration_secs = excluded.duration_secs,
+               quality = excluded.quality,
+               art_gradient = excluded.art_gradient",
             params![s.id, s.title, s.artist, s.album, s.duration, s.duration_secs, s.quality, s.file_path, s.art_gradient],
         )
         .map_err(|e| e.to_string())?;
     }
+    let mut ids = Vec::with_capacity(songs.len());
+    for s in &songs {
+        let id: String = tx
+            .query_row("SELECT id FROM songs WHERE file_path = ?1", params![s.file_path], |row| row.get(0))
+            .map_err(|e| e.to_string())?;
+        ids.push(id);
+    }
     tx.commit().map_err(|e| e.to_string())?;
-    Ok(())
+    Ok(ids)
 }
 
 #[tauri::command]

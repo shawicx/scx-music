@@ -3,6 +3,8 @@ mod audio;
 mod commands;
 mod db;
 
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
 use std::sync::{Arc, Mutex};
 
 use audio::AudioStateInner;
@@ -81,8 +83,14 @@ fn scan_dir(dir: &Path, exts: &[&str], files: &mut Vec<SongEntry>) -> Result<(),
         let total_secs = secs as u64;
         let duration = format!("{}:{:02}", total_secs / 60, total_secs % 60);
 
+        let id = {
+            let mut hasher = DefaultHasher::new();
+            file_path.hash(&mut hasher);
+            format!("{:x}", hasher.finish())
+        };
+
         files.push(SongEntry {
-            id: format!("{}", files.len()),
+            id,
             title: title.unwrap_or(file_stem),
             artist: artist.unwrap_or_else(|| "Unknown Artist".to_string()),
             album: album.unwrap_or_else(|| "Unknown Album".to_string()),
@@ -173,6 +181,7 @@ pub fn run() {
             commands::playlists::delete_playlist,
             commands::playlists::get_playlist_songs,
             commands::playlists::add_songs_to_playlist,
+            commands::playlists::clear_playlist,
             commands::playlists::remove_song_from_playlist,
             commands::settings::get_all_settings,
             commands::settings::get_setting,

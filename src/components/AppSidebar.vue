@@ -22,6 +22,7 @@ const {
   addPlaylist,
   renamePlaylist,
   deletePlaylist,
+  clearPlaylist,
   importToPlaylist,
   setActivePlaylist,
 } = libraryStore
@@ -111,6 +112,12 @@ function handleRename() {
   if (!name) return
   renamePlaylist(renamingPlaylistId.value, name)
   showRenameDialog.value = false
+}
+
+function handleClearPlaylist() {
+  const pid = contextMenu.value.playlistId
+  contextMenu.value.show = false
+  clearPlaylist(pid)
 }
 
 function handleDelete() {
@@ -207,6 +214,7 @@ async function handleImport() {
     >
       <v-list density="compact" min-width="140">
         <v-list-item prepend-icon="mdi-folder-open" :title="t('sidebar.importFolder')" @click="handleImport" />
+        <v-list-item prepend-icon="mdi-playlist-remove" :title="t('sidebar.clearPlaylist')" @click="handleClearPlaylist" />
         <v-list-item v-if="contextMenu.playlistId !== 'fav'" prepend-icon="mdi-pencil" :title="t('sidebar.rename')" @click="startRename" />
         <v-list-item v-if="contextMenu.playlistId !== 'fav'" prepend-icon="mdi-delete" :title="t('common.delete')" @click="handleDelete" />
       </v-list>

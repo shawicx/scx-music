@@ -117,6 +117,14 @@ pub fn add_songs_to_playlist(
 }
 
 #[tauri::command]
+pub fn clear_playlist(db: tauri::State<'_, Db>, playlist_id: String) -> Result<(), String> {
+    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    conn.execute("DELETE FROM playlist_songs WHERE playlist_id = ?1", params![playlist_id])
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
 pub fn remove_song_from_playlist(
     db: tauri::State<'_, Db>,
     playlist_id: String,

@@ -213,6 +213,17 @@ export const useLibraryStore = defineStore('library', () => {
     }
   }
 
+  async function clearPlaylist(playlistId: string) {
+    try {
+      await invokeCommand('clear_playlist', { playlistId })
+      playlistSongs.value = { ...playlistSongs.value, [playlistId]: [] }
+      showSuccess(t('toast.playlistCleared'))
+    } catch (error) {
+      showError(t('toast.clearPlaylistFailed'))
+      throw error
+    }
+  }
+
   async function removeSongFromPlaylist(playlistId: string, songId: string) {
     try {
       await invokeCommand('remove_song_from_playlist', { playlistId, songId })
@@ -261,28 +272,30 @@ export const useLibraryStore = defineStore('library', () => {
         artGradient: getGradientForIndex(songs.value.length + i),
       }))
 
-      // Upsert to SQLite
+      // Upsert to SQLite, get actual DB IDs (may differ for existing paths)
+      const dbIds: string[] = await invokeCommand('upsert_songs', { songs: newSongs })
+      const upsertedSongs = newSongs.map((s, i) => ({ ...s, id: dbIds[i] }))
+
+      // Add new songs to local state
       const existingIds = new Set(songs.value.map((s) => s.id))
-      const uniqueNew = newSongs.filter((s) => !existingIds.has(s.id))
-      if (uniqueNew.length > 0) {
-        await invokeCommand('upsert_songs', { songs: uniqueNew })
-        songs.value = [...songs.value, ...uniqueNew]
+      const addedToState = upsertedSongs.filter((s) => !existingIds.has(s.id))
+      if (addedToState.length > 0) {
+        songs.value = [...songs.value, ...addedToState]
       }
 
-      // Add to playlist in SQLite
-      const currentIds = playlistSongs.value[playlistId] ?? []
-      const currentSet = new Set(currentIds)
-      const newIds = newSongs.filter((s) => !currentSet.has(s.id)).map((s) => s.id)
-      if (newIds.length > 0) {
-        await invokeCommand('add_songs_to_playlist', { playlistId, songIds: newIds })
-        playlistSongs.value = {
-          ...playlistSongs.value,
-          [playlistId]: [...currentIds, ...newIds],
-        }
+      // Clear existing songs then add new ones
+      await invokeCommand('clear_playlist', { playlistId })
+      const actualIds = upsertedSongs.map((s) => s.id)
+      if (actualIds.length > 0) {
+        await invokeCommand('add_songs_to_playlist', { playlistId, songIds: actualIds })
+      }
+      playlistSongs.value = {
+        ...playlistSongs.value,
+        [playlistId]: actualIds,
       }
 
-      showSuccess(t('toast.songsImported', { count: newIds.length }))
-      return newIds.length
+      showSuccess(t('toast.songsImported', { count: actualIds.length }))
+      return actualIds.length
     } catch (error) {
       showError(t('toast.importFailed'))
       throw error
@@ -332,6 +345,7 @@ export const useLibraryStore = defineStore('library', () => {
     deletePlaylist,
     addSongToPlaylist,
     removeSongFromPlaylist,
+    clearPlaylist,
     importToPlaylist,
     playSong,
   }

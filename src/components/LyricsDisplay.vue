@@ -92,8 +92,8 @@ function onClickLine(line: LrcLine) {
 
 .lyric-line.active {
   color: rgb(var(--v-theme-on-background));
-  font-size: 16px;
-  font-weight: 500;
+  font-size: 19px;
+  font-weight: 600;
 }
 
 .lyric-spacer {
