@@ -1,8 +1,20 @@
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import type { Song, PlaybackMode, PlaybackState } from '../types'
 import { invokeCommand } from '../utils/errorHandler'
 import { useToast } from './useToast'
+import i18n from '../i18n'
+
+type PlayerStateReturnType = {
+  currentSong: Song | null
+  state: PlaybackState
+  volume: number
+  mode: PlaybackMode
+  progress: number
+  duration: number
+  queueLength: number
+  queueIndex: number
+}
 
 const currentSong = ref<Song | null>(null)
 const isPlaying = ref(false)
@@ -12,17 +24,16 @@ const volume = ref(1.0)
 const playbackMode = ref<PlaybackMode>('sequential')
 const queue = ref<Song[]>([])
 const queueIndex = ref(0)
+const listenersSetup = ref(false)
 
-// 使用新的 Toast 系统
 const { showToast, showWarning } = useToast()
+const t = i18n.global.t
 
-let listenersSetup = false
+const unlisteners: UnlistenFn[] = []
 
 async function setupListeners() {
-  if (listenersSetup) return
-  listenersSetup = true
-
-  const unlisteners: UnlistenFn[] = []
+  if (listenersSetup.value) return
+  listenersSetup.value = true
 
   unlisteners.push(
     await listen<{ current: number; duration: number }>('audio:progress', (e) => {
@@ -69,12 +80,10 @@ function formatTime(secs: number): string {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
 }
 
-const progressFormatted = () => formatTime(progress.value)
-const durationFormatted = () => formatTime(duration.value)
+const progressFormatted = computed(() => formatTime(progress.value))
+const durationFormatted = computed(() => formatTime(duration.value))
 
 export function usePlayer() {
-  setupListeners()
-
   async function playFromQueue(songs: Song[], index: number) {
     try {
       queue.value = songs
@@ -90,12 +99,13 @@ export function usePlayer() {
       }))
       await invokeCommand('player_set_queue', { songs: mapped, index })
     } catch (error) {
-      showToast('播放失败，请重试')
+      showToast(t('toast.playbackFailed'))
       throw error
     }
   }
 
   async function togglePlayPause() {
+    if (!currentSong.value) return
     try {
       if (isPlaying.value) {
         await invokeCommand('player_pause')
@@ -103,7 +113,7 @@ export function usePlayer() {
         await invokeCommand('player_resume')
       }
     } catch (error) {
-      showToast('播放控制失败')
+      showToast(t('toast.playbackControlFailed'))
       throw error
     }
   }
@@ -112,7 +122,7 @@ export function usePlayer() {
     try {
       await invokeCommand('player_seek', { positionSecs })
     } catch (error) {
-      showToast('进度调整失败')
+      showToast(t('toast.seekFailed'))
       throw error
     }
   }
@@ -122,21 +132,30 @@ export function usePlayer() {
       volume.value = v
       await invokeCommand('player_set_volume', { volume: v })
     } catch (error) {
-      showToast('音量设置失败')
+      showToast(t('toast.volumeFailed'))
       throw error
     }
+  }
+
+  async function seekRelative(deltaSecs: number) {
+    const pos = Math.max(0, Math.min(duration.value, progress.value + deltaSecs))
+    await seek(pos)
+  }
+
+  async function adjustVolume(delta: number) {
+    await setVolume(Math.max(0, Math.min(1, volume.value + delta)))
   }
 
   async function next() {
     if (queue.value.length === 0) return
     if (queueIndex.value >= queue.value.length - 1 && playbackMode.value === 'sequential') {
-      showWarning('已经是最后一首了')
+      showWarning(t('toast.lastSong'))
       return
     }
     try {
       await invokeCommand('player_next')
     } catch (error) {
-      showToast('切换下一首失败')
+      showToast(t('toast.nextSongFailed'))
       throw error
     }
   }
@@ -144,23 +163,25 @@ export function usePlayer() {
   async function previous() {
     if (queue.value.length === 0) return
     if (queueIndex.value === 0) {
-      showWarning('已经是第一首了')
+      showWarning(t('toast.firstSong'))
       return
     }
     try {
       await invokeCommand('player_previous')
     } catch (error) {
-      showToast('切换上一首失败')
+      showToast(t('toast.previousSongFailed'))
       throw error
     }
   }
 
   async function setMode(mode: PlaybackMode) {
+    const previousMode = playbackMode.value
     try {
       playbackMode.value = mode
       await invokeCommand('player_set_mode', { mode })
     } catch (error) {
-      showToast('播放模式设置失败')
+      playbackMode.value = previousMode
+      showToast(t('toast.modeFailed'))
       throw error
     }
   }
@@ -169,9 +190,32 @@ export function usePlayer() {
     try {
       await invokeCommand('player_stop')
     } catch (error) {
-      showToast('停止播放失败')
+      showToast(t('toast.stopFailed'))
       throw error
     }
+  }
+
+  async function getState() {
+    try {
+      const state = await invokeCommand<PlayerStateReturnType>('player_get_state')
+      if (state.currentSong) {
+        currentSong.value = state.currentSong
+      }
+      isPlaying.value = state.state === 'playing'
+      progress.value = state.progress
+      duration.value = state.duration
+      queueIndex.value = state.queueIndex
+      playbackMode.value = state.mode
+      volume.value = state.volume
+    } catch (error) {
+      console.log('获取播放状态失败（可能还未开始播放）:', error)
+    }
+  }
+
+  function cleanup() {
+    unlisteners.forEach((unlisten) => unlisten())
+    unlisteners.length = 0
+    listenersSetup.value = false
   }
 
   return {
@@ -183,15 +227,23 @@ export function usePlayer() {
     playbackMode,
     queue,
     queueIndex,
+    listenersSetup,
+
+    setupListeners,
     playFromQueue,
     togglePlayPause,
     seek,
     setVolume,
+    seekRelative,
+    adjustVolume,
     next,
     previous,
     setMode,
     stop,
+    getState,
     formatTime,
+    cleanup,
+
     progressFormatted,
     durationFormatted,
   }
