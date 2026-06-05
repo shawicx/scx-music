@@ -23,6 +23,7 @@ export default {
     searchSongs: '搜索歌曲...',
     selectPlaylist: '选择歌单',
     addToPlaylist: '添加到歌单',
+    removeFromPlaylist: '从歌单移除',
     sort: '排序',
     sortBy: '排序方式',
     sortDefault: '默认排序',

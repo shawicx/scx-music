@@ -39,6 +39,7 @@ const {
   setSortOrder,
   toggleSortOrder,
   addSongToPlaylist,
+  removeSongFromPlaylist,
 } = libraryStore
 
 const {
@@ -100,6 +101,14 @@ function openSongMenu(e: MouseEvent, songId: string) {
 
 function handleAddToPlaylist(playlistId: string) {
   addSongToPlaylist(playlistId, songMenu.value.songId)
+  songMenu.value.show = false
+}
+
+function handleRemoveFromPlaylist() {
+  const pid = activePlaylistId.value
+  if (pid) {
+    removeSongFromPlaylist(pid, songMenu.value.songId)
+  }
   songMenu.value.show = false
 }
 
@@ -194,7 +203,7 @@ const emptyStateType = computed(() => {
       @song-menu="openSongMenu"
     />
 
-    <!-- Song context menu (add to playlist) -->
+    <!-- Song context menu (add to playlist / remove) -->
     <v-menu
       v-model="songMenu.show"
       :target="[songMenu.x, songMenu.y]"
@@ -207,6 +216,12 @@ const emptyStateType = computed(() => {
           :key="pl.id"
           :title="pl.name"
           @click="handleAddToPlaylist(pl.id)"
+        />
+        <v-divider v-if="activePlaylistId" />
+        <v-list-item
+          v-if="activePlaylistId"
+          :title="t('library.removeFromPlaylist')"
+          @click="handleRemoveFromPlaylist"
         />
       </v-list>
     </v-menu>

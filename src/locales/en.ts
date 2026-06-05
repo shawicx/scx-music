@@ -23,6 +23,7 @@ export default {
     searchSongs: 'Search songs...',
     selectPlaylist: 'Select a playlist',
     addToPlaylist: 'Add to Playlist',
+    removeFromPlaylist: 'Remove from Playlist',
     sort: 'Sort',
     sortBy: 'Sort by',
     sortDefault: 'Default',
