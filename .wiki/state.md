@@ -28,8 +28,8 @@ listen('audio:state_change', (e) => {
 ```
 
 **数据库同步：**
-- 应用启动时从数据库加载 (`loadFromDb()`)
-- 状态变化时保存到数据库 (`set_setting()`)
+- 应用启动时通过 `get_bootstrap_data` 一次性加载
+- 设置变化时保存到数据库 (`set_setting()`)
 
 ### 后端状态 (Rust)
 
@@ -43,6 +43,7 @@ listen('audio:state_change', (e) => {
 - playlists 表
 - playlist_songs 表
 - settings 表
+- lyrics 表 (V3 新增)
 
 ## 关键状态
 
@@ -52,6 +53,7 @@ listen('audio:state_change', (e) => {
 **更新方式：**
 - 用户操作 -> IPC Command -> Rust 状态变更 -> Event -> Store 状态
 - 进度线程直接推送 progress 事件
+- `getState()` 从后端恢复播放状态
 
 **关键状态：**
 - `currentSong` - 当前歌曲 (来自 track_change 事件)
@@ -64,20 +66,24 @@ listen('audio:state_change', (e) => {
 
 ### 音乐库状态 (stores/library.ts - useLibraryStore)
 
-**来源：** SQLite 数据库
+**来源：** SQLite 数据库 (通过 get_bootstrap_data 单次加载)
 **更新方式：**
-- 启动时从数据库加载
+- 启动时从 `get_bootstrap_data` 一次性加载全部数据
 - 用户操作后同步到数据库
 
 **关键状态：**
-- `songs` - 所有歌曲 (来自数据库)
-- `playlists` - 播放列表 (来自数据库)
-- `playlistSongs` - 播放列表歌曲映射 (来自数据库)
+- `songs` - 所有歌曲 (来自 bootstrap)
+- `playlists` - 播放列表 (来自 bootstrap)
+- `playlistSongs` - 播放列表歌曲映射 (来自 bootstrap)
 - `activePlaylistId` - 当前播放列表 (来自 settings)
-- `searchQuery` - 搜索关键词 (用户输入)
+- `searchQuery` - 搜索关键词 (用户输入, 防抖)
 - `displayMode` - 显示模式 (用户选择)
-- `sortBy` / `sortOrder` - 排序方式 (用户选择)
 - `drilldown` - 专辑/艺术家筛选 (用户选择)
+- `sortBy` / `sortOrder` - 排序方式 (useOptimizedSort)
+- `ready` - 数据加载完成标志
+
+**计算属性链：**
+`currentPlaylistSongs` → `searchedSongs` → `drilldownFilter` → `displayedSongs`
 
 ### 设置状态 (stores/settings.ts - useSettingsStore)
 
@@ -91,13 +97,25 @@ listen('audio:state_change', (e) => {
 - `mode` - 主题模式 (light/dark/system)
 - `isDark` - 当前是否深色模式 (计算属性)
 
+### 歌词状态 (composables/useLyrics.ts)
+
+**来源：** SQLite 缓存 + Lofty + LRCLIB API
+**更新方式：**
+- 歌曲切换时触发加载
+- 进度事件驱动同步
+
+**关键状态：**
+- `lines` - 解析后的歌词行数组
+- `currentLineIndex` - 当前行索引
+- `isLoading` - 加载状态
+
 ## 状态持久化策略
 
 **前端状态：** Pinia Store (Vue reactive refs)
-**后端持久化：** SQLite 数据库
+**后端持久化：** SQLite 数据库 (WAL 模式)
 **同步时机：**
-- 应用启动：从数据库加载到 Store
-- 状态变化：立即保存到数据库 (settings)
+- 应用启动：`get_bootstrap_data` 一次 IPC 加载全部数据
+- 设置变化：立即保存到数据库
 - 批量操作：事务提交
 
 ## 最关键状态
@@ -108,9 +126,13 @@ listen('audio:state_change', (e) => {
 4. **歌曲库** - songs (核心数据)
 5. **播放列表** - playlists + playlistSongs
 6. **主题设置** - colorName + mode
+7. **歌词** - lines + currentLineIndex
 
 ## 性能优化
 
+- **Bootstrap 启动：** 单次 IPC 获取全部数据，替代多次单独调用
+- **防抖搜索：** useDebounceSearch 300ms 防抖
+- **排序缓存：** useOptimizedSort 避免重复排序
 - **虚拟滚动：** VirtualSongTable.vue 仅渲染可见 DOM 节点
 - **计算属性缓存：** Pinia computed properties 避免重复计算
 - **事件监听管理：** Store 生命周期管理监听器

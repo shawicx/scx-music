@@ -6,7 +6,7 @@
 
 **统一错误类型：** `AppError` 枚举
 - `FileOperation` - 文件操作错误
-- `Database` - 数据库错误  
+- `Database` - 数据库错误
 - `AudioParse` - 音频解析错误
 - `AudioPlayback` - 音频播放错误
 - `DeviceNotFound` - 设备未找到
@@ -26,18 +26,20 @@
 
 **audio.rs** - 音频播放引擎
 - `player_set_queue` - 设置播放队列并开始播放
-- `player_pause` / `player_resume` - 播放控制
+- `player_pause` / `player_resume` / `player_stop` - 播放控制
 - `player_seek` - 跳转播放位置
 - `player_set_volume` - 设置音量
 - `player_next` / `player_previous` - 切换曲目
 - `player_set_mode` - 设置播放模式 (sequential/repeat_all/repeat_one/shuffle)
+- `player_get_state` - 获取当前播放状态（恢复用）
 - `player_get_output_devices` - 枚举音频输出设备
 - `player_set_output_device` - 切换音频输出设备
+- `player_get_current_device` - 获取当前输出设备名
 - `analyzer_start` / `analyzer_stop` - 启动/停止音频频谱分析
 
 **commands/songs.rs** - 歌曲数据操作
 - `get_all_songs` - 获取所有歌曲
-- `upsert_songs` - 批量插入/更新歌曲
+- `upsert_songs` - 批量插入/更新歌曲（返回实际 DB ID）
 - `delete_songs` - 删除歌曲
 
 **commands/playlists.rs** - 播放列表管理
@@ -48,11 +50,20 @@
 - `get_playlist_songs` - 获取播放列表中的歌曲
 - `add_songs_to_playlist` - 添加歌曲到播放列表
 - `remove_song_from_playlist` - 从播放列表移除歌曲
+- `clear_playlist` - 清空播放列表（保留列表本身）
 
 **commands/settings.rs** - 设置管理
 - `get_all_settings` - 获取所有设置
 - `get_setting` - 获取单个设置
 - `set_setting` - 设置单个键值对
+- `get_system_locale` - 获取系统语言
+
+**commands/bootstrap.rs** - 启动批量加载
+- `get_bootstrap_data` - 单次 IPC 返回全部应用数据（songs + playlists + playlist_songs + settings）
+
+**commands/lyrics.rs** - 歌词管理
+- `get_lyrics` - 获取歌词（缓存 → 内嵌 → LRCLIB API）
+- `refresh_lyrics` - 强制刷新歌词（跳过缓存）
 
 **lib.rs** - 文件扫描
 - `scan_music_folder` - 扫描音乐文件夹并提取元数据
@@ -66,7 +77,7 @@
 **作用：** 封装 Rodio 音频播放，提供播放控制 API
 
 **核心结构：**
-- `AudioStateInner` - 音频状态（队列、模式、音量、进度、分析器）
+- `AudioStateInner` - 音频状态（队列、模式、音量、进度、分析器、输出设备）
 - `AudioEngine` - Rodio OutputStream 和 Sink 封装
 - `QueuedSong` - 队列中的歌曲数据结构
 
@@ -92,10 +103,34 @@
 - FFT_SIZE = 256, NUM_BINS = 64, 采样率 ~30fps
 - 依赖 `rustfft` crate
 
-**风险点：**
-- 线程安全：使用 `Arc<Mutex<AudioStateInner>>` 保护共享状态
-- 进度线程：独立线程每 500ms 推送进度，需要正确管理生命周期
-- 设备切换：需要重建整个音频引擎，可能导致播放中断
+### lyrics.rs - 歌词服务
+
+**文件位置：** `src-tauri/src/commands/lyrics.rs`
+
+**作用：** 多源歌词获取与缓存
+
+**获取链：**
+1. 查询 SQLite `lyrics` 表缓存
+2. 使用 Lofty 从音频文件提取内嵌歌词
+3. 调用 LRCLIB API (`https://lrclib.net/api/search`) 搜索歌词
+4. 结果写入 SQLite 缓存
+
+**LRCLIB 搜索策略：**
+- 参数：track_name, artist_name, duration
+- 优先选择有 synced_lyrics 的结果
+- 持久化 source 标记 (embedded / lrclib / none)
+
+### bootstrap.rs - 启动数据聚合
+
+**文件位置：** `src-tauri/src/commands/bootstrap.rs`
+
+**作用：** 单次数据库查询返回全部应用初始化数据
+
+**返回 `BootstrapData`：**
+- `songs` - 全部歌曲
+- `playlists` - 全部播放列表
+- `playlist_songs` - HashMap<playlist_id, Vec<song_id>>
+- `settings` - HashMap<key, value>
 
 ### db/mod.rs - 数据库管理
 
@@ -105,21 +140,19 @@
 
 **被谁调用：** lib.rs 在应用启动时初始化
 
-**风险点：**
-- 数据库文件位置：使用系统应用数据目录
-- 迁移系统：应用升级时需要正确执行迁移
+### db/migrations.rs - 数据库迁移
 
-## Utils
+**Schema 版本：**
+- V1: 核心表 (songs, playlists, playlist_songs, settings) + 基础索引
+- V2: 性能索引 (title, created_at, playlist position)
+- V3: 歌词表 (lyrics)
 
-**lib.rs** - 文件扫描和元数据提取
-- 使用 `lofty` 库提取音频元数据
-- 递归遍历目录
-- 支持格式：MP3, FLAC, WAV, AAC, OGG, M4A, Opus, WMA
+### db/models.rs - 数据模型
 
-**error.rs** - 统一错误处理
-- `AppError` 枚举定义所有错误类型
-- `AppResult<T>` 类型别名
-- 自动错误转换和传播
+**Rust 结构体：**
+- `Song` - id, title, artist, album, duration, duration_secs, quality, file_path, art_gradient
+- `Playlist` - id, name, sort_order
+- `PlaylistSong` - playlist_id, song_id, sort_order
 
 ## Async Task
 
@@ -127,16 +160,6 @@
 - 独立线程每 500ms 推送播放进度
 - 检测曲目播放完毕并自动播放下一曲
 - 使用 `Arc<AtomicBool>` 控制线程生命周期
-
-## IO 操作
-
-**文件系统：**
-- `scan_music_folder` - 递归读取音乐文件夹
-- Rodio - 音频文件读取和解码
-
-**数据库：**
-- 所有 commands/ 模块中的数据库操作
-- 使用参数化查询防止 SQL 注入
 
 ## 多线程
 
@@ -163,11 +186,9 @@ pub fn start_progress_thread(state: AudioState, app: AppHandle) {
 **调用位置：**
 - `lib.rs::scan_music_folder()` - 扫描音乐文件夹
 - `audio.rs` - Rodio 读取音频文件
+- `lyrics.rs` - Lofty 读取音频文件内嵌歌词
 
-**风险点：**
-- 大型音乐库扫描可能较慢
-- 文件权限问题
-- 符号链接可能导致重复扫描
+**支持格式：** MP3, FLAC, WAV, AAC, OGG, M4A, Opus, WMA
 
 ## Shell 调用
 

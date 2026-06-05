@@ -2,11 +2,12 @@
 
 ## 页面结构
 
-- **App.vue** - 根组件，侧边栏 + 主区域布局
+- **App.vue** - 根组件，侧边栏 + 主区域布局，负责初始化 Store 和事件监听
 - **LibraryView.vue** - 音乐库主视图
 - **PlayerBar.vue** - 底部播放控制条
 - **SettingsView.vue** - 设置页面
 - **NowPlayingOverlay.vue** - 正在播放覆盖层
+- **LyricsDisplay.vue** - 歌词显示组件（LRC 解析、同步滚动、点击跳转）
 
 ## Router
 
@@ -14,11 +15,9 @@
 
 ## 状态管理 (Pinia Stores)
 
-项目使用 Pinia 进行状态管理，所有业务逻辑集中在 `stores/` 目录：
+项目使用 Pinia 进行状态管理，核心业务逻辑集中在 `stores/` 目录：
 
 ### stores/player.ts - 播放器状态 (usePlayerStore)
-
-**最复杂逻辑：** 进度跟踪和播放队列管理
 
 **关键状态：**
 - `currentSong` - 当前歌曲
@@ -26,57 +25,60 @@
 - `progress` / `duration` - 播放进度
 - `queue` - 播放队列
 - `playbackMode` - 播放模式 (sequential/repeat_all/repeat_one/shuffle)
+- `volume` - 音量
 
 **IPC 封装：**
 - `playFromQueue()` -> `player_set_queue`
 - `togglePlayPause()` -> `player_pause` / `player_resume`
-- `seek()` -> `player_seek`
-- `setVolume()` -> `player_set_volume`
+- `seek()` / `seekRelative()` -> `player_seek`
+- `setVolume()` / `adjustVolume()` -> `player_set_volume`
+- `next()` / `previous()` -> `player_next` / `player_previous`
 - `setMode()` -> `player_set_mode`
+- `stop()` -> `player_stop`
+- `getState()` -> `player_get_state` (恢复播放状态)
 
 **事件监听：**
-- `audio:progress` - 播放进度更新
+- `audio:progress` - 播放进度更新 (500ms)
 - `audio:state_change` - 播放状态变化
 - `audio:track_change` - 曲目切换
 - `audio:error` - 音频错误
 
-**风险点：**
-- 进度更新频率 (500ms) 需要合理处理
-- 播放队列索引越界检查
-- 事件监听器生命周期管理
+**工具方法：**
+- `formatTime()` - 时间格式化
+- `progressFormatted` / `durationFormatted` - 格式化计算属性
 
 ### stores/library.ts - 音乐库管理 (useLibraryStore)
-
-**最复杂逻辑：** 搜索、筛选、排序计算属性链
 
 **关键状态：**
 - `songs` - 所有歌曲
 - `playlists` - 播放列表
 - `playlistSongs` - 播放列表歌曲映射
-- `searchQuery` - 搜索关键词
+- `searchQuery` - 搜索关键词 (防抖)
 - `displayMode` - 显示模式 (songs/albums/artists)
+- `drilldown` - 专辑/艺术家下钻筛选
 - `sortBy` / `sortOrder` - 排序方式
+- `viewMode` - 视图模式
+- `ready` - 数据加载完成标志
 
 **计算属性链：**
-`currentPlaylistSongs` -> `searchedSongs` -> `displayedSongs`
+`currentPlaylistSongs` -> `searchedSongs` -> `drilldownFilter` -> `displayedSongs`
+
+**额外计算属性：**
+- `filteredAlbums` / `filteredArtists` - 按专辑/艺术家聚合
+- `currentSong` - 当前播放歌曲
+- `activePlaylist` - 当前激活播放列表
 
 **IPC 封装：**
-- `loadFromDb()` -> `get_all_songs`, `get_playlists`, `get_all_settings`
-- `importToPlaylist()` -> `scan_music_folder`, `upsert_songs`
-- 播放列表管理 -> `create_playlist`, `rename_playlist`, `delete_playlist`
-
-**容易改崩：**
-- 计算属性依赖关系修改
-- 搜索筛选逻辑改动
-- 排序函数的 localeCompare 参数
+- `loadFromDb()` -> `get_bootstrap_data` (单次加载全部数据)
+- `importToPlaylist()` -> `scan_music_folder` + `upsert_songs` + `clear_playlist` + `add_songs_to_playlist`
+- 播放列表 CRUD -> `create_playlist`, `rename_playlist`, `delete_playlist`
+- 播放列表歌曲 -> `add_songs_to_playlist`, `remove_song_from_playlist`, `clear_playlist`
 
 ### stores/settings.ts - 设置和主题管理 (useSettingsStore)
 
-**功能：** Vuetify 主题切换 + 数据库持久化
-
 **关键状态：**
 - `colorName` - 主题颜色
-- `mode` - 主题模式
+- `mode` - 主题模式 (light/dark/system)
 - `isDark` - 当前是否深色模式 (计算属性)
 
 **IPC 封装：**
@@ -89,12 +91,11 @@
 - 支持 3 种主题模式：浅色、深色、跟随系统
 - 系统主题检测通过 VueUse 的 `usePreferredDark` 实现
 - 数据库持久化用户偏好
-- 响应式主题切换，自动更新 Vuetify 全局主题
+- 旧主题设置自动迁移
 
 **主题配置位置：**
 - `plugins/vuetify.ts` - Vuetify 主题定义和颜色配置
 - 12 种主题变体（6 颜色 × 2 模式）
-- 支持动态 CSS 变量和渐变效果
 
 ## 组件结构
 
@@ -104,6 +105,8 @@
 - **PlayerBar.vue** - 底部播放控制
 - **SettingsView.vue** - 设置页面
 - **NowPlayingOverlay.vue** - 正在播放覆盖层
+- **LyricsDisplay.vue** - 歌词显示（同步滚动、点击跳转、骨架屏加载态）
+- **IconButtonWithTooltip.vue** - 通用图标按钮 + Tooltip 组件
 
 ### Library 子组件 (components/library/)
 - **BrowseCards.vue** - 浏览卡片视图（专辑/艺术家网格）
@@ -117,18 +120,15 @@
 ### 组件使用策略
 - **小数据量** (< 100首歌): 使用 SongTable.vue 或 SongGrid.vue
 - **大数据量** (> 100首歌): 自动切换到 VirtualSongTable.vue 提升性能
-- **虚拟滚动优势**: 仅渲染可见区域的 DOM 节点，大幅减少内存占用
 
 ## 工具函数
 
 ### utils/virtualScroll.ts - 虚拟滚动
-**用途：** 大数据列表性能优化
 - 仅渲染可见区域的 DOM 节点
 - 支持动态高度计算
 - 滚动位置记忆
 
 ### utils/errorHandler.ts - 错误处理
-**用途：** 统一的 Tauri IPC 调用错误处理
 - `invokeCommand<T>()` - 带错误处理的命令调用
 - `safeInvoke<T>()` - 返回 Result 类型的安全调用
 - `batchInvoke()` - 批量命令执行
@@ -136,10 +136,17 @@
 
 ## Composables
 
-保留的 composables 用于 UI 交互：
+活跃的 composables（被 Store 和组件引用）：
+
+- **composables/usePlayer.ts** - 播放器核心逻辑（Store 的实际实现）
+- **composables/useLibrary.ts** - 音乐库核心逻辑（Store 的实际实现）
+- **composables/useTheme.ts** - 主题核心逻辑（Store 的实际实现，含 useColorTheme + useThemeMode）
 - **composables/useToast.ts** - Toast 通知封装（全局消息提示）
 - **composables/useI18n.ts** - 国际化封装（语言初始化、切换、持久化）
 - **composables/usePlaybackMode.ts** - 播放模式切换（含 i18n 标签）
+- **composables/useLyrics.ts** - 歌词获取 + LRC 解析 + 同步跟踪
+- **composables/useDebounceSearch.ts** - 搜索防抖（300ms）
+- **composables/useOptimizedSort.ts** - 排序缓存（中文 locale 支持）
 
 ## 音频可视化
 
@@ -174,17 +181,27 @@ Canvas 2D 渲染
 ### VisualizationStyle 类型
 `'bar' | 'circular' | 'wave' | 'particle'` — 通过设置面板切换，持久化到 settings 表
 
-### useToast 功能
-- `showToast()` - 显示通用通知
-- `showSuccess()` - 显示成功消息
-- `showError()` - 显示错误消息  
-- `showWarning()` - 显示警告消息
-- `showInfo()` - 显示信息消息
-- `hideToast()` - 隐藏通知
+## 歌词系统
 
-## IPC 封装位置
+### 数据流
+```
+stores/player.ts (progress 事件)
+  ↓ 实时进度
+composables/useLyrics.ts
+  ↓ 进度匹配 LRC 时间戳
+LyricsDisplay.vue
+  ↓ 同步滚动 + 高亮当前行
+```
 
-所有 IPC 调用集中在 Pinia Stores 中，组件通过 Store 操作数据，不直接调用 `invoke`。错误处理通过 `utils/errorHandler.ts` 统一管理。
+### 歌词获取优先级
+1. **SQLite 缓存** → 命中则直接返回
+2. **内嵌歌词** → Lofty 从音频文件提取
+3. **LRCLIB API** → 按歌名/艺术家/时长搜索
+4. **缓存写入** → 获取后写入 SQLite
+
+### LRC 解析
+- 正则 `\[(\d{2}):(\d{2})\.(\d{2,3})](.*)` 解析时间戳
+- `LrcLine { time: number, text: string }` 结构
 
 ## 国际化 (i18n)
 
@@ -205,27 +222,21 @@ App.vue onMounted
 
 ### 文件结构
 - `src/i18n.ts`: vue-i18n 配置（legacy: false, fallback: zh-CN）
-- `src/locales/zh-CN.ts`: 中文翻译（8 个命名空间）
-- `src/locales/en.ts`: 英文翻译（8 个命名空间）
+- `src/locales/zh-CN.ts`: 中文翻译
+- `src/locales/en.ts`: 英文翻译
 - `src/composables/useI18n.ts`: i18n 组合式函数
 
 ### 命名空间
-- common / sidebar / library / player / settings / playbackMode / toast / empty
+common / sidebar / library / player / settings / playbackMode / toast / empty
 
-### 使用方式
-```typescript
-// 组件中
-import { useI18n } from '@/composables/useI18n'
-const { t, setLocale } = useI18n()
+## IPC 封装位置
 
-// Store 中（setup 上下文外）
-import i18n from '../i18n'
-const t = i18n.global.t
-```
+所有 IPC 调用集中在 Pinia Stores 中，组件通过 Store 操作数据，不直接调用 `invoke`。错误处理通过 `utils/errorHandler.ts` 统一管理。
 
 ## 关键业务逻辑
 
-1. **播放控制** - stores/player.ts 封装所有播放相关 IPC
+1. **播放控制** - stores/player.ts 封装所有播放相关 IPC + 事件监听
 2. **歌曲导入** - stores/library.ts 的 `importToPlaylist()` 方法
-3. **播放列表管理** - stores/library.ts 的增删改查方法
+3. **播放列表管理** - stores/library.ts 的增删改查 + 清空方法
 4. **主题切换** - stores/settings.ts 的主题管理逻辑
+5. **歌词同步** - composables/useLyrics.ts 进度驱动歌词行匹配

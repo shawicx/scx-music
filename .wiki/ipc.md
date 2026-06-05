@@ -14,31 +14,61 @@ const result = await invokeCommand('command_name', { param: value })
 
 | command | frontend caller | rust file | purpose |
 |---------|----------------|-----------|---------|
+| **播放器** | | | |
 | `player_set_queue` | stores/player.ts | audio.rs | 设置播放队列并开始播放 |
 | `player_pause` | stores/player.ts | audio.rs | 暂停播放 |
 | `player_resume` | stores/player.ts | audio.rs | 恢复播放 |
+| `player_stop` | stores/player.ts | audio.rs | 停止播放 |
 | `player_seek` | stores/player.ts | audio.rs | 跳转播放位置 |
 | `player_set_volume` | stores/player.ts | audio.rs | 设置音量 |
 | `player_next` | stores/player.ts | audio.rs | 下一曲 |
 | `player_previous` | stores/player.ts | audio.rs | 上一曲 |
 | `player_set_mode` | stores/player.ts | audio.rs | 设置播放模式 |
-| `get_all_songs` | stores/library.ts | commands/songs.rs | 获取所有歌曲 |
+| `player_get_state` | stores/player.ts | audio.rs | 获取当前播放状态 |
+| `player_get_output_devices` | - | audio.rs | 枚举音频输出设备 |
+| `player_set_output_device` | - | audio.rs | 切换音频输出设备 |
+| `player_get_current_device` | - | audio.rs | 获取当前输出设备 |
+| **歌曲** | | | |
+| `get_all_songs` | - | commands/songs.rs | 获取所有歌曲 |
 | `upsert_songs` | stores/library.ts | commands/songs.rs | 批量插入/更新歌曲 |
-| `get_playlists` | stores/library.ts | commands/playlists.rs | 获取所有播放列表 |
+| `delete_songs` | - | commands/songs.rs | 删除歌曲 |
+| **播放列表** | | | |
+| `get_playlists` | - | commands/playlists.rs | 获取所有播放列表 |
 | `create_playlist` | stores/library.ts | commands/playlists.rs | 创建播放列表 |
 | `rename_playlist` | stores/library.ts | commands/playlists.rs | 重命名播放列表 |
 | `delete_playlist` | stores/library.ts | commands/playlists.rs | 删除播放列表 |
-| `get_playlist_songs` | stores/library.ts | commands/playlists.rs | 获取播放列表歌曲 |
+| `get_playlist_songs` | - | commands/playlists.rs | 获取播放列表歌曲 |
 | `add_songs_to_playlist` | stores/library.ts | commands/playlists.rs | 添加歌曲到播放列表 |
 | `remove_song_from_playlist` | stores/library.ts | commands/playlists.rs | 从播放列表移除歌曲 |
-| `get_all_settings` | stores/library.ts | commands/settings.rs | 获取所有设置 |
+| `clear_playlist` | stores/library.ts | commands/playlists.rs | 清空播放列表 |
+| **设置** | | | |
+| `get_all_settings` | - | commands/settings.rs | 获取所有设置 |
 | `get_setting` | stores/settings.ts | commands/settings.rs | 获取单个设置 |
 | `set_setting` | stores/settings.ts, stores/library.ts | commands/settings.rs | 设置单个键值对 |
+| `get_system_locale` | composables/useI18n.ts | commands/settings.rs | 获取系统语言 |
+| **文件扫描** | | | |
 | `scan_music_folder` | stores/library.ts | lib.rs | 扫描音乐文件夹 |
+| **启动加载** | | | |
+| `get_bootstrap_data` | stores/library.ts | commands/bootstrap.rs | 单次加载全部应用数据 |
+| **歌词** | | | |
+| `get_lyrics` | composables/useLyrics.ts | commands/lyrics.rs | 获取歌词 (缓存→内嵌→LRCLIB) |
+| `refresh_lyrics` | - | commands/lyrics.rs | 强制刷新歌词 |
+| **频谱分析** | | | |
 | `analyzer_start` | visualization/useAudioAnalyzer.ts | audio.rs | 启动频谱分析 |
 | `analyzer_stop` | visualization/useAudioAnalyzer.ts | audio.rs | 停止频谱分析 |
 
 ## 前后端调用链
+
+### 应用启动流程
+
+```
+App.vue onMounted
+-> useLibraryStore.loadFromDb()
+-> invokeCommand('get_bootstrap_data')
+-> bootstrap.rs::get_bootstrap_data()
+-> 单次 DB 查询返回 { songs, playlists, playlist_songs, settings }
+-> Store 状态初始化
+```
 
 ### 播放歌曲流程
 
@@ -64,12 +94,24 @@ const result = await invokeCommand('command_name', { param: value })
 -> lib.rs::scan_music_folder()
 -> 返回歌曲数组
 -> invokeCommand('upsert_songs', {songs})
--> commands/songs.rs::upsert_songs()
--> 数据库插入
+-> commands/songs.rs::upsert_songs() -> 返回实际 DB ID
+-> invokeCommand('clear_playlist', {playlistId})
 -> invokeCommand('add_songs_to_playlist', {playlistId, songIds})
--> commands/playlists.rs::add_songs_to_playlist()
--> 数据库插入
 -> useLibraryStore 状态更新
+```
+
+### 歌词获取流程
+
+```
+歌曲切换
+-> useLyrics.loadLyrics(song)
+-> invoke('get_lyrics', {songId, filePath, title, artist, duration})
+-> lyrics.rs::get_lyrics()
+  ├─ SQLite 缓存命中 → 直接返回
+  ├─ Lofty 内嵌歌词 → 缓存 + 返回
+  └─ LRCLIB API 搜索 → 缓存 + 返回
+-> 前端 LRC 解析
+-> LyricsDisplay 同步显示
 ```
 
 ### 主题切换流程
@@ -90,7 +132,7 @@ const result = await invokeCommand('command_name', { param: value })
 |-------|---------|----------|----------|
 | `audio:progress` | `{current, duration}` | 每 500ms | stores/player.ts |
 | `audio:state_change` | `{state, currentSong, queueIndex, mode}` | 播放状态变化 | stores/player.ts |
-| `audio:track_change` | `Song | null` | 当前曲目变化 | stores/player.ts |
+| `audio:track_change` | `Song \| null` | 当前曲目变化 | stores/player.ts |
 | `audio:error` | `string` | 音频错误发生 | stores/player.ts |
 | `audio:spectrum` | `number[64]` | 每 33ms (播放时) | visualization/useAudioAnalyzer.ts |
 
