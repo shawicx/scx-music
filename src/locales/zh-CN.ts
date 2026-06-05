@@ -46,6 +46,9 @@ export default {
     visualizationParticle: '粒子系统',
     visualizationStyle: '可视化风格',
   },
+  lyrics: {
+    noLyrics: '暂无歌词',
+  },
   settings: {
     title: '设置',
     themeMode: '主题模式',

@@ -1,0 +1,180 @@
+use crate::db::Db;
+use lofty::file::{AudioFile as AudioFileTrait, TaggedFileExt};
+use lofty::tag::ItemKey;
+use rusqlite::params;
+use serde::{Deserialize, Serialize};
+use std::path::Path;
+
+#[derive(Debug, Deserialize)]
+struct LrclibSearchResult {
+    id: i64,
+    track_name: String,
+    artist_name: String,
+    duration: Option<f64>,
+    synced_lyrics: Option<String>,
+    plain_lyrics: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LyricsResult {
+    pub raw_lrc: Option<String>,
+    pub source: String,
+}
+
+#[tauri::command]
+pub fn get_lyrics(
+    db: tauri::State<'_, Db>,
+    song_id: String,
+    file_path: String,
+    title: String,
+    artist: String,
+    duration_secs: f64,
+) -> Result<Option<LyricsResult>, String> {
+    let conn = db.0.lock().map_err(|e| e.to_string())?;
+
+    // 1. Check SQLite cache
+    let cached: Option<(Option<String>, String)> = conn
+        .query_row(
+            "SELECT raw_lrc, source FROM lyrics WHERE song_id = ?1",
+            params![song_id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .ok();
+
+    if let Some((raw_lrc, source)) = cached {
+        return Ok(Some(LyricsResult { raw_lrc, source }));
+    }
+
+    // 2. Try embedded lyrics from Lofty
+    if let Some(raw_lrc) = extract_embedded_lyrics(&file_path) {
+        let source = "embedded".to_string();
+        conn.execute(
+            "INSERT INTO lyrics (song_id, raw_lrc, source) VALUES (?1, ?2, ?3)",
+            params![song_id, raw_lrc, source],
+        )
+        .map_err(|e| e.to_string())?;
+        return Ok(Some(LyricsResult {
+            raw_lrc: Some(raw_lrc),
+            source,
+        }));
+    }
+
+    // 3. Try LRCLIB online
+    drop(conn); // release lock before HTTP request
+    if let Some(result) = fetch_lrclib(&title, &artist, duration_secs) {
+        let conn = db.0.lock().map_err(|e| e.to_string())?;
+        conn.execute(
+            "INSERT INTO lyrics (song_id, raw_lrc, source) VALUES (?1, ?2, ?3)",
+            params![song_id, &result.raw_lrc, &result.source],
+        )
+        .map_err(|e| e.to_string())?;
+        return Ok(Some(result));
+    }
+
+    // 4. No lyrics found — cache the miss
+    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    conn.execute(
+        "INSERT INTO lyrics (song_id, raw_lrc, source) VALUES (?1, NULL, 'none')",
+        params![song_id],
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(None)
+}
+
+#[tauri::command]
+pub fn refresh_lyrics(
+    db: tauri::State<'_, Db>,
+    song_id: String,
+    title: String,
+    artist: String,
+    duration_secs: f64,
+) -> Result<Option<LyricsResult>, String> {
+    if let Some(result) = fetch_lrclib(&title, &artist, duration_secs) {
+        let conn = db.0.lock().map_err(|e| e.to_string())?;
+        conn.execute(
+            "INSERT OR REPLACE INTO lyrics (song_id, raw_lrc, source) VALUES (?1, ?2, ?3)",
+            params![song_id, &result.raw_lrc, &result.source],
+        )
+        .map_err(|e| e.to_string())?;
+        return Ok(Some(result));
+    }
+
+    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    conn.execute(
+        "INSERT OR REPLACE INTO lyrics (song_id, raw_lrc, source) VALUES (?1, NULL, 'none')",
+        params![song_id],
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(None)
+}
+
+fn extract_embedded_lyrics(file_path: &str) -> Option<String> {
+    let path = Path::new(file_path);
+    let tagged = lofty::read_from_path(path).ok()?;
+    let tag = tagged.primary_tag()?;
+
+    if let Some(lyrics) = tag.get_string(&ItemKey::Lyrics) {
+        let text = lyrics.to_string();
+        if !text.trim().is_empty() {
+            return Some(text);
+        }
+    }
+
+    None
+}
+
+fn fetch_lrclib(title: &str, artist: &str, duration_secs: f64) -> Option<LyricsResult> {
+    let query = format!("{} {}", title, artist);
+    let client = reqwest::blocking::Client::builder()
+        .timeout(std::time::Duration::from_secs(8))
+        .build()
+        .ok()?;
+
+    let url = if duration_secs > 0.0 {
+        format!(
+            "https://lrclib.net/api/search?q={}&duration={}",
+            urlencoding::encode(&query),
+            duration_secs.round()
+        )
+    } else {
+        format!(
+            "https://lrclib.net/api/search?q={}",
+            urlencoding::encode(&query)
+        )
+    };
+
+    let resp = client.get(&url).send().ok()?;
+    if !resp.status().is_success() {
+        return None;
+    }
+
+    let results: Vec<LrclibSearchResult> = resp.json().ok()?;
+    if results.is_empty() {
+        return None;
+    }
+
+    let best = results
+        .into_iter()
+        .min_by(|a, b| {
+            let a_score = match (a.duration, duration_secs > 0.0) {
+                (Some(d), true) => (d - duration_secs).abs(),
+                _ => f64::MAX,
+            };
+            let b_score = match (b.duration, duration_secs > 0.0) {
+                (Some(d), true) => (d - duration_secs).abs(),
+                _ => f64::MAX,
+            };
+            match (a.synced_lyrics.is_some(), b.synced_lyrics.is_some()) {
+                (true, false) => std::cmp::Ordering::Less,
+                (false, true) => std::cmp::Ordering::Greater,
+                _ => a_score
+                    .partial_cmp(&b_score)
+                    .unwrap_or(std::cmp::Ordering::Equal),
+            }
+        })?;
+
+    let raw_lrc = best.synced_lyrics.or(best.plain_lyrics);
+    let source = "lrclib".to_string();
+    Some(LyricsResult { raw_lrc, source })
+}

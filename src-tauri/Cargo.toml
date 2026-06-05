@@ -30,3 +30,5 @@ rusqlite = { version = "0.31", features = ["bundled"] }
 sys-locale = "0.3"
 thiserror = "1.0"
 rustfft = "6.2"
+reqwest = { version = "0.12", features = ["json", "blocking"] }
+urlencoding = "2"

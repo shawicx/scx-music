@@ -46,6 +46,9 @@ export default {
     visualizationParticle: 'Particles',
     visualizationStyle: 'Visualization Style',
   },
+  lyrics: {
+    noLyrics: 'No lyrics available',
+  },
   settings: {
     title: 'Settings',
     themeMode: 'Theme Mode',

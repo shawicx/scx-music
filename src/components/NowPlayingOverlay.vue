@@ -5,7 +5,9 @@ import { usePlayerStore } from '../stores/player'
 import { useLibraryStore } from '../stores/library'
 import { usePlaybackMode } from '../composables/usePlaybackMode'
 import { useI18n } from '../composables/useI18n'
+import { useLyrics } from '../composables/useLyrics'
 import { AudioVisualizer } from '../visualization'
+import LyricsDisplay from './LyricsDisplay.vue'
 
 defineEmits<{ close: [] }>()
 
@@ -32,6 +34,8 @@ const {
 const { addSongToPlaylist: addSong, removeSongFromPlaylist: removeSong } = libraryStore
 const { playlistSongs } = storeToRefs(libraryStore)
 
+const { lines, currentLineIndex, isLoading } = useLyrics(currentSong)
+
 const isLiked = computed(() => {
   if (!currentSong.value) return false
   const favIds = playlistSongs.value['fav']
@@ -51,6 +55,10 @@ const progressModel = computed({
   get: () => duration.value > 0 ? (progress.value / duration.value) * 100 : 0,
   set: (val: number) => { if (duration.value > 0) seek((val / 100) * duration.value) },
 })
+
+function onLyricSeek(time: number) {
+  seek(time)
+}
 </script>
 
 <template>
@@ -68,13 +76,16 @@ const progressModel = computed({
       <v-icon icon="mdi-close" size="16"></v-icon>
       {{ t('player.collapse') }}
     </v-btn>
-    <div class="album-art">
-      <v-icon icon="mdi-music-note" size="56" color="rgba(255,255,255,0.6)"></v-icon>
+    <div class="top-section">
+        <div class="song-title">{{ currentSong?.title ?? t('player.notPlaying') }}</div>
+        <div class="song-artist">{{ currentSong ? `${currentSong.artist} · ${currentSong.album}` : '--' }}</div>
     </div>
-    <div class="song-info">
-      <div class="song-title">{{ currentSong?.title ?? t('player.notPlaying') }}</div>
-      <div class="song-artist">{{ currentSong ? `${currentSong.artist} · ${currentSong.album}` : '--' }}</div>
-    </div>
+    <LyricsDisplay
+      :lines="lines"
+      :current-line-index="currentLineIndex"
+      :is-loading="isLoading"
+      @seek="onLyricSeek"
+    />
     <div class="progress-section">
       <v-slider
         v-model="progressModel"
@@ -117,8 +128,9 @@ const progressModel = computed({
   background: rgb(var(--v-theme-background) / 0.82);
   backdrop-filter: blur(40px);
   -webkit-backdrop-filter: blur(40px);
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  z-index: 20; gap: 16px; overflow: hidden;
+  display: flex; flex-direction: column; align-items: center;
+  z-index: 20; overflow: hidden;
+  padding: 48px 24px 36px;
 }
 
 .glow { position: absolute; border-radius: 50%; pointer-events: none; }
@@ -138,48 +150,48 @@ const progressModel = computed({
 .close-btn { position: absolute; top: 16px; left: 20px; z-index: 1; color: var(--v-text-secondary); animation: fade-up 0.4s 0.05s cubic-bezier(0.16, 1, 0.3, 1) both; }
 
 .mode-status-bar {
-  position: absolute;
-  top: 16px;
-  right: 20px;
-  z-index: 1;
+  position: absolute; top: 16px; right: 20px; z-index: 1;
   animation: fade-up 0.4s 0.05s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
-
 .status-item {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+  display: flex; align-items: center; gap: 6px;
   padding: 6px 12px;
   background: rgb(var(--v-theme-surface-variant) / 0.3);
-  border-radius: 16px;
-  font-size: var(--text-xs);
-  color: var(--v-text-secondary);
+  border-radius: 16px; font-size: var(--text-xs); color: var(--v-text-secondary);
 }
 
+.top-section {
+  display: flex; align-items: center; gap: 16px;
+  width: 100%; z-index: 1; flex-shrink: 0;
+  justify-content: center;
+  animation: fade-up 0.4s 0.05s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
 .album-art {
-  width: 200px; height: 200px;
-  background: var(--v-gradient-brand); border-radius: 16px;
+  width: 120px; height: 120px;
+  background: var(--v-gradient-brand); border-radius: 14px;
   display: flex; align-items: center; justify-content: center;
-  box-shadow: 0 16px 48px var(--v-accent-shadow);
-  position: relative; z-index: 1;
-  animation: art-expand 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+  box-shadow: 0 12px 36px var(--v-accent-shadow);
+  flex-shrink: 0;
+}
+.song-info { flex: 1; min-width: 0; z-index: 1; }
+.song-title {
+  font-size: var(--text-xl); font-weight: 600;
+  color: rgb(var(--v-theme-on-background)); margin-bottom: 4px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.song-artist {
+  font-size: var(--text-md); color: var(--v-text-secondary);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 
-.song-info { text-align: center; z-index: 1; animation: fade-up 0.4s 0.1s cubic-bezier(0.16, 1, 0.3, 1) both; }
-.song-title { font-size: var(--text-2xl); font-weight: 600; color: rgb(var(--v-theme-on-background)); margin-bottom: 4px; }
-.song-artist { font-size: var(--text-md); color: var(--v-text-secondary); }
-
-.progress-section { width: 320px; z-index: 1; animation: fade-up 0.4s 0.15s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.progress-section { width: 100%; z-index: 1; flex-shrink: 0; animation: fade-up 0.4s 0.15s cubic-bezier(0.16, 1, 0.3, 1) both; }
 .time-row { display: flex; justify-content: space-between; margin-top: 6px; font-size: var(--text-xs); color: var(--v-text-muted); }
 
-.controls { display: flex; align-items: center; gap: 12px; z-index: 1; animation: fade-up 0.4s 0.2s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.controls { display: flex; align-items: center; gap: 12px; z-index: 1; flex-shrink: 0; animation: fade-up 0.4s 0.2s cubic-bezier(0.16, 1, 0.3, 1) both; }
 .play-btn-lg { box-shadow: 0 4px 20px var(--v-accent-shadow); transition: transform 0.15s, box-shadow 0.15s; }
 .play-btn-lg:hover { transform: scale(1.06); }
 .muted { opacity: 0.5; }
 
-@keyframes art-expand {
-  from { transform: scale(0.24) translateY(120px); opacity: 0; }
-}
 @keyframes fade-up {
   from { opacity: 0; transform: translateY(16px); }
 }
