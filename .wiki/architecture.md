@@ -6,6 +6,7 @@
 - **状态管理：** Pinia 3.0 (stores/player.ts, stores/library.ts, stores/settings.ts)
 - **UI 库：** Vuetify 4.0
 - **工具库：** VueUse 14.3
+- **动画：** GSAP (with Flip, ScrollTo plugins)
 - **构建：** Vite 6.0
 - **国际化：** vue-i18n v11
 

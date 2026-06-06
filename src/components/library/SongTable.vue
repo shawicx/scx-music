@@ -30,6 +30,7 @@ const { t } = useI18n()
       <div
         v-for="(song, i) in songs"
         :key="song.id"
+        :data-song-id="song.id"
         class="table-row"
         :class="{ playing: song.id === currentSongId }"
         @click="emit('songClick', i)"

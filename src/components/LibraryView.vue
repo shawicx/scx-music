@@ -11,6 +11,8 @@ import BrowseCards from './library/BrowseCards.vue'
 import EmptyStates from './library/EmptyStates.vue'
 import SortMenu from './library/SortMenu.vue'
 import { useI18n } from '../composables/useI18n'
+import { usePlaylistTransition } from '../composables/usePlaylistTransition'
+import { useViewModeFlip } from '../composables/useViewModeFlip'
 
 const libraryStore = useLibraryStore()
 const playerStore = usePlayerStore()
@@ -31,6 +33,11 @@ const {
   filteredArtists,
   playlists,
 } = storeToRefs(libraryStore)
+
+const contentRef = ref<HTMLElement | null>(null)
+const { onEnter: onContentEnter, onLeave: onContentLeave } = usePlaylistTransition()
+
+const { flipOnChange } = useViewModeFlip(contentRef, displayMode)
 
 const {
   setDrilldown,
@@ -79,6 +86,12 @@ const browseCards = computed(() => {
 
 function onSongClick(index: number) {
   playFromQueue(displayedSongs.value, index)
+}
+
+async function handleViewModeChange(mode: 'list' | 'grid') {
+  await flipOnChange(() => {
+    viewMode.value = mode
+  })
 }
 
 function onCardClick(name: string) {
@@ -158,89 +171,100 @@ const emptyStateType = computed(() => {
       :show-sort-option="!showCardView && !drilldown"
       @update:search-query="searchQuery = $event"
       @update:display-mode="displayMode = $event"
-      @update:view-mode="viewMode = $event"
+      @update:view-mode="handleViewModeChange"
       @open-sort-menu="openSortMenu"
       @back="clearDrilldown"
     />
 
-    <!-- Empty states -->
-    <EmptyStates v-if="emptyStateType" :type="emptyStateType" />
+    <Transition :css="false" mode="out-in" @enter="onContentEnter" @leave="onContentLeave">
+      <div :key="activePlaylistId ?? 'none'" class="library-content" ref="contentRef">
+        <!-- Empty states -->
+        <EmptyStates v-if="emptyStateType" :type="emptyStateType" />
 
-    <!-- Album/Artist card browse -->
-    <BrowseCards
-      v-else-if="showCardView"
-      :cards="browseCards"
-      :type="displayMode as 'albums' | 'artists'"
-      @card-click="onCardClick"
-    />
-
-    <!-- List view -->
-    <SongTable
-      v-if="viewMode === 'list' && displayedSongs.length < 100"
-      :songs="displayedSongs"
-      :current-song-id="currentSong?.id"
-      :is-playing="isPlaying"
-      @song-click="onSongClick"
-      @song-menu="openSongMenu"
-    />
-    <VirtualSongTable
-      v-else-if="viewMode === 'list'"
-      :songs="displayedSongs"
-      :current-song-id="currentSong?.id"
-      :is-playing="isPlaying"
-      :container-height="600"
-      @song-click="onSongClick"
-      @song-menu="openSongMenu"
-    />
-
-    <!-- Grid view -->
-    <SongGrid
-      v-else
-      :songs="displayedSongs"
-      :current-song-id="currentSong?.id"
-      :is-playing="isPlaying"
-      @song-click="onSongClick"
-      @song-menu="openSongMenu"
-    />
-
-    <!-- Song context menu (add to playlist / remove) -->
-    <v-menu
-      v-model="songMenu.show"
-      :target="[songMenu.x, songMenu.y]"
-      :close-on-content-click="true"
-    >
-      <v-list density="compact" min-width="160">
-        <v-list-subheader>{{ t('library.addToPlaylist') }}</v-list-subheader>
-        <v-list-item
-          v-for="pl in playlists"
-          :key="pl.id"
-          :title="pl.name"
-          @click="handleAddToPlaylist(pl.id)"
+        <!-- Album/Artist card browse -->
+        <BrowseCards
+          v-else-if="showCardView"
+          :cards="browseCards"
+          :type="displayMode as 'albums' | 'artists'"
+          @card-click="onCardClick"
         />
-        <v-divider v-if="activePlaylistId" />
-        <v-list-item
-          v-if="activePlaylistId"
-          :title="t('library.removeFromPlaylist')"
-          @click="handleRemoveFromPlaylist"
-        />
-      </v-list>
-    </v-menu>
 
-    <!-- Sort menu -->
-    <SortMenu
-      :show="sortMenu.show"
-      :x="sortMenu.x"
-      :y="sortMenu.y"
-      :sort-by="sortBy"
-      :sort-order="sortOrder"
-      @update:show="sortMenu.show = $event"
-      @sort="handleSortBy"
-    />
+        <!-- List view -->
+        <SongTable
+          v-if="viewMode === 'list' && displayedSongs.length < 100"
+          :songs="displayedSongs"
+          :current-song-id="currentSong?.id"
+          :is-playing="isPlaying"
+          @song-click="onSongClick"
+          @song-menu="openSongMenu"
+        />
+        <VirtualSongTable
+          v-else-if="viewMode === 'list'"
+          :songs="displayedSongs"
+          :current-song-id="currentSong?.id"
+          :is-playing="isPlaying"
+          :container-height="600"
+          @song-click="onSongClick"
+          @song-menu="openSongMenu"
+        />
+
+        <!-- Grid view -->
+        <SongGrid
+          v-else
+          :songs="displayedSongs"
+          :current-song-id="currentSong?.id"
+          :is-playing="isPlaying"
+          @song-click="onSongClick"
+          @song-menu="openSongMenu"
+        />
+
+        <!-- Song context menu (add to playlist / remove) -->
+        <v-menu
+          v-model="songMenu.show"
+          :target="[songMenu.x, songMenu.y]"
+          :close-on-content-click="true"
+        >
+          <v-list density="compact" min-width="160">
+            <v-list-subheader>{{ t('library.addToPlaylist') }}</v-list-subheader>
+            <v-list-item
+              v-for="pl in playlists"
+              :key="pl.id"
+              :title="pl.name"
+              @click="handleAddToPlaylist(pl.id)"
+            />
+            <v-divider v-if="activePlaylistId" />
+            <v-list-item
+              v-if="activePlaylistId"
+              :title="t('library.removeFromPlaylist')"
+              @click="handleRemoveFromPlaylist"
+            />
+          </v-list>
+        </v-menu>
+
+        <!-- Sort menu -->
+        <SortMenu
+          :show="sortMenu.show"
+          :x="sortMenu.x"
+          :y="sortMenu.y"
+          :sort-by="sortBy"
+          :sort-order="sortOrder"
+          @update:show="sortMenu.show = $event"
+          @sort="handleSortBy"
+        />
+      </div>
+    </Transition>
   </div>
 </template>
 
 <style scoped>
 .library {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.library-content {
   flex: 1;
   display: flex;
   flex-direction: column;

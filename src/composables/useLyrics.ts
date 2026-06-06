@@ -1,4 +1,4 @@
-import { ref, watch, type Ref } from 'vue'
+import { ref, watch, onUnmounted, type Ref } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import type { Song } from '../types'
@@ -39,7 +39,7 @@ export function useLyrics(currentSong: Ref<Song | null>) {
   const isLoading = ref(false)
   const rawLrc = ref<string | null>(null)
   const source = ref('')
-  let unlisten: UnlistenFn | null = null
+  let _unlisten: UnlistenFn | null = null // assigned in setupProgressListener, used for cleanup
 
   async function fetchLyrics(song: Song) {
     isLoading.value = true
@@ -83,7 +83,7 @@ export function useLyrics(currentSong: Ref<Song | null>) {
   }
 
   async function setupProgressListener() {
-    unlisten = await listen<{ current: number; duration: number }>(
+    _unlisten = await listen<{ current: number; duration: number }>(
       'audio:progress',
       (e) => {
         computeCurrentLine(e.payload.current)
@@ -102,6 +102,10 @@ export function useLyrics(currentSong: Ref<Song | null>) {
   }, { immediate: true })
 
   setupProgressListener()
+
+  onUnmounted(() => {
+    _unlisten?.()
+  })
 
   return {
     lines,

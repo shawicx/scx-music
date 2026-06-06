@@ -148,6 +148,35 @@
 - **composables/useDebounceSearch.ts** - 搜索防抖（300ms）
 - **composables/useOptimizedSort.ts** - 排序缓存（中文 locale 支持）
 
+## Animation System
+
+GSAP-powered animation system across five interaction scenarios:
+
+### Architecture
+
+- **Library:** `gsap` (with Flip, ScrollTo plugins)
+- **Shared composable:** `useAnimation.ts` — provides easing presets, `createTimeline()` factory, and auto-cleanup via `gsap.context()` + `onUnmounted()`
+- All animations use `transform` and `opacity` only (GPU-composited)
+
+### Composables
+
+| Composable | Scenario | Description |
+|---|---|---|
+| `usePageTransition` | Library ↔ Settings | Fade + translateY page transition (out-in mode) |
+| `usePlaylistTransition` | Playlist switching | Slide-left-out + slide-right-in content transition |
+| `useViewModeFlip` | List ↔ Grid toggle | GSAP Flip layout animation with stagger |
+| `usePlayerExpand` | Player expand/collapse | Staggered timeline for overlay elements |
+| `useLyricsAnimation` | Lyrics display | Spotlight opacity gradient + GSAP ScrollTo |
+
+### Pattern
+
+Every composable uses `useAnimation()` for scoped GSAP context. Cleanup is automatic on component unmount. Vue `<Transition :css="false">` with JS hooks (`@enter`/`@leave`) bridges GSAP into Vue's transition lifecycle.
+
+### Key attributes
+
+- Song items use `data-song-id` attribute for FLIP animations
+- Lyrics lines use `.lyric-line` and `.active` classes for spotlight targeting
+
 ## 音频可视化
 
 ### 文件结构 (src/visualization/)

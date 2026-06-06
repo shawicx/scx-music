@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref, watch, nextTick } from 'vue'
+import { ref, computed } from 'vue'
 import type { LrcLine } from '../composables/useLyrics'
 import { useI18n } from '../composables/useI18n'
+import { useLyricsAnimation } from '../composables/useLyricsAnimation'
 
 const props = defineProps<{
   lines: LrcLine[]
@@ -18,20 +19,19 @@ const containerRef = ref<HTMLElement | null>(null)
 const userScrolling = ref(false)
 let scrollTimer: ReturnType<typeof setTimeout> | null = null
 
+useLyricsAnimation(
+  containerRef,
+  computed(() => props.currentLineIndex),
+  userScrolling,
+)
+
 function onScroll() {
   userScrolling.value = true
   if (scrollTimer) clearTimeout(scrollTimer)
   scrollTimer = setTimeout(() => {
     userScrolling.value = false
-  }, 5000)
+  }, 3000)
 }
-
-watch(() => props.currentLineIndex, async (idx) => {
-  if (idx < 0 || userScrolling.value || !containerRef.value) return
-  await nextTick()
-  const active = containerRef.value.querySelector('.lyric-line.active') as HTMLElement
-  active?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-})
 
 function onClickLine(line: LrcLine) {
   if (line.time > 0) {
@@ -83,7 +83,6 @@ function onClickLine(line: LrcLine) {
   color: rgba(var(--v-theme-on-background), 0.25);
   cursor: pointer;
   text-align: center;
-  transition: color 0.3s ease, font-size 0.3s ease;
 }
 
 .lyric-line:hover {

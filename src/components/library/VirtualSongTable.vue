@@ -76,6 +76,7 @@ defineExpose({
         <div
           v-for="{ item: song, index } in visibleItems"
           :key="song.id"
+          :data-song-id="song.id"
           class="table-row"
           :class="{ playing: song.id === currentSongId }"
           :style="{ height: `${ITEM_HEIGHT}px` }"

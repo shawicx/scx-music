@@ -147,11 +147,10 @@ function onLyricSeek(time: number) {
   filter: blur(40px);
 }
 
-.close-btn { position: absolute; top: 16px; left: 20px; z-index: 1; color: var(--v-text-secondary); animation: fade-up 0.4s 0.05s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.close-btn { position: absolute; top: 16px; left: 20px; z-index: 1; color: var(--v-text-secondary); }
 
 .mode-status-bar {
   position: absolute; top: 16px; right: 20px; z-index: 1;
-  animation: fade-up 0.4s 0.05s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 .status-item {
   display: flex; align-items: center; gap: 6px;
@@ -164,7 +163,6 @@ function onLyricSeek(time: number) {
   display: flex; align-items: center; gap: 16px;
   width: 100%; z-index: 1; flex-shrink: 0;
   justify-content: center;
-  animation: fade-up 0.4s 0.05s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 .album-art {
   width: 120px; height: 120px;
@@ -184,15 +182,11 @@ function onLyricSeek(time: number) {
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 
-.progress-section { width: 100%; z-index: 1; flex-shrink: 0; animation: fade-up 0.4s 0.15s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.progress-section { width: 100%; z-index: 1; flex-shrink: 0; }
 .time-row { display: flex; justify-content: space-between; margin-top: 6px; font-size: var(--text-xs); color: var(--v-text-muted); }
 
-.controls { display: flex; align-items: center; gap: 12px; z-index: 1; flex-shrink: 0; animation: fade-up 0.4s 0.2s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.controls { display: flex; align-items: center; gap: 12px; z-index: 1; flex-shrink: 0; }
 .play-btn-lg { box-shadow: 0 4px 20px var(--v-accent-shadow); transition: transform 0.15s, box-shadow 0.15s; }
 .play-btn-lg:hover { transform: scale(1.06); }
 .muted { opacity: 0.5; }
-
-@keyframes fade-up {
-  from { opacity: 0; transform: translateY(16px); }
-}
 </style>

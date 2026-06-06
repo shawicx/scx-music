@@ -11,12 +11,16 @@ const PlayerBar = defineAsyncComponent(() => import('./components/PlayerBar.vue'
 const NowPlayingOverlay = defineAsyncComponent(() => import('./components/NowPlayingOverlay.vue'))
 import { useToast } from './composables/useToast'
 import { useI18n } from './composables/useI18n'
+import { usePageTransition } from './composables/usePageTransition'
+import { usePlayerExpand } from './composables/usePlayerExpand'
 
 const settingsStore = useSettingsStore()
 const libraryStore = useLibraryStore()
 const playerStore = usePlayerStore()
 const { toastMessage, toastVisible, toastColor } = useToast()
 const { initLocale } = useI18n()
+const { onEnter: onPageEnter, onLeave: onPageLeave } = usePageTransition()
+const { onEnter: onOverlayEnter, onLeave: onOverlayLeave } = usePlayerExpand()
 
 function isEditable(e: Event) {
   const el = e.target as HTMLElement
@@ -78,17 +82,19 @@ const showNowPlaying = ref(false)
     <div class="app-shell">
       <AppSidebar :active-view="activeView" @navigate="activeView = $event" />
       <div class="main-area">
-        <SettingsView v-if="activeView === 'settings'" @back="activeView = 'library'" />
-        <template v-else>
-          <LibraryView />
-          <PlayerBar @expand="showNowPlaying = true" />
-          <Transition name="overlay">
-            <NowPlayingOverlay
-              v-if="showNowPlaying"
-              @close="showNowPlaying = false"
-            />
-          </Transition>
-        </template>
+        <Transition :css="false" mode="out-in" @enter="onPageEnter" @leave="onPageLeave">
+          <SettingsView v-if="activeView === 'settings'" key="settings" @back="activeView = 'library'" />
+          <div v-else key="library" class="library-wrapper">
+            <LibraryView />
+            <PlayerBar @expand="showNowPlaying = true" />
+            <Transition :css="false" @enter="onOverlayEnter" @leave="onOverlayLeave">
+              <NowPlayingOverlay
+                v-if="showNowPlaying"
+                @close="showNowPlaying = false"
+              />
+            </Transition>
+          </div>
+        </Transition>
       </div>
     </div>
     <v-snackbar
@@ -130,11 +136,5 @@ html, body, #app {
 <style scoped>
 .app-shell { display: flex; height: 100vh; position: relative; }
 .main-area { flex: 1; display: flex; flex-direction: column; overflow: hidden; position: relative; }
-
-.overlay-enter-active { animation: overlay-fade 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
-.overlay-leave-active { animation: overlay-fade 0.25s ease-in reverse; }
-@keyframes overlay-fade {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
+.library-wrapper { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
 </style>

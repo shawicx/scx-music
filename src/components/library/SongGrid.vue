@@ -18,6 +18,7 @@ const emit = defineEmits<{
     <div
       v-for="(song, i) in songs"
       :key="song.id"
+      :data-song-id="song.id"
       class="grid-card"
       :class="{ playing: song.id === currentSongId }"
       @click="emit('songClick', i)"
