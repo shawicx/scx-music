@@ -5,6 +5,7 @@ import { useMouse } from '@vueuse/core'
 import { useLibraryStore } from '../stores/library'
 import { useToast } from '../composables/useToast'
 import { useI18n } from '../composables/useI18n'
+import { useImportExport } from '../composables/useImportExport'
 
 defineProps<{ activeView: string }>()
 const emit = defineEmits<{ navigate: [view: string] }>()
@@ -12,6 +13,7 @@ const emit = defineEmits<{ navigate: [view: string] }>()
 const libraryStore = useLibraryStore()
 const { showSuccess, showWarning } = useToast()
 const { t } = useI18n()
+const { exportPlaylist } = useImportExport()
 
 const {
   playlists,
@@ -145,6 +147,12 @@ async function handleImport() {
     isImporting.value = null
   }
 }
+
+function handleExportPlaylist() {
+  const { playlistId, playlistName } = contextMenu.value
+  contextMenu.value.show = false
+  exportPlaylist(playlistId, playlistName)
+}
 </script>
 
 <template>
@@ -214,6 +222,7 @@ async function handleImport() {
     >
       <v-list density="compact" min-width="140">
         <v-list-item prepend-icon="mdi-folder-open" :title="t('sidebar.importFolder')" @click="handleImport" />
+        <v-list-item prepend-icon="mdi-export" :title="t('sidebar.exportPlaylist')" @click="handleExportPlaylist" />
         <v-list-item prepend-icon="mdi-playlist-remove" :title="t('sidebar.clearPlaylist')" @click="handleClearPlaylist" />
         <v-list-item v-if="contextMenu.playlistId !== 'fav'" prepend-icon="mdi-pencil" :title="t('sidebar.rename')" @click="startRename" />
         <v-list-item v-if="contextMenu.playlistId !== 'fav'" prepend-icon="mdi-delete" :title="t('common.delete')" @click="handleDelete" />

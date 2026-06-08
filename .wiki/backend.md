@@ -65,6 +65,14 @@
 - `get_lyrics` - 获取歌词（缓存 → 内嵌 → LRCLIB API）
 - `refresh_lyrics` - 强制刷新歌词（跳过缓存）
 
+**commands/import_export.rs** - 数据导入导出
+- `export_playlist_m3u` - 导出播放列表为 M3U 格式
+- `export_playlist_pls` - 导出播放列表为 PLS 格式
+- `export_backup` - 导出完整备份（歌曲+歌单+歌词+设置 → JSON）
+- `import_backup` - 导入备份（支持 replace/merge 策略）
+- `export_settings` - 导出设置为 JSON 文件
+- `import_settings` - 从 JSON 文件导入设置
+
 **lib.rs** - 文件扫描
 - `scan_music_folder` - 扫描音乐文件夹并提取元数据
 
@@ -153,6 +161,7 @@
 - `Song` - id, title, artist, album, duration, duration_secs, quality, file_path, art_gradient
 - `Playlist` - id, name, sort_order
 - `PlaylistSong` - playlist_id, song_id, sort_order
+- `Lyric` - song_id, raw_lrc, source
 
 ## Async Task
 

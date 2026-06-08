@@ -147,6 +147,7 @@
 - **composables/useLyrics.ts** - 歌词获取 + LRC 解析 + 同步跟踪
 - **composables/useDebounceSearch.ts** - 搜索防抖（300ms）
 - **composables/useOptimizedSort.ts** - 排序缓存（中文 locale 支持）
+- **composables/useImportExport.ts** - 导入导出功能（歌单导出 M3U/PLS、音乐库备份恢复、设置迁移）
 
 ## Animation System
 
@@ -256,7 +257,7 @@ App.vue onMounted
 - `src/composables/useI18n.ts`: i18n 组合式函数
 
 ### 命名空间
-common / sidebar / library / player / settings / playbackMode / toast / empty
+common / sidebar / library / player / settings / playbackMode / toast / empty / importExport
 
 ## IPC 封装位置
 
@@ -269,3 +270,4 @@ common / sidebar / library / player / settings / playbackMode / toast / empty
 3. **播放列表管理** - stores/library.ts 的增删改查 + 清空方法
 4. **主题切换** - stores/settings.ts 的主题管理逻辑
 5. **歌词同步** - composables/useLyrics.ts 进度驱动歌词行匹配
+6. **数据导入导出** - composables/useImportExport.ts 歌单导出、备份恢复、设置迁移

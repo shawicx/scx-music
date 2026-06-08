@@ -190,6 +190,12 @@ pub fn run() {
             commands::bootstrap::get_bootstrap_data,
             commands::lyrics::get_lyrics,
             commands::lyrics::refresh_lyrics,
+            commands::import_export::export_playlist_m3u,
+            commands::import_export::export_playlist_pls,
+            commands::import_export::export_backup,
+            commands::import_export::import_backup,
+            commands::import_export::export_settings,
+            commands::import_export::import_settings,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

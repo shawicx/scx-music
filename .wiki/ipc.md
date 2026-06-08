@@ -53,6 +53,13 @@ const result = await invokeCommand('command_name', { param: value })
 | **歌词** | | | |
 | `get_lyrics` | composables/useLyrics.ts | commands/lyrics.rs | 获取歌词 (缓存→内嵌→LRCLIB) |
 | `refresh_lyrics` | - | commands/lyrics.rs | 强制刷新歌词 |
+| **导入导出** | | | |
+| `export_playlist_m3u` | composables/useImportExport.ts | commands/import_export.rs | 导出播放列表为 M3U 格式 |
+| `export_playlist_pls` | composables/useImportExport.ts | commands/import_export.rs | 导出播放列表为 PLS 格式 |
+| `export_backup` | composables/useImportExport.ts | commands/import_export.rs | 导出完整备份到 JSON |
+| `import_backup` | composables/useImportExport.ts | commands/import_export.rs | 导入备份（replace/merge） |
+| `export_settings` | composables/useImportExport.ts | commands/import_export.rs | 导出设置到 JSON |
+| `import_settings` | composables/useImportExport.ts | commands/import_export.rs | 从 JSON 导入设置 |
 | **频谱分析** | | | |
 | `analyzer_start` | visualization/useAudioAnalyzer.ts | audio.rs | 启动频谱分析 |
 | `analyzer_stop` | visualization/useAudioAnalyzer.ts | audio.rs | 停止频谱分析 |
@@ -124,6 +131,33 @@ App.vue onMounted
 -> 数据库更新
 -> Vuetify 主题系统响应
 -> UI 更新
+```
+
+### 歌单导出流程
+
+```
+用户右键歌单 → 导出歌单
+-> useImportExport.exportPlaylist()
+-> Tauri Dialog 选择保存路径 (M3U/PLS)
+-> invokeCommand('export_playlist_m3u' 或 'export_playlist_pls')
+-> import_export.rs 查询歌单歌曲并写入文件
+```
+
+### 备份恢复流程
+
+```
+用户在设置页 → 备份音乐库
+-> useImportExport.exportBackup()
+-> Tauri Dialog 选择保存路径
+-> invokeCommand('export_backup')
+-> import_export.rs 导出 songs+playlists+lyrics+settings 到 JSON
+
+用户在设置页 → 恢复音乐库
+-> Tauri Dialog 选择备份文件
+-> 用户选择策略 (replace/merge)
+-> invokeCommand('import_backup', {filePath, strategy})
+-> import_export.rs 事务导入，返回 ImportResult
+-> useLibraryStore.loadFromDb() 刷新前端状态
 ```
 
 ## 核心事件

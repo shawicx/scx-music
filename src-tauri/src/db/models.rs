@@ -29,3 +29,11 @@ pub struct PlaylistSong {
     pub song_id: String,
     pub sort_order: i64,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Lyric {
+    pub song_id: String,
+    pub raw_lrc: Option<String>,
+    pub source: String,
+}
