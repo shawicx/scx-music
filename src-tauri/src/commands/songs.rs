@@ -1,5 +1,8 @@
 use crate::db::models::Song;
 use crate::db::Db;
+use lofty::config::WriteOptions;
+use lofty::file::{AudioFile, TaggedFileExt};
+use lofty::tag::ItemKey;
 use rusqlite::params;
 
 #[tauri::command]
@@ -69,4 +72,121 @@ pub fn delete_songs(db: tauri::State<'_, Db>, ids: Vec<String>) -> Result<(), St
     }
     tx.commit().map_err(|e| e.to_string())?;
     Ok(())
+}
+
+#[tauri::command]
+pub fn rename_song(
+    song_id: String,
+    new_title: String,
+    new_artist: Option<String>,
+    new_album: Option<String>,
+    db: tauri::State<'_, Db>,
+) -> Result<Song, String> {
+    let conn = db.0.lock().map_err(|e| e.to_string())?;
+
+    // 1. Query current song
+    let (old_file_path, old_artist, old_album): (String, String, String) = conn
+        .query_row(
+            "SELECT file_path, artist, album FROM songs WHERE id = ?1",
+            params![song_id],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+        )
+        .map_err(|e| format!("Song not found: {}", e))?;
+
+    // 2. Validate file exists and is writable
+    let old_path = std::path::Path::new(&old_file_path);
+    if !old_path.exists() {
+        return Err("File not found on disk".to_string());
+    }
+
+    let parent = old_path.parent().ok_or("Cannot determine parent directory")?;
+    let metadata = std::fs::metadata(&old_file_path).map_err(|e| format!("Cannot read file: {}", e))?;
+    if metadata.permissions().readonly() {
+        return Err("File is read-only".to_string());
+    }
+
+    // 3. Write metadata tags via Lofty
+    let artist = new_artist.unwrap_or(old_artist);
+    let album = new_album.unwrap_or(old_album);
+
+    if let Ok(mut tagged) = lofty::read_from_path(&old_file_path) {
+        if let Some(tag) = tagged.primary_tag_mut() {
+            tag.insert_text(lofty::tag::ItemKey::TrackTitle, new_title.clone());
+            tag.insert_text(lofty::tag::ItemKey::TrackArtist, artist.clone());
+            tag.insert_text(lofty::tag::ItemKey::AlbumTitle, album.clone());
+            tagged.save_to_path(&old_file_path, WriteOptions::default()).map_err(|e| format!("Failed to write metadata: {}", e))?;
+        }
+    }
+
+    // 4. Build new filename, resolve conflicts
+    let extension = old_path
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_string();
+
+    let new_filename = if extension.is_empty() {
+        sanitize_filename(&new_title)
+    } else {
+        format!("{}.{}", sanitize_filename(&new_title), extension)
+    };
+
+    let mut new_path = parent.join(&new_filename);
+    let mut counter = 2u32;
+    while new_path.exists() && new_path != old_path {
+        let conflict_name = if extension.is_empty() {
+            format!("{} ({})", sanitize_filename(&new_title), counter)
+        } else {
+            format!("{} ({}).{}", sanitize_filename(&new_title), counter, extension)
+        };
+        new_path = parent.join(&conflict_name);
+        counter += 1;
+    }
+
+    // 5. Rename file on disk
+    if new_path != old_path {
+        std::fs::rename(&old_file_path, new_path.to_string_lossy().to_string())
+            .map_err(|e| format!("Failed to rename file: {}", e))?;
+    }
+
+    let new_file_path = new_path.to_string_lossy().to_string();
+
+    // 6. Update database
+    conn.execute(
+        "UPDATE songs SET title = ?1, artist = ?2, album = ?3, file_path = ?4 WHERE id = ?5",
+        params![new_title, artist, album, new_file_path, song_id],
+    )
+    .map_err(|e| e.to_string())?;
+
+    // 7. Return updated song
+    let song = conn
+        .query_row(
+            "SELECT id, title, artist, album, duration, duration_secs, quality, file_path, art_gradient FROM songs WHERE id = ?1",
+            params![song_id],
+            |row| {
+                Ok(Song {
+                    id: row.get(0)?,
+                    title: row.get(1)?,
+                    artist: row.get(2)?,
+                    album: row.get(3)?,
+                    duration: row.get(4)?,
+                    duration_secs: row.get(5)?,
+                    quality: row.get(6)?,
+                    file_path: row.get(7)?,
+                    art_gradient: row.get(8)?,
+                })
+            },
+        )
+        .map_err(|e| e.to_string())?;
+
+    Ok(song)
+}
+
+fn sanitize_filename(name: &str) -> String {
+    name.chars()
+        .map(|c| match c {
+            '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|' => '_',
+            _ => c,
+        })
+        .collect()
 }

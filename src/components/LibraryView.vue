@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useLibraryStore } from '../stores/library'
 import { usePlayerStore } from '../stores/player'
+import type { Song } from '../types'
 import LibraryHeader from './library/LibraryHeader.vue'
 import SongTable from './library/SongTable.vue'
 import VirtualSongTable from './library/VirtualSongTable.vue'
@@ -10,6 +11,7 @@ import SongGrid from './library/SongGrid.vue'
 import BrowseCards from './library/BrowseCards.vue'
 import EmptyStates from './library/EmptyStates.vue'
 import SortMenu from './library/SortMenu.vue'
+import RenameDialog from './library/RenameDialog.vue'
 import { useI18n } from '../composables/useI18n'
 import { usePlaylistTransition } from '../composables/usePlaylistTransition'
 import { useViewModeFlip } from '../composables/useViewModeFlip'
@@ -107,6 +109,9 @@ const songMenu = ref<{ show: boolean; x: number; y: number; songId: string }>({
   show: false, x: 0, y: 0, songId: '',
 })
 
+const showRenameDialog = ref(false)
+const renameSongData = ref<Song | null>(null)
+
 function openSongMenu(e: MouseEvent, songId: string) {
   e.preventDefault()
   songMenu.value = { show: true, x: e.clientX, y: e.clientY, songId }
@@ -121,6 +126,15 @@ function handleRemoveFromPlaylist() {
   const pid = activePlaylistId.value
   if (pid) {
     removeSongFromPlaylist(pid, songMenu.value.songId)
+  }
+  songMenu.value.show = false
+}
+
+function handleRenameSong() {
+  const song = displayedSongs.value.find((s) => s.id === songMenu.value.songId)
+  if (song) {
+    renameSongData.value = song
+    showRenameDialog.value = true
   }
   songMenu.value.show = false
 }
@@ -238,6 +252,12 @@ const emptyStateType = computed(() => {
               :title="t('library.removeFromPlaylist')"
               @click="handleRemoveFromPlaylist"
             />
+            <v-divider />
+            <v-list-item
+              :title="t('library.rename')"
+              prepend-icon="mdi-pencil"
+              @click="handleRenameSong"
+            />
           </v-list>
         </v-menu>
 
@@ -250,6 +270,12 @@ const emptyStateType = computed(() => {
           :sort-order="sortOrder"
           @update:show="sortMenu.show = $event"
           @sort="handleSortBy"
+        />
+
+        <RenameDialog
+          v-model="showRenameDialog"
+          :song="renameSongData"
+          @renamed="() => {}"
         />
       </div>
     </Transition>

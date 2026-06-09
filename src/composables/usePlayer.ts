@@ -212,6 +212,13 @@ export function usePlayer() {
     }
   }
 
+  function updateSongInQueue(updatedSong: Song) {
+    queue.value = queue.value.map((s) => (s.id === updatedSong.id ? updatedSong : s))
+    if (currentSong.value && currentSong.value.id === updatedSong.id) {
+      currentSong.value = updatedSong
+    }
+  }
+
   function cleanup() {
     unlisteners.forEach((unlisten) => unlisten())
     unlisteners.length = 0
@@ -241,6 +248,7 @@ export function usePlayer() {
     setMode,
     stop,
     getState,
+    updateSongInQueue,
     formatTime,
     cleanup,
 

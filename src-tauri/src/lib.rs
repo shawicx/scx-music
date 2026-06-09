@@ -175,6 +175,7 @@ pub fn run() {
             commands::songs::get_all_songs,
             commands::songs::upsert_songs,
             commands::songs::delete_songs,
+            commands::songs::rename_song,
             commands::playlists::get_playlists,
             commands::playlists::create_playlist,
             commands::playlists::rename_playlist,

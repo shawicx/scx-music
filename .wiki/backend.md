@@ -41,6 +41,7 @@
 - `get_all_songs` - 获取所有歌曲
 - `upsert_songs` - 批量插入/更新歌曲（返回实际 DB ID）
 - `delete_songs` - 删除歌曲
+- `rename_song` - 重命名歌曲（更新元数据标签 + 重命名文件 + 更新数据库）
 
 **commands/playlists.rs** - 播放列表管理
 - `get_playlists` - 获取所有播放列表
@@ -72,6 +73,37 @@
 - `import_backup` - 导入备份（支持 replace/merge 策略）
 - `export_settings` - 导出设置为 JSON 文件
 - `import_settings` - 从 JSON 文件导入设置
+
+**commands/songs.rs - rename_song 详解**
+
+**文件位置：** `src-tauri/src/commands/songs.rs`
+
+**参数：**
+- `song_id` (String) - 歌曲 ID
+- `new_title` (String) - 新标题
+- `new_artist` (Option<String>) - 新艺术家（None 则保留原值）
+- `new_album` (Option<String>) - 新专辑（None 则保留原值）
+
+**返回：** 更新后的 `Song` 对象
+
+**处理流程：**
+1. 从数据库查询当前歌曲（获取 file_path、artist、album）
+2. 验证文件存在且可写
+3. 使用 Lofty 写入元数据标签（TrackTitle、TrackArtist、AlbumTitle）
+4. 构建新文件名（基于 new_title，通过 `sanitize_filename` 清理非法字符）
+5. 文件名冲突解决：若目标文件已存在且非自身，添加 `(2)`, `(3)` ... 后缀
+6. 重命名磁盘文件（`std::fs::rename`）
+7. 更新数据库记录（title、artist、album、file_path）
+8. 返回更新后的完整 Song 对象
+
+**错误情况：**
+- 歌曲未找到（DB 查询失败）
+- 文件在磁盘上不存在
+- 文件只读（permissions.readonly）
+- 元数据写入失败（Lofty save 错误）
+- 文件重命名失败（`std::fs::rename` 错误）
+
+**辅助函数：** `sanitize_filename(name)` — 将 `/ \ : * ? " < > |` 替换为 `_`
 
 **lib.rs** - 文件扫描
 - `scan_music_folder` - 扫描音乐文件夹并提取元数据

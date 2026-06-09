@@ -5,6 +5,7 @@ import { invokeCommand } from '../utils/errorHandler'
 import { useToast } from './useToast'
 import { useDebounceSearch } from './useDebounceSearch'
 import { useOptimizedSort } from './useOptimizedSort'
+import { usePlayerStore } from '../stores/player'
 import i18n from '../i18n'
 
 const songs = ref<Song[]>([])
@@ -234,6 +235,26 @@ export function useLibrary() {
     }
   }
 
+  async function renameSong(songId: string, newTitle: string, newArtist?: string, newAlbum?: string) {
+    try {
+      const updated = await invokeCommand<Song>('rename_song', {
+        songId,
+        newTitle,
+        newArtist: newArtist ?? null,
+        newAlbum: newAlbum ?? null,
+      })
+      songs.value = songs.value.map((s) => (s.id === songId ? updated : s))
+
+      const playerStore = usePlayerStore()
+      playerStore.updateSongInQueue(updated)
+
+      showSuccess(t('toast.songRenamed'))
+    } catch (error) {
+      showError(t('toast.songRenameFailed'))
+      throw error
+    }
+  }
+
   async function importToPlaylist(playlistId: string) {
     try {
       const { open } = await import('@tauri-apps/plugin-dialog')
@@ -334,6 +355,7 @@ export function useLibrary() {
     deletePlaylist,
     addSongToPlaylist,
     removeSongFromPlaylist,
+    renameSong,
     clearPlaylist,
     importToPlaylist,
     playSong,

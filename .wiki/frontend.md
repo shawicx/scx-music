@@ -46,6 +46,7 @@
 **工具方法：**
 - `formatTime()` - 时间格式化
 - `progressFormatted` / `durationFormatted` - 格式化计算属性
+- `updateSongInQueue(updatedSong)` - 更新队列数组中对应歌曲，同步更新 `currentSong` ref（用于歌曲重命名后保持播放状态一致）
 
 ### stores/library.ts - 音乐库管理 (useLibraryStore)
 
@@ -71,6 +72,7 @@
 **IPC 封装：**
 - `loadFromDb()` -> `get_bootstrap_data` (单次加载全部数据)
 - `importToPlaylist()` -> `scan_music_folder` + `upsert_songs` + `clear_playlist` + `add_songs_to_playlist`
+- `renameSong(songId, newTitle, newArtist?, newAlbum?)` -> `rename_song` — 更新本地 `songs` 状态，通过 `usePlayerStore.updateSongInQueue` 同步播放队列，显示 Toast
 - 播放列表 CRUD -> `create_playlist`, `rename_playlist`, `delete_playlist`
 - 播放列表歌曲 -> `add_songs_to_playlist`, `remove_song_from_playlist`, `clear_playlist`
 
@@ -112,6 +114,7 @@
 - **BrowseCards.vue** - 浏览卡片视图（专辑/艺术家网格）
 - **EmptyStates.vue** - 空状态提示组件
 - **LibraryHeader.vue** - 库头部工具栏（搜索、显示模式切换）
+- **RenameDialog.vue** - 歌曲重命名对话框（标题必填、艺术家、专辑可选，loading/error 状态，Enter 提交）
 - **SongGrid.vue** - 歌曲网格视图（小数据量）
 - **SongTable.vue** - 歌曲表格视图（小数据量）
 - **SortMenu.vue** - 排序菜单（标题/艺术家/专辑/时长排序）
@@ -267,7 +270,8 @@ common / sidebar / library / player / settings / playbackMode / toast / empty / 
 
 1. **播放控制** - stores/player.ts 封装所有播放相关 IPC + 事件监听
 2. **歌曲导入** - stores/library.ts 的 `importToPlaylist()` 方法
-3. **播放列表管理** - stores/library.ts 的增删改查 + 清空方法
-4. **主题切换** - stores/settings.ts 的主题管理逻辑
-5. **歌词同步** - composables/useLyrics.ts 进度驱动歌词行匹配
-6. **数据导入导出** - composables/useImportExport.ts 歌单导出、备份恢复、设置迁移
+3. **歌曲重命名** - stores/library.ts 的 `renameSong()` 方法（后端更新元数据+文件+数据库，前端同步歌曲列表和播放队列）
+4. **播放列表管理** - stores/library.ts 的增删改查 + 清空方法
+5. **主题切换** - stores/settings.ts 的主题管理逻辑
+6. **歌词同步** - composables/useLyrics.ts 进度驱动歌词行匹配
+7. **数据导入导出** - composables/useImportExport.ts 歌单导出、备份恢复、设置迁移
