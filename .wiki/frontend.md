@@ -115,6 +115,7 @@
 - **EmptyStates.vue** - 空状态提示组件
 - **LibraryHeader.vue** - 库头部工具栏（搜索、显示模式切换）
 - **RenameDialog.vue** - 歌曲重命名对话框（标题必填、艺术家、专辑可选，loading/error 状态，Enter 提交）
+- **UpdateDialog.vue** - 自动更新提示弹窗（available/downloading/ready/error 四状态，进度条，重启按钮）
 - **SongGrid.vue** - 歌曲网格视图（小数据量）
 - **SongTable.vue** - 歌曲表格视图（小数据量）
 - **SortMenu.vue** - 排序菜单（标题/艺术家/专辑/时长排序）
@@ -151,6 +152,7 @@
 - **composables/useDebounceSearch.ts** - 搜索防抖（300ms）
 - **composables/useOptimizedSort.ts** - 排序缓存（中文 locale 支持）
 - **composables/useImportExport.ts** - 导入导出功能（歌单导出 M3U/PLS、音乐库备份恢复、设置迁移）
+- **composables/useAutoUpdate.ts** - 自动更新逻辑（启动延迟检查、下载进度跟踪、重启安装）
 
 ## Animation System
 
@@ -260,7 +262,7 @@ App.vue onMounted
 - `src/composables/useI18n.ts`: i18n 组合式函数
 
 ### 命名空间
-common / sidebar / library / player / settings / playbackMode / toast / empty / importExport
+common / sidebar / library / player / settings / playbackMode / toast / empty / importExport / update
 
 ## IPC 封装位置
 
@@ -275,3 +277,4 @@ common / sidebar / library / player / settings / playbackMode / toast / empty / 
 5. **主题切换** - stores/settings.ts 的主题管理逻辑
 6. **歌词同步** - composables/useLyrics.ts 进度驱动歌词行匹配
 7. **数据导入导出** - composables/useImportExport.ts 歌单导出、备份恢复、设置迁移
+8. **自动更新** - composables/useAutoUpdate.ts 启动时延迟检查更新，用户确认后下载安装，UpdateDialog 显示进度和状态

@@ -108,6 +108,26 @@
 **lib.rs** - 文件扫描
 - `scan_music_folder` - 扫描音乐文件夹并提取元数据
 
+## 自动更新
+
+**依赖：** `tauri-plugin-updater`, `tauri-plugin-process`
+
+**插件注册（lib.rs）：**
+- `tauri_plugin_updater::Builder::new().build()` — 更新检查与下载
+- `tauri_plugin_process::init()` — 提供重启功能（`relaunch()`）
+
+**配置（tauri.conf.json）：**
+- `bundle.createUpdaterArtifacts: true` — 构建时生成更新签名产物
+- `plugins.updater.endpoints` — 更新 JSON 端点（GitHub Releases）
+- `plugins.updater.pubkey` — 签名验证公钥
+
+**权限（capabilities/default.json）：**
+- `updater:default` — 允许前端调用更新 API
+
+**签名密钥：**
+- 私钥：`~/.tauri/scx-music.key`（CI 通过 `TAURI_SIGNING_PRIVATE_KEY` 环境变量注入）
+- 公钥：嵌入 `tauri.conf.json`
+
 ## Services
 
 ### audio.rs - 音频引擎

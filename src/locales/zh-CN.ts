@@ -139,4 +139,17 @@ export default {
     replaceLabel: '覆盖恢复',
     mergeLabel: '合并恢复',
   },
+  update: {
+    available: '发现新版本',
+    newVersion: '新版本 {version} 可用',
+    updateNow: '立即更新',
+    later: '稍后',
+    downloading: '下载中...',
+    ready: '更新已就绪',
+    readyDescription: '更新已下载完成，重启以安装',
+    restart: '重启',
+    error: '更新失败',
+    retry: '重试',
+    close: '关闭',
+  },
 }

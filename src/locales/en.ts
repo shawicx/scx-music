@@ -139,4 +139,17 @@ export default {
     replaceLabel: 'Replace',
     mergeLabel: 'Merge',
   },
+  update: {
+    available: 'Update Available',
+    newVersion: 'A new version {version} is available',
+    updateNow: 'Update Now',
+    later: 'Later',
+    downloading: 'Downloading...',
+    ready: 'Update Ready',
+    readyDescription: 'Update downloaded, restart to install',
+    restart: 'Restart',
+    error: 'Update Failed',
+    retry: 'Retry',
+    close: 'Close',
+  },
 }

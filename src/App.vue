@@ -13,6 +13,8 @@ import { useToast } from './composables/useToast'
 import { useI18n } from './composables/useI18n'
 import { usePageTransition } from './composables/usePageTransition'
 import { usePlayerExpand } from './composables/usePlayerExpand'
+import { useAutoUpdate } from './composables/useAutoUpdate'
+import UpdateDialog from './components/UpdateDialog.vue'
 
 const settingsStore = useSettingsStore()
 const libraryStore = useLibraryStore()
@@ -21,6 +23,7 @@ const { toastMessage, toastVisible, toastColor } = useToast()
 const { initLocale } = useI18n()
 const { onEnter: onPageEnter, onLeave: onPageLeave } = usePageTransition()
 const { onEnter: onOverlayEnter, onLeave: onOverlayLeave } = usePlayerExpand()
+const { startCheck } = useAutoUpdate()
 
 function isEditable(e: Event) {
   const el = e.target as HTMLElement
@@ -71,6 +74,8 @@ onMounted(async () => {
   ])
 
   console.log(`[perf] App initialized in ${(performance.now() - t0).toFixed(0)}ms`)
+
+  startCheck()
 })
 
 const activeView = ref('library')
@@ -109,6 +114,7 @@ const showNowPlaying = ref(false)
     >
       {{ toastMessage }}
     </v-snackbar>
+    <UpdateDialog />
   </v-app>
 </template>
 

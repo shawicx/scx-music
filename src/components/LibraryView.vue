@@ -255,7 +255,6 @@ const emptyStateType = computed(() => {
             <v-divider />
             <v-list-item
               :title="t('library.rename')"
-              prepend-icon="mdi-pencil"
               @click="handleRenameSong"
             />
           </v-list>
