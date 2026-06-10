@@ -2,7 +2,7 @@ use std::fs::File;
 use std::io::BufReader;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
-use std::thread;
+use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 
 use rand::Rng;
@@ -91,6 +91,7 @@ pub struct AudioStateInner {
     position_base_secs: f64,
     segment_started_at: Option<Instant>,
     progress_stop: Arc<AtomicBool>,
+    progress_thread_handle: Option<JoinHandle<()>>,
     output_device_name: Option<String>,
     pub analyzer: AnalyzerHandle,
 }
@@ -110,6 +111,7 @@ impl AudioStateInner {
             position_base_secs: 0.0,
             segment_started_at: None,
             progress_stop: Arc::new(AtomicBool::new(false)),
+            progress_thread_handle: None,
             output_device_name: None,
             analyzer: AnalyzerHandle::new(),
         }
@@ -356,7 +358,7 @@ impl AudioStateInner {
     }
 }
 
-pub fn start_progress_thread(state: AudioState, app: AppHandle) {
+pub fn start_progress_thread(state: AudioState, app: AppHandle) -> JoinHandle<()> {
     let stop_flag = state.lock().unwrap().progress_stop.clone();
 
     thread::spawn(move || {
@@ -416,7 +418,7 @@ pub fn start_progress_thread(state: AudioState, app: AppHandle) {
                 }
             }
         }
-    });
+    })
 }
 
 // ---- Tauri Commands ----
@@ -431,6 +433,13 @@ pub fn player_set_queue(
     let arc: AudioState = (*state).clone();
     {
         let mut s = arc.lock().unwrap();
+        s.progress_stop.store(true, Ordering::Relaxed);
+        let old_handle = s.progress_thread_handle.take();
+        drop(s);
+        if let Some(handle) = old_handle {
+            let _ = handle.join();
+        }
+        let mut s = arc.lock().unwrap();
         s.progress_stop.store(false, Ordering::Relaxed);
         s.queue = songs;
         s.play_file_at_index(index)?;
@@ -439,7 +448,8 @@ pub fn player_set_queue(
         let _ = app.emit("audio:track_change", &payload.current_song);
         let _ = app.emit("audio:state_change", &payload);
     }
-    start_progress_thread(arc, app);
+    let handle = start_progress_thread(arc.clone(), app);
+    arc.lock().unwrap().progress_thread_handle = Some(handle);
     Ok(())
 }
 

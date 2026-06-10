@@ -12,6 +12,32 @@ interface Particle {
 let particles: Particle[] = []
 let initialized = false
 
+const GLOW_LAYERS = 4
+const GLOW_BASE_SIZE = 48
+const glowCanvases: HTMLCanvasElement[] = []
+
+function buildGlowCache(r: number, g: number, b: number) {
+  glowCanvases.length = 0
+  for (let layer = 0; layer < GLOW_LAYERS; layer++) {
+    const alpha = 0.25 + (layer / GLOW_LAYERS) * 0.55
+    const size = GLOW_BASE_SIZE * (1 - layer * 0.15)
+    const c = document.createElement('canvas')
+    c.width = size
+    c.height = size
+    const cx = c.getContext('2d')!
+    const half = size / 2
+    const gradient = cx.createRadialGradient(half, half, 0, half, half, half)
+    gradient.addColorStop(0, `rgba(${r}, ${g}, ${b}, ${alpha})`)
+    gradient.addColorStop(0.4, `rgba(${r}, ${g}, ${b}, ${alpha * 0.5})`)
+    gradient.addColorStop(1, 'transparent')
+    cx.fillStyle = gradient
+    cx.fillRect(0, 0, size, size)
+    glowCanvases.push(c)
+  }
+}
+
+let cachedColorKey = ''
+
 function initParticles(width: number, height: number) {
   const count = 250
   particles = []
@@ -38,9 +64,17 @@ export const particleRenderer: Renderer = ({ ctx, width, height, frequencyData, 
   }
 
   const { r, g, b } = themeColor
+  const colorKey = `${r},${g},${b}`
+  if (colorKey !== cachedColorKey) {
+    buildGlowCache(r, g, b)
+    cachedColorKey = colorKey
+  }
+
   const cx = width / 2
   const cy = height / 2
   const maxDist = Math.min(width, height) * 0.45
+
+  ctx.globalCompositeOperation = 'lighter'
 
   for (const p of particles) {
     const value = frequencyData[p.binIndex] / 255
@@ -59,22 +93,15 @@ export const particleRenderer: Renderer = ({ ctx, width, height, frequencyData, 
     }
 
     const size = p.baseSize * (1 + value * 3)
-    const alpha = 0.2 + value * 0.7
+    const alpha = 0.3 + value * 0.7
 
-    const gradient = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, size * 3)
-    gradient.addColorStop(0, `rgba(${r}, ${g}, ${b}, ${alpha})`)
-    gradient.addColorStop(0.4, `rgba(${r}, ${g}, ${b}, ${alpha * 0.5})`)
-    gradient.addColorStop(1, 'transparent')
-
-    ctx.fillStyle = gradient
-    ctx.fillRect(p.x - size * 3, p.y - size * 3, size * 6, size * 6)
-
-    const coreR = Math.min(255, r + 100)
-    const coreG = Math.min(255, g + 100)
-    const coreB = Math.min(255, b + 100)
-    ctx.fillStyle = `rgba(${coreR}, ${coreG}, ${coreB}, ${alpha})`
-    ctx.beginPath()
-    ctx.arc(p.x, p.y, size * 0.5, 0, Math.PI * 2)
-    ctx.fill()
+    const layerIdx = Math.min(GLOW_LAYERS - 1, Math.floor(alpha * GLOW_LAYERS))
+    const glow = glowCanvases[layerIdx]
+    const drawSize = size * 6
+    ctx.globalAlpha = alpha
+    ctx.drawImage(glow, p.x - drawSize / 2, p.y - drawSize / 2, drawSize, drawSize)
   }
+
+  ctx.globalCompositeOperation = 'source-over'
+  ctx.globalAlpha = 1
 }

@@ -114,6 +114,7 @@ function handleRename() {
   if (!name) return
   renamePlaylist(renamingPlaylistId.value, name)
   showRenameDialog.value = false
+  showSuccess(t('toast.playlistRenamed'))
 }
 
 function handleClearPlaylist() {

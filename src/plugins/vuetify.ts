@@ -1,6 +1,4 @@
 import { createVuetify } from 'vuetify'
-import * as components from 'vuetify/components'
-import * as directives from 'vuetify/directives'
 import { aliases, mdi } from 'vuetify/iconsets/mdi'
 import 'vuetify/styles'
 import '@mdi/font/css/materialdesignicons.css'
@@ -76,8 +74,6 @@ for (const [colorName, colorData] of Object.entries(materialColors)) {
 }
 
 export default createVuetify({
-  components,
-  directives,
   icons: {
     defaultSet: 'mdi',
     aliases,

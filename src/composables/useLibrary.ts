@@ -156,7 +156,6 @@ export function useLibrary() {
       const pl = await invokeCommand<{ id: string; name: string; sort_order: number }>('create_playlist', { name })
       playlists.value = [...playlists.value, { id: pl.id, name: pl.name }]
       playlistSongs.value = { ...playlistSongs.value, [pl.id]: [] }
-      showSuccess(t('toast.playlistCreated', { name }))
       return pl.id
     } catch (error) {
       showError(t('toast.createPlaylistFailed'))
@@ -168,7 +167,6 @@ export function useLibrary() {
     try {
       await invokeCommand('rename_playlist', { id, name })
       playlists.value = playlists.value.map((p) => (p.id === id ? { ...p, name } : p))
-      showSuccess(t('toast.playlistRenamed'))
     } catch (error) {
       showError(t('toast.renameFailed'))
       throw error
@@ -188,7 +186,6 @@ export function useLibrary() {
           saveSetting('activePlaylistId', activePlaylistId.value)
         }
       }
-      showSuccess(t('toast.playlistDeleted'))
     } catch (error) {
       showError(t('toast.deletePlaylistFailed'))
       throw error
@@ -307,7 +304,6 @@ export function useLibrary() {
         [playlistId]: actualIds,
       }
 
-      showSuccess(t('toast.songsImported', { count: actualIds.length }))
       return actualIds.length
     } catch (error) {
       showError(t('toast.importFailed'))

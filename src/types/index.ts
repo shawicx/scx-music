@@ -21,18 +21,7 @@ export type PlaybackMode = 'sequential' | 'repeat_all' | 'repeat_one' | 'shuffle
 export type PlaybackState = 'playing' | 'paused' | 'stopped'
 export type VisualizationStyle = 'bar' | 'circular' | 'wave' | 'particle'
 
-// 主题相关类型
-export type ThemeColor =
-  | 'teal'
-  | 'pink'
-  | 'green'
-  | 'orange'
-  | 'blue'
-  | 'purple'
-  | 'indigo'
-  | 'cyan'
-
-export type ThemeMode = 'light' | 'dark' | 'system'
+// 主题相关类型 — ThemeColor 和 ThemeMode 统一从 plugins/vuetify.ts 导出
 
 // 视图相关类型
 export type ViewMode = 'list' | 'grid'
@@ -42,8 +31,8 @@ export type SortOrder = 'asc' | 'desc'
 
 // 设置相关类型
 export interface AppSettings {
-  theme_color: ThemeColor
-  theme_mode: ThemeMode
+  theme_color: string
+  theme_mode: string
   output_device: string | null
   currentSongId: string | null
   viewMode: ViewMode
@@ -64,10 +53,10 @@ export type Result<T> =
 // 音频设备相关类型
 export interface AudioDeviceInfo {
   name: string
-  is_default: boolean
+  isDefault: boolean
 }
 
 export interface AudioDevicesResponse {
   devices: AudioDeviceInfo[]
-  default_device_name: string | null
+  defaultDeviceName: string | null
 }

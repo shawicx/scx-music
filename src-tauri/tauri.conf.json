@@ -18,7 +18,7 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://lrclib.net https://github.com https://github.com; img-src 'self' data: asset: https://asset.localhost"
     }
   },
   "bundle": {

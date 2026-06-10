@@ -45,15 +45,9 @@ async function handleSetLocale(value: LocaleSetting) {
   await setLocale(value)
 }
 
-interface AudioDeviceInfo {
-  name: string
-  isDefault: boolean
-}
+import type { AudioDevicesResponse } from '../types'
 
-interface AudioDevicesResponse {
-  devices: AudioDeviceInfo[]
-  defaultDeviceName: string | null
-}
+type AudioDeviceInfo = AudioDevicesResponse['devices'][number]
 
 const devices = ref<AudioDeviceInfo[]>([])
 const defaultDeviceName = ref<string | null>(null)

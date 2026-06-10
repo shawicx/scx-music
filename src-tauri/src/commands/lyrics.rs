@@ -23,7 +23,7 @@ pub struct LyricsResult {
 }
 
 #[tauri::command]
-pub fn get_lyrics(
+pub async fn get_lyrics(
     db: tauri::State<'_, Db>,
     song_id: String,
     file_path: String,
@@ -31,38 +31,42 @@ pub fn get_lyrics(
     artist: String,
     duration_secs: f64,
 ) -> Result<Option<LyricsResult>, String> {
-    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    // 1. Check SQLite cache + 2. Try embedded lyrics (sync, no .await)
+    let early_result = {
+        let conn = db.0.lock().map_err(|e| e.to_string())?;
 
-    // 1. Check SQLite cache
-    let cached: Option<(Option<String>, String)> = conn
-        .query_row(
-            "SELECT raw_lrc, source FROM lyrics WHERE song_id = ?1",
-            params![song_id],
-            |row| Ok((row.get(0)?, row.get(1)?)),
-        )
-        .ok();
+        let cached: Option<(Option<String>, String)> = conn
+            .query_row(
+                "SELECT raw_lrc, source FROM lyrics WHERE song_id = ?1",
+                params![song_id],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .ok();
 
-    if let Some((raw_lrc, source)) = cached {
-        return Ok(Some(LyricsResult { raw_lrc, source }));
+        if let Some((raw_lrc, source)) = cached {
+            Some(Ok(Some(LyricsResult { raw_lrc, source })))
+        } else if let Some(raw_lrc) = extract_embedded_lyrics(&file_path) {
+            let source = "embedded".to_string();
+            conn.execute(
+                "INSERT INTO lyrics (song_id, raw_lrc, source) VALUES (?1, ?2, ?3)",
+                params![song_id, raw_lrc, source],
+            )
+            .map_err(|e| e.to_string())?;
+            Some(Ok(Some(LyricsResult {
+                raw_lrc: Some(raw_lrc),
+                source,
+            })))
+        } else {
+            None
+        }
+    };
+
+    if let Some(result) = early_result {
+        return result;
     }
 
-    // 2. Try embedded lyrics from Lofty
-    if let Some(raw_lrc) = extract_embedded_lyrics(&file_path) {
-        let source = "embedded".to_string();
-        conn.execute(
-            "INSERT INTO lyrics (song_id, raw_lrc, source) VALUES (?1, ?2, ?3)",
-            params![song_id, raw_lrc, source],
-        )
-        .map_err(|e| e.to_string())?;
-        return Ok(Some(LyricsResult {
-            raw_lrc: Some(raw_lrc),
-            source,
-        }));
-    }
-
-    // 3. Try LRCLIB online
-    drop(conn); // release lock before HTTP request
-    if let Some(result) = fetch_lrclib(&title, &artist, duration_secs) {
+    // 3. Try LRCLIB online (conn is dropped, safe to .await)
+    if let Some(result) = fetch_lrclib(&title, &artist, duration_secs).await {
         let conn = db.0.lock().map_err(|e| e.to_string())?;
         conn.execute(
             "INSERT INTO lyrics (song_id, raw_lrc, source) VALUES (?1, ?2, ?3)",
@@ -83,14 +87,14 @@ pub fn get_lyrics(
 }
 
 #[tauri::command]
-pub fn refresh_lyrics(
+pub async fn refresh_lyrics(
     db: tauri::State<'_, Db>,
     song_id: String,
     title: String,
     artist: String,
     duration_secs: f64,
 ) -> Result<Option<LyricsResult>, String> {
-    if let Some(result) = fetch_lrclib(&title, &artist, duration_secs) {
+    if let Some(result) = fetch_lrclib(&title, &artist, duration_secs).await {
         let conn = db.0.lock().map_err(|e| e.to_string())?;
         conn.execute(
             "INSERT OR REPLACE INTO lyrics (song_id, raw_lrc, source) VALUES (?1, ?2, ?3)",
@@ -124,9 +128,9 @@ fn extract_embedded_lyrics(file_path: &str) -> Option<String> {
     None
 }
 
-fn fetch_lrclib(title: &str, artist: &str, duration_secs: f64) -> Option<LyricsResult> {
+async fn fetch_lrclib(title: &str, artist: &str, duration_secs: f64) -> Option<LyricsResult> {
     let query = format!("{} {}", title, artist);
-    let client = reqwest::blocking::Client::builder()
+    let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(8))
         .build()
         .ok()?;
@@ -144,12 +148,12 @@ fn fetch_lrclib(title: &str, artist: &str, duration_secs: f64) -> Option<LyricsR
         )
     };
 
-    let resp = client.get(&url).send().ok()?;
+    let resp = client.get(&url).send().await.ok()?;
     if !resp.status().is_success() {
         return None;
     }
 
-    let results: Vec<LrclibSearchResult> = resp.json().ok()?;
+    let results: Vec<LrclibSearchResult> = resp.json().await.ok()?;
     if results.is_empty() {
         return None;
     }

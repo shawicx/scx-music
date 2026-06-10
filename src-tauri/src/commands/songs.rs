@@ -82,16 +82,16 @@ pub fn rename_song(
     new_album: Option<String>,
     db: tauri::State<'_, Db>,
 ) -> Result<Song, String> {
-    let conn = db.0.lock().map_err(|e| e.to_string())?;
-
-    // 1. Query current song
-    let (old_file_path, old_artist, old_album): (String, String, String) = conn
-        .query_row(
+    // 1. Query current song (release lock immediately)
+    let (old_file_path, old_artist, old_album): (String, String, String) = {
+        let conn = db.0.lock().map_err(|e| e.to_string())?;
+        conn.query_row(
             "SELECT file_path, artist, album FROM songs WHERE id = ?1",
             params![song_id],
             |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
         )
-        .map_err(|e| format!("Song not found: {}", e))?;
+        .map_err(|e| format!("Song not found: {}", e))?
+    };
 
     // 2. Validate file exists and is writable
     let old_path = std::path::Path::new(&old_file_path);
@@ -151,7 +151,8 @@ pub fn rename_song(
 
     let new_file_path = new_path.to_string_lossy().to_string();
 
-    // 6. Update database
+    // 6. Update database (re-acquire lock)
+    let conn = db.0.lock().map_err(|e| e.to_string())?;
     conn.execute(
         "UPDATE songs SET title = ?1, artist = ?2, album = ?3, file_path = ?4 WHERE id = ?5",
         params![new_title, artist, album, new_file_path, song_id],

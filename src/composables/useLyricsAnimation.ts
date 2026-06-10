@@ -24,14 +24,16 @@ export function useLyricsAnimation(
       else if (distance === 2) opacity = 0.3
       else opacity = 0.2
 
-      const scale = distance === 0 ? 1.02 : 1
-
-      gsap.to(el, {
-        opacity,
-        scale,
-        duration: 0.3,
-        ease: easings.gentle,
-      })
+      if (distance === 0) {
+        gsap.to(el, {
+          opacity,
+          scale: 1.02,
+          duration: 0.3,
+          ease: easings.gentle,
+        })
+      } else {
+        gsap.set(el, { opacity, scale: 1 })
+      }
     })
   }
 

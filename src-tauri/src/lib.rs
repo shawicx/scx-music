@@ -3,8 +3,7 @@ mod audio;
 mod commands;
 mod db;
 
-use std::collections::hash_map::DefaultHasher;
-use std::hash::{Hash, Hasher};
+use sha2::{Sha256, Digest};
 use std::sync::{Arc, Mutex};
 
 use audio::AudioStateInner;
@@ -84,9 +83,10 @@ fn scan_dir(dir: &Path, exts: &[&str], files: &mut Vec<SongEntry>) -> Result<(),
         let duration = format!("{}:{:02}", total_secs / 60, total_secs % 60);
 
         let id = {
-            let mut hasher = DefaultHasher::new();
-            file_path.hash(&mut hasher);
-            format!("{:x}", hasher.finish())
+            let mut hasher = Sha256::new();
+            hasher.update(file_path.as_bytes());
+            let result = hasher.finalize();
+            result.iter().map(|b| format!("{:02x}", b)).collect::<String>()
         };
 
         files.push(SongEntry {

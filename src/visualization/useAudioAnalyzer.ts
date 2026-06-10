@@ -1,11 +1,11 @@
-import { ref } from 'vue'
+import { shallowRef, ref } from 'vue'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import { invoke } from '@tauri-apps/api/core'
 
 export const NUM_BINS = 64
 
 export function useAudioAnalyzer() {
-  const frequencyData = ref<Uint8Array>(new Uint8Array(NUM_BINS))
+  const frequencyData = shallowRef<Uint8Array>(new Uint8Array(NUM_BINS))
   const isActive = ref(false)
   let unlisten: UnlistenFn | null = null
 
@@ -18,7 +18,6 @@ export function useAudioAnalyzer() {
       for (let i = 0; i < Math.min(payload.length, NUM_BINS); i++) {
         buf[i] = payload[i]
       }
-      frequencyData.value = buf
     })
 
     await invoke('analyzer_start')
