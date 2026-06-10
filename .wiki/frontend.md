@@ -5,6 +5,7 @@
 - **App.vue** - 根组件，侧边栏 + 主区域布局，负责初始化 Store 和事件监听
 - **LibraryView.vue** - 音乐库主视图
 - **PlayerBar.vue** - 底部播放控制条
+- **PlayQueueDrawer.vue** - 播放队列右侧抽屉（GSAP Flip 重排动画、当前歌曲高亮、模式切换）
 - **SettingsView.vue** - 设置页面
 - **NowPlayingOverlay.vue** - 正在播放覆盖层
 - **LyricsDisplay.vue** - 歌词显示组件（LRC 解析、同步滚动、点击跳转）
@@ -23,12 +24,14 @@
 - `currentSong` - 当前歌曲
 - `isPlaying` - 播放状态
 - `progress` / `duration` - 播放进度
-- `queue` - 播放队列
+- `queue` - 播放队列（由 usePlayQueue 按播放模式生成）
+- `sourceSongs` - 原始歌曲列表（队列的生成源）
 - `playbackMode` - 播放模式 (sequential/repeat_all/repeat_one/shuffle)
 - `volume` - 音量
 
 **IPC 封装：**
-- `playFromQueue()` -> `player_set_queue`
+- `playFromQueue()` -> `player_set_queue`（通过 `generateQueue` 按模式生成队列后发送）
+- `regenerateQueue()` -> `player_set_queue`（切换模式时重新生成队列，保持当前歌曲位置）
 - `togglePlayPause()` -> `player_pause` / `player_resume`
 - `seek()` / `seekRelative()` -> `player_seek`
 - `setVolume()` / `adjustVolume()` -> `player_set_volume`
@@ -104,7 +107,8 @@
 ### 主要组件
 - **AppSidebar.vue** - 侧边栏导航
 - **LibraryView.vue** - 音乐库主容器
-- **PlayerBar.vue** - 底部播放控制
+- **PlayerBar.vue** - 底部播放控制（toggleQueue 事件触发 PlayQueueDrawer）
+- **PlayQueueDrawer.vue** - 播放队列抽屉（GSAP Flip 列表重排动画、点击歌曲播放、模式切换按钮）
 - **SettingsView.vue** - 设置页面
 - **NowPlayingOverlay.vue** - 正在播放覆盖层
 - **LyricsDisplay.vue** - 歌词显示（同步滚动、点击跳转、骨架屏加载态）
@@ -147,7 +151,8 @@
 - **composables/useTheme.ts** - 主题核心逻辑（Store 的实际实现，含 useColorTheme + useThemeMode）
 - **composables/useToast.ts** - Toast 通知封装（全局消息提示）
 - **composables/useI18n.ts** - 国际化封装（语言初始化、切换、持久化）
-- **composables/usePlaybackMode.ts** - 播放模式切换（含 i18n 标签）
+- **composables/usePlaybackMode.ts** - 播放模式切换（cycleMode 后调用 regenerateQueue 重新生成队列）
+- **composables/usePlayQueue.ts** - 播放队列生成（Fisher-Yates 洗牌、模式映射：sequential/repeat_all=原序、repeat_one=仅当前歌曲、shuffle=洗牌后当前歌曲排首位）
 - **composables/useLyrics.ts** - 歌词获取 + LRC 解析 + 同步跟踪
 - **composables/useDebounceSearch.ts** - 搜索防抖（300ms）
 - **composables/useOptimizedSort.ts** - 排序缓存（中文 locale 支持）
@@ -172,6 +177,7 @@ GSAP-powered animation system across five interaction scenarios:
 | `usePlaylistTransition` | Playlist switching | Slide-left-out + slide-right-in content transition |
 | `useViewModeFlip` | List ↔ Grid toggle | GSAP Flip layout animation with stagger |
 | `usePlayerExpand` | Player expand/collapse | Staggered timeline for overlay elements |
+| PlayQueueDrawer | Play queue reorder | GSAP Flip list reorder on mode switch (0.35s) |
 | `useLyricsAnimation` | Lyrics display | Spotlight opacity gradient + GSAP ScrollTo |
 
 ### Pattern
@@ -264,13 +270,19 @@ App.vue onMounted
 ### 命名空间
 common / sidebar / library / player / settings / playbackMode / toast / empty / importExport / update
 
+### player 命名空间（播放队列相关）
+- `playQueue` - "播放队列" / "Play Queue"
+- `songCount` - "{count} 首" / "{count} songs"
+- `noQueue` - "暂无播放队列" / "No play queue"
+
 ## IPC 封装位置
 
 所有 IPC 调用集中在 Pinia Stores 中，组件通过 Store 操作数据，不直接调用 `invoke`。错误处理通过 `utils/errorHandler.ts` 统一管理。
 
 ## 关键业务逻辑
 
-1. **播放控制** - stores/player.ts 封装所有播放相关 IPC + 事件监听
+1. **播放控制** - stores/player.ts 封装所有播放相关 IPC + 事件监听 + 队列生成（通过 usePlayQueue）
+2. **播放队列** - composables/usePlayQueue.ts 按播放模式从歌曲列表派生只读队列，PlayQueueDrawer 右侧抽屉展示
 2. **歌曲导入** - stores/library.ts 的 `importToPlaylist()` 方法
 3. **歌曲重命名** - stores/library.ts 的 `renameSong()` 方法（后端更新元数据+文件+数据库，前端同步歌曲列表和播放队列）
 4. **播放列表管理** - stores/library.ts 的增删改查 + 清空方法

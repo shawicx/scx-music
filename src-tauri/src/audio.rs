@@ -311,26 +311,14 @@ impl AudioStateInner {
             return None;
         }
         match self.mode {
-            PlaybackMode::Sequential => {
-                if self.queue_index + 1 < self.queue.len() {
-                    Some(self.queue_index + 1)
-                } else {
-                    None
-                }
-            }
+            PlaybackMode::Sequential => Some((self.queue_index + 1) % self.queue.len()),
             PlaybackMode::RepeatAll => Some((self.queue_index + 1) % self.queue.len()),
             PlaybackMode::RepeatOne => Some(self.queue_index),
             PlaybackMode::Shuffle => {
-                if self.queue.len() == 1 {
-                    Some(0)
+                if self.queue_index + 1 < self.queue.len() {
+                    Some(self.queue_index + 1)
                 } else {
-                    let mut rng = rand::thread_rng();
-                    loop {
-                        let i = rng.gen_range(0..self.queue.len());
-                        if i != self.queue_index {
-                            return Some(i);
-                        }
-                    }
+                    Some(0)
                 }
             }
         }

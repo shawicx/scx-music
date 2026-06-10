@@ -27,12 +27,13 @@ export function usePlaybackMode() {
 
   const isModeActive = computed(() => playbackMode.value !== 'sequential')
 
-  function cycleMode() {
+  async function cycleMode() {
     const modes: readonly PlaybackModeKey[] = ['sequential', 'repeat_all', 'repeat_one', 'shuffle']
     const currentKey = playbackMode.value as PlaybackModeKey
     const idx = modes.indexOf(currentKey)
     const nextMode = modes[(idx + 1) % modes.length]
-    playerStore.setMode(nextMode)
+    await playerStore.setMode(nextMode)
+    await playerStore.regenerateQueue()
   }
 
   return {

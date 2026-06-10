@@ -7,7 +7,7 @@ import IconButtonWithTooltip from './IconButtonWithTooltip.vue'
 import { usePlaybackMode } from '../composables/usePlaybackMode'
 import { useI18n } from '../composables/useI18n'
 
-defineEmits<{ expand: [] }>()
+const emit = defineEmits<{ expand: []; toggleQueue: [] }>()
 
 const playerStore = usePlayerStore()
 const libraryStore = useLibraryStore()
@@ -164,6 +164,7 @@ const displayProgress = computed(() => {
         icon="mdi-playlist-music"
         :tooltip="t('player.playlist')"
         size="x-small"
+        @click.stop="emit('toggleQueue')"
       />
       <v-slider
         v-model="volumeModel"

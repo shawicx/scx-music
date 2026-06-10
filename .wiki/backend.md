@@ -30,7 +30,7 @@
 - `player_seek` - 跳转播放位置
 - `player_set_volume` - 设置音量
 - `player_next` / `player_previous` - 切换曲目
-- `player_set_mode` - 设置播放模式 (sequential/repeat_all/repeat_one/shuffle)
+- `player_set_mode` - 设置播放模式 (sequential/repeat_all/repeat_one/shuffle) — Shuffle 队列由前端洗牌，后端按队列顺序播放
 - `player_get_state` - 获取当前播放状态（恢复用）
 - `player_get_output_devices` - 枚举音频输出设备
 - `player_set_output_device` - 切换音频输出设备

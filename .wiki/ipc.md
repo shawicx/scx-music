@@ -82,7 +82,11 @@ App.vue onMounted
 ```
 用户点击播放
 -> usePlayerStore.playFromQueue()
--> invokeCommand('player_set_queue', {songs, index})
+-> usePlayQueue.generateQueue(songs, index, mode)
+   ├─ sequential / repeat_all → 歌曲原序
+   ├─ repeat_one → 仅当前歌曲
+   └─ shuffle → Fisher-Yates 洗牌，当前歌曲排首位
+-> invokeCommand('player_set_queue', {songs: ordered, index})
 -> audio.rs::player_set_queue()
 -> audio.rs::play_file_at_index()
 -> audio.rs::ensure_engine()
@@ -90,6 +94,19 @@ App.vue onMounted
 -> emit('audio:state_change')
 -> usePlayerStore 监听器
 -> UI 更新
+```
+
+### 播放模式切换流程
+
+```
+用户切换播放模式
+-> usePlaybackMode.cycleMode()
+-> usePlayerStore.setMode(nextMode)
+-> invokeCommand('player_set_mode', {mode})
+-> usePlayerStore.regenerateQueue()
+-> usePlayQueue.generateQueue(sourceSongs, currentSongIndex, newMode)
+-> invokeCommand('player_set_queue', {songs: ordered, index})
+-> PlayQueueDrawer GSAP Flip 动画重排队列列表
 ```
 
 ### 导入歌曲流程

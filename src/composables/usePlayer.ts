@@ -4,6 +4,7 @@ import type { Song, PlaybackMode, PlaybackState } from '../types'
 import { invokeCommand } from '../utils/errorHandler'
 import { useToast } from './useToast'
 import i18n from '../i18n'
+import { generateQueue } from './usePlayQueue'
 
 type PlayerStateReturnType = {
   currentSong: Song | null
@@ -24,6 +25,7 @@ const volume = ref(1.0)
 const playbackMode = ref<PlaybackMode>('sequential')
 const queue = ref<Song[]>([])
 const queueIndex = ref(0)
+const sourceSongs = ref<Song[]>([])
 const listenersSetup = ref(false)
 
 const { showToast, showWarning } = useToast()
@@ -86,9 +88,13 @@ const durationFormatted = computed(() => formatTime(duration.value))
 export function usePlayer() {
   async function playFromQueue(songs: Song[], index: number) {
     try {
-      queue.value = songs
-      queueIndex.value = index
-      const mapped = songs.map((s) => ({
+      sourceSongs.value = songs
+      const ordered = generateQueue(songs, index, playbackMode.value)
+      queue.value = ordered
+      // 找到当前歌曲在 ordered 中的位置
+      const playIndex = ordered.findIndex((s) => s.id === songs[index].id)
+      queueIndex.value = playIndex >= 0 ? playIndex : 0
+      const mapped = ordered.map((s) => ({
         id: s.id,
         title: s.title,
         artist: s.artist,
@@ -97,11 +103,38 @@ export function usePlayer() {
         quality: s.quality,
         filePath: s.filePath,
       }))
-      await invokeCommand('player_set_queue', { songs: mapped, index })
+      await invokeCommand('player_set_queue', { songs: mapped, index: queueIndex.value })
     } catch (error) {
       showToast(t('toast.playbackFailed'))
       throw error
     }
+  }
+
+  async function regenerateQueue() {
+    if (sourceSongs.value.length === 0) return
+    const currentSongId = queue.value[queueIndex.value]?.id ?? null
+    const sourceIndex = currentSongId
+      ? Math.max(0, sourceSongs.value.findIndex((s) => s.id === currentSongId))
+      : 0
+    const ordered = generateQueue(sourceSongs.value, sourceIndex, playbackMode.value)
+    queue.value = ordered
+    // 保持当前歌曲在队列中的位置
+    let newIndex = 0
+    if (currentSongId) {
+      const found = ordered.findIndex((s) => s.id === currentSongId)
+      if (found >= 0) newIndex = found
+    }
+    queueIndex.value = newIndex
+    const mapped = ordered.map((s) => ({
+      id: s.id,
+      title: s.title,
+      artist: s.artist,
+      album: s.album,
+      durationSecs: s.durationSecs,
+      quality: s.quality,
+      filePath: s.filePath,
+    }))
+    await invokeCommand('player_set_queue', { songs: mapped, index: newIndex })
   }
 
   async function togglePlayPause() {
@@ -148,10 +181,6 @@ export function usePlayer() {
 
   async function next() {
     if (queue.value.length === 0) return
-    if (queueIndex.value >= queue.value.length - 1 && playbackMode.value === 'sequential') {
-      showWarning(t('toast.lastSong'))
-      return
-    }
     try {
       await invokeCommand('player_next')
     } catch (error) {
@@ -234,6 +263,8 @@ export function usePlayer() {
     playbackMode,
     queue,
     queueIndex,
+    sourceSongs,
+    regenerateQueue,
     listenersSetup,
 
     setupListeners,

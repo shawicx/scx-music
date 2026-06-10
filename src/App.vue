@@ -9,6 +9,7 @@ const LibraryView = defineAsyncComponent(() => import('./components/LibraryView.
 const SettingsView = defineAsyncComponent(() => import('./components/SettingsView.vue'))
 const PlayerBar = defineAsyncComponent(() => import('./components/PlayerBar.vue'))
 const NowPlayingOverlay = defineAsyncComponent(() => import('./components/NowPlayingOverlay.vue'))
+const PlayQueueDrawer = defineAsyncComponent(() => import('./components/PlayQueueDrawer.vue'))
 import { useToast } from './composables/useToast'
 import { useI18n } from './composables/useI18n'
 import { usePageTransition } from './composables/usePageTransition'
@@ -80,6 +81,7 @@ onMounted(async () => {
 
 const activeView = ref('library')
 const showNowPlaying = ref(false)
+const showQueue = ref(false)
 </script>
 
 <template>
@@ -91,7 +93,7 @@ const showNowPlaying = ref(false)
           <SettingsView v-if="activeView === 'settings'" key="settings" @back="activeView = 'library'" />
           <div v-else key="library" class="library-wrapper">
             <LibraryView />
-            <PlayerBar @expand="showNowPlaying = true" />
+            <PlayerBar @expand="showNowPlaying = true" @toggle-queue="showQueue = !showQueue" />
             <Transition :css="false" @enter="onOverlayEnter" @leave="onOverlayLeave">
               <NowPlayingOverlay
                 v-if="showNowPlaying"
@@ -102,6 +104,7 @@ const showNowPlaying = ref(false)
         </Transition>
       </div>
     </div>
+    <PlayQueueDrawer v-model="showQueue" />
     <v-snackbar
       v-model="toastVisible"
       :color="toastColor"
