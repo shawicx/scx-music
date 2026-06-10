@@ -7,7 +7,26 @@ on:
   workflow_dispatch:
 
 jobs:
+  changelog:
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    outputs:
+      body: ${{ steps.git-cliff.outputs.content }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate changelog
+        id: git-cliff
+        uses: orhun/git-cliff-action@v4
+        with:
+          config: cliff.toml
+          args: --latest --strip header
+
   build:
+    needs: changelog
     permissions:
       contents: write
     strategy:
@@ -63,7 +82,7 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: 'SCX Music ${{ github.ref_name }}'
-          releaseBody: 'See the assets to download and install.'
+          releaseBody: ${{ needs.changelog.outputs.body }}
           releaseDraft: false
           prerelease: false
           updaterJsonPreferWallpapers: false

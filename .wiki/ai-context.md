@@ -135,6 +135,13 @@ UI -> useLibraryStore.importToPlaylist()
 - 后端函数：snake_case
 - Command 命名：snake_case
 
+## CI / 发布
+
+- GitHub Actions: `.github/workflows/build.yml`
+- 触发: 推送 `v*` tag
+- Changelog: `git-cliff` 从 Conventional Commits 自动生成，写入 GitHub Release body
+- 配置: `cliff.toml`（过滤 feat/fix/perf/refactor，中文分组）
+
 ## 快速开始
 
 ```bash
