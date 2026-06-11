@@ -129,10 +129,10 @@ export function useLyrics(currentSong: Ref<Song | null>) {
     )
   }
 
-  watch(currentSong, async (song) => {
-    if (song) {
+  watch(currentSong, async (song, oldSong) => {
+    if (song && song.id !== oldSong?.id) {
       await fetchLyrics(song)
-    } else {
+    } else if (!song) {
       lines.value = []
       rawLrc.value = null
       currentLineIndex.value = -1
