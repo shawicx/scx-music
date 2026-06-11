@@ -12,19 +12,13 @@
 
 ### 主界面
 
-![主界面](docs/screenshots/main.png)
-
-### 播放控制
-
-![播放控制](docs/screenshots/player.png)
-
-### 夜间模式
-
-![夜间模式](docs/screenshots/night.png)
-
-### 设置界面
-
-![设置界面](docs/screenshots/settings.png)
+<div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem;">
+  <img src="docs/screenshots/main.png" />
+  <img src="docs/screenshots/playlist.png" />
+  <img src="docs/screenshots/player.png" />
+  <img src="docs/screenshots/night.png" />
+  <img src="docs/screenshots/settings.png" />
+</div>
 
 ---
 
