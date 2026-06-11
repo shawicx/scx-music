@@ -20,6 +20,7 @@ struct LrclibSearchResult {
 pub struct LyricsResult {
     pub raw_lrc: Option<String>,
     pub source: String,
+    pub offset_secs: f64,
 }
 
 #[tauri::command]
@@ -35,26 +36,27 @@ pub async fn get_lyrics(
     let early_result = {
         let conn = db.0.lock().map_err(|e| e.to_string())?;
 
-        let cached: Option<(Option<String>, String)> = conn
+        let cached: Option<(Option<String>, String, f64)> = conn
             .query_row(
-                "SELECT raw_lrc, source FROM lyrics WHERE song_id = ?1",
+                "SELECT raw_lrc, source, offset_secs FROM lyrics WHERE song_id = ?1",
                 params![song_id],
-                |row| Ok((row.get(0)?, row.get(1)?)),
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
             )
             .ok();
 
-        if let Some((raw_lrc, source)) = cached {
-            Some(Ok(Some(LyricsResult { raw_lrc, source })))
+        if let Some((raw_lrc, source, offset_secs)) = cached {
+            Some(Ok(Some(LyricsResult { raw_lrc, source, offset_secs })))
         } else if let Some(raw_lrc) = extract_embedded_lyrics(&file_path) {
             let source = "embedded".to_string();
             conn.execute(
-                "INSERT INTO lyrics (song_id, raw_lrc, source) VALUES (?1, ?2, ?3)",
+                "INSERT INTO lyrics (song_id, raw_lrc, source, offset_secs) VALUES (?1, ?2, ?3, 0.0)",
                 params![song_id, raw_lrc, source],
             )
             .map_err(|e| e.to_string())?;
             Some(Ok(Some(LyricsResult {
                 raw_lrc: Some(raw_lrc),
                 source,
+                offset_secs: 0.0,
             })))
         } else {
             None
@@ -69,8 +71,8 @@ pub async fn get_lyrics(
     if let Some(result) = fetch_lrclib(&title, &artist, duration_secs).await {
         let conn = db.0.lock().map_err(|e| e.to_string())?;
         conn.execute(
-            "INSERT INTO lyrics (song_id, raw_lrc, source) VALUES (?1, ?2, ?3)",
-            params![song_id, &result.raw_lrc, &result.source],
+            "INSERT INTO lyrics (song_id, raw_lrc, source, offset_secs) VALUES (?1, ?2, ?3, ?4)",
+            params![song_id, &result.raw_lrc, &result.source, result.offset_secs],
         )
         .map_err(|e| e.to_string())?;
         return Ok(Some(result));
@@ -79,7 +81,7 @@ pub async fn get_lyrics(
     // 4. No lyrics found — cache the miss
     let conn = db.0.lock().map_err(|e| e.to_string())?;
     conn.execute(
-        "INSERT INTO lyrics (song_id, raw_lrc, source) VALUES (?1, NULL, 'none')",
+        "INSERT INTO lyrics (song_id, raw_lrc, source, offset_secs) VALUES (?1, NULL, 'none', 0.0)",
         params![song_id],
     )
     .map_err(|e| e.to_string())?;
@@ -94,23 +96,53 @@ pub async fn refresh_lyrics(
     artist: String,
     duration_secs: f64,
 ) -> Result<Option<LyricsResult>, String> {
+    // Preserve existing offset before overwrite
+    let existing_offset: f64 = {
+        let conn = db.0.lock().map_err(|e| e.to_string())?;
+        conn.query_row(
+            "SELECT offset_secs FROM lyrics WHERE song_id = ?1",
+            params![song_id],
+            |row| row.get(0),
+        )
+        .unwrap_or(0.0)
+    };
+
     if let Some(result) = fetch_lrclib(&title, &artist, duration_secs).await {
         let conn = db.0.lock().map_err(|e| e.to_string())?;
         conn.execute(
-            "INSERT OR REPLACE INTO lyrics (song_id, raw_lrc, source) VALUES (?1, ?2, ?3)",
-            params![song_id, &result.raw_lrc, &result.source],
+            "INSERT OR REPLACE INTO lyrics (song_id, raw_lrc, source, offset_secs) VALUES (?1, ?2, ?3, ?4)",
+            params![song_id, &result.raw_lrc, &result.source, existing_offset],
         )
         .map_err(|e| e.to_string())?;
-        return Ok(Some(result));
+        return Ok(Some(LyricsResult {
+            raw_lrc: result.raw_lrc,
+            source: result.source,
+            offset_secs: existing_offset,
+        }));
     }
 
     let conn = db.0.lock().map_err(|e| e.to_string())?;
     conn.execute(
-        "INSERT OR REPLACE INTO lyrics (song_id, raw_lrc, source) VALUES (?1, NULL, 'none')",
-        params![song_id],
+        "INSERT OR REPLACE INTO lyrics (song_id, raw_lrc, source, offset_secs) VALUES (?1, NULL, 'none', ?2)",
+        params![song_id, existing_offset],
     )
     .map_err(|e| e.to_string())?;
     Ok(None)
+}
+
+#[tauri::command]
+pub async fn set_lyric_offset(
+    db: tauri::State<'_, Db>,
+    song_id: String,
+    offset_secs: f64,
+) -> Result<(), String> {
+    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    conn.execute(
+        "UPDATE lyrics SET offset_secs = ?1 WHERE song_id = ?2",
+        params![offset_secs, song_id],
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(())
 }
 
 fn extract_embedded_lyrics(file_path: &str) -> Option<String> {
@@ -180,5 +212,9 @@ async fn fetch_lrclib(title: &str, artist: &str, duration_secs: f64) -> Option<L
 
     let raw_lrc = best.synced_lyrics.or(best.plain_lyrics);
     let source = "lrclib".to_string();
-    Some(LyricsResult { raw_lrc, source })
+    Some(LyricsResult {
+        raw_lrc,
+        source,
+        offset_secs: 0.0,
+    })
 }

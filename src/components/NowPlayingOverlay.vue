@@ -34,7 +34,7 @@ const {
 const { addSongToPlaylist: addSong, removeSongFromPlaylist: removeSong } = libraryStore
 const { playlistSongs } = storeToRefs(libraryStore)
 
-const { lines, currentLineIndex, isLoading } = useLyrics(currentSong)
+const { lines, currentLineIndex, isLoading, offsetSecs, adjustOffset, resetOffset, getSeekTime } = useLyrics(currentSong)
 
 const isLiked = computed(() => {
   if (!currentSong.value) return false
@@ -84,6 +84,10 @@ function onLyricSeek(time: number) {
       :lines="lines"
       :current-line-index="currentLineIndex"
       :is-loading="isLoading"
+      :offset-secs="offsetSecs"
+      :adjust-offset="adjustOffset"
+      :reset-offset="resetOffset"
+      :get-seek-time="getSeekTime"
       @seek="onLyricSeek"
     />
     <div class="progress-section">

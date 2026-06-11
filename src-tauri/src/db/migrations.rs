@@ -53,6 +53,10 @@ CREATE TABLE IF NOT EXISTS lyrics (
 );
 ";
 
+const V4_SCHEMA: &str = "
+ALTER TABLE lyrics ADD COLUMN offset_secs REAL NOT NULL DEFAULT 0.0;
+";
+
 pub fn run_migrations(conn: &rusqlite::Connection) -> Result<(), Box<dyn std::error::Error>> {
     conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;")?;
     conn.execute_batch(V1_SCHEMA)?;
@@ -61,6 +65,9 @@ pub fn run_migrations(conn: &rusqlite::Connection) -> Result<(), Box<dyn std::er
     conn.execute_batch(V2_SCHEMA)?;
 
     conn.execute_batch(V3_SCHEMA)?;
+
+    // V4: Lyric offset support
+    conn.execute_batch(V4_SCHEMA)?;
 
     Ok(())
 }

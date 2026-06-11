@@ -55,6 +55,8 @@ export default {
   },
   lyrics: {
     noLyrics: 'No lyrics available',
+    resetOffset: 'Reset',
+    offsetReset: 'Lyric offset reset',
   },
   settings: {
     title: 'Settings',
@@ -127,6 +129,7 @@ export default {
     settingsExportFailed: 'Failed to export settings',
     settingsImported: '{count} settings imported',
     settingsImportFailed: 'Failed to import settings',
+    offsetResetFailed: 'Failed to reset lyric offset',
   },
   empty: {
     noPlaylistTitle: 'Select a playlist to start',

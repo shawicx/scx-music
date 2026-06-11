@@ -55,6 +55,8 @@ export default {
   },
   lyrics: {
     noLyrics: '暂无歌词',
+    resetOffset: '重置',
+    offsetReset: '歌词偏移已重置',
   },
   settings: {
     title: '设置',
@@ -127,6 +129,7 @@ export default {
     settingsExportFailed: '设置导出失败',
     settingsImported: '已导入 {count} 项设置',
     settingsImportFailed: '设置导入失败',
+    offsetResetFailed: '歌词偏移重置失败',
   },
   empty: {
     noPlaylistTitle: '选择一个歌单开始',

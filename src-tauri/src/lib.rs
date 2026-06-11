@@ -193,6 +193,7 @@ pub fn run() {
             commands::bootstrap::get_bootstrap_data,
             commands::lyrics::get_lyrics,
             commands::lyrics::refresh_lyrics,
+            commands::lyrics::set_lyric_offset,
             commands::import_export::export_playlist_m3u,
             commands::import_export::export_playlist_pls,
             commands::import_export::export_backup,

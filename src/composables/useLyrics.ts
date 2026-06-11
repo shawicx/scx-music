@@ -11,9 +11,12 @@ export interface LrcLine {
 interface LyricsResult {
   rawLrc: string | null
   source: string
+  offsetSecs: number
 }
 
 const LRC_REGEX = /\[(\d{2}):(\d{2})\.(\d{2,3})](.*)/
+const OFFSET_MIN = -10.0
+const OFFSET_MAX = 10.0
 
 function parseLrc(raw: string): LrcLine[] {
   const lines: LrcLine[] = []
@@ -39,7 +42,8 @@ export function useLyrics(currentSong: Ref<Song | null>) {
   const isLoading = ref(false)
   const rawLrc = ref<string | null>(null)
   const source = ref('')
-  let _unlisten: UnlistenFn | null = null // assigned in setupProgressListener, used for cleanup
+  const offsetSecs = ref(0)
+  let _unlisten: UnlistenFn | null = null
 
   async function fetchLyrics(song: Song) {
     isLoading.value = true
@@ -54,15 +58,18 @@ export function useLyrics(currentSong: Ref<Song | null>) {
       if (result && result.rawLrc) {
         rawLrc.value = result.rawLrc
         source.value = result.source
+        offsetSecs.value = result.offsetSecs
         lines.value = parseLrc(result.rawLrc)
       } else {
         rawLrc.value = null
         source.value = ''
+        offsetSecs.value = result?.offsetSecs ?? 0
         lines.value = []
       }
     } catch {
       rawLrc.value = null
       lines.value = []
+      offsetSecs.value = 0
     } finally {
       isLoading.value = false
       currentLineIndex.value = -1
@@ -71,15 +78,46 @@ export function useLyrics(currentSong: Ref<Song | null>) {
 
   function computeCurrentLine(progressSecs: number) {
     if (lines.value.length === 0) return
+    const adjusted = progressSecs + offsetSecs.value
     let idx = -1
     for (let i = 0; i < lines.value.length; i++) {
-      if (lines.value[i].time <= progressSecs) {
+      if (lines.value[i].time <= adjusted) {
         idx = i
       } else {
         break
       }
     }
     currentLineIndex.value = idx
+  }
+
+  async function adjustOffset(delta: number) {
+    const next = Math.round((offsetSecs.value + delta) * 10) / 10
+    if (next < OFFSET_MIN || next > OFFSET_MAX) return
+    offsetSecs.value = next
+    const song = currentSong.value
+    if (song) {
+      try {
+        await invoke('set_lyric_offset', { songId: song.id, offsetSecs: next })
+      } catch {
+        // silently fail — offset still works in memory
+      }
+    }
+  }
+
+  async function resetOffset() {
+    offsetSecs.value = 0
+    const song = currentSong.value
+    if (song) {
+      try {
+        await invoke('set_lyric_offset', { songId: song.id, offsetSecs: 0 })
+      } catch {
+        // silently fail
+      }
+    }
+  }
+
+  function getSeekTime(lineTime: number): number {
+    return lineTime - offsetSecs.value
   }
 
   async function setupProgressListener() {
@@ -98,6 +136,7 @@ export function useLyrics(currentSong: Ref<Song | null>) {
       lines.value = []
       rawLrc.value = null
       currentLineIndex.value = -1
+      offsetSecs.value = 0
     }
   }, { immediate: true })
 
@@ -113,5 +152,9 @@ export function useLyrics(currentSong: Ref<Song | null>) {
     isLoading,
     rawLrc,
     source,
+    offsetSecs,
+    adjustOffset,
+    resetOffset,
+    getSeekTime,
   }
 }
