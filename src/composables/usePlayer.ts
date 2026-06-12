@@ -28,7 +28,7 @@ const queueIndex = ref(0)
 const sourceSongs = ref<Song[]>([])
 const listenersSetup = ref(false)
 
-const { showToast, showWarning } = useToast()
+const { showToast } = useToast()
 const t = i18n.global.t
 
 const unlisteners: UnlistenFn[] = []
@@ -191,10 +191,6 @@ export function usePlayer() {
 
   async function previous() {
     if (queue.value.length === 0) return
-    if (queueIndex.value === 0) {
-      showWarning(t('toast.firstSong'))
-      return
-    }
     try {
       await invokeCommand('player_previous')
     } catch (error) {

@@ -553,7 +553,7 @@ pub fn player_previous(app: AppHandle, state: tauri::State<'_, AudioState>) -> R
         let s = arc.lock().unwrap();
         if s.queue_index > 0 {
             Some(s.queue_index - 1)
-        } else if matches!(s.mode, PlaybackMode::RepeatAll) && !s.queue.is_empty() {
+        } else if !s.queue.is_empty() {
             Some(s.queue.len() - 1)
         } else {
             None

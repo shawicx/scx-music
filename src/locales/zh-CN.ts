@@ -115,7 +115,6 @@ export default {
     seekFailed: '进度调整失败',
     volumeFailed: '音量设置失败',
     nextSongFailed: '切换下一首失败',
-    firstSong: '已经是第一首了',
     previousSongFailed: '切换上一首失败',
     modeFailed: '播放模式设置失败',
     stopFailed: '停止播放失败',

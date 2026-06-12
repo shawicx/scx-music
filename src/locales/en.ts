@@ -115,7 +115,6 @@ export default {
     seekFailed: 'Seek failed',
     volumeFailed: 'Volume adjustment failed',
     nextSongFailed: 'Failed to switch to next song',
-    firstSong: 'Already at the first song',
     previousSongFailed: 'Failed to switch to previous song',
     modeFailed: 'Failed to set playback mode',
     stopFailed: 'Failed to stop playback',
