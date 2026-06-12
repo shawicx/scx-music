@@ -67,7 +67,13 @@ pub fn run_migrations(conn: &rusqlite::Connection) -> Result<(), Box<dyn std::er
     conn.execute_batch(V3_SCHEMA)?;
 
     // V4: Lyric offset support
-    conn.execute_batch(V4_SCHEMA)?;
+    let has_offset: bool = conn
+        .prepare("SELECT offset_secs FROM lyrics LIMIT 0")?
+        .column_names()
+        .contains(&"offset_secs");
+    if !has_offset {
+        conn.execute_batch(V4_SCHEMA)?;
+    }
 
     Ok(())
 }

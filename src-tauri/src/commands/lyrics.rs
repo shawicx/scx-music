@@ -1,11 +1,12 @@
 use crate::db::Db;
-use lofty::file::{AudioFile as AudioFileTrait, TaggedFileExt};
+use lofty::file::TaggedFileExt;
 use lofty::tag::ItemKey;
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct LrclibSearchResult {
     id: i64,
     track_name: String,

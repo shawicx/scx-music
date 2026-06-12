@@ -2,7 +2,6 @@ use crate::db::models::Song;
 use crate::db::Db;
 use lofty::config::WriteOptions;
 use lofty::file::{AudioFile, TaggedFileExt};
-use lofty::tag::ItemKey;
 use rusqlite::params;
 
 #[tauri::command]

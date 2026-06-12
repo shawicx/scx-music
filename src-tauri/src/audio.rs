@@ -5,7 +5,6 @@ use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 
-use rand::Rng;
 use rodio::cpal::traits::HostTrait;
 use rodio::{Decoder, OutputStream, OutputStreamHandle, Sink, Source};
 use serde::{Deserialize, Serialize};
