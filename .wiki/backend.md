@@ -143,6 +143,34 @@
 
 **被谁调用：** 所有 `player_*` Commands 和 `analyzer_*` Commands
 
+### 音频输出设备处理
+
+**涉及函数：** `find_device_by_name`、`try_output_stream_for_device`、`try_build_hardcoded_stream`
+
+**问题背景：**
+macOS CoreAudio 通过 CPAL 暴露设备时存在两个已知问题：
+1. **复合设备变体混淆** — 带麦克风的音箱（如 EDIFIER Halo Soundbar）在 `host.devices()` 中会出现两次（输入变体 + 输出变体），`find` 匹配到第一个（输入变体）时，创建输出流必然返回 `StreamTypeNotSupported`
+2. **设备配置查询失败** — 部分内置设备（如 Mac mini扬声器）的 `default_output_config()` 和 `supported_output_configs()` 均返回 `BackendSpecificError { description: "Invalid property value" }`，无法获取有效的音频配置
+
+**修复方案 — 三层回退链：**
+
+```
+1. find_device_by_name: 优先使用 default_output_device() 句柄匹配名称
+   └─ 确保拿到输出变体而非输入变体
+
+2. try_output_stream_for_device: 三级流创建回退
+   ├─ 第一级: OutputStream::try_from_device（标准路径，依赖 default_output_config）
+   ├─ 第二级: 遍历 supported_output_configs 逐个尝试
+   └─ 第三级: try_build_hardcoded_stream（硬编码标准配置）
+
+3. try_build_hardcoded_stream: 绕过 CPAL 配置查询，直接尝试常见配置
+   └─ 48kHz/44.1kHz/96kHz × 1ch/2ch × F32/I16 共 7 种组合
+```
+
+**调用点：**
+- `player_set_output_device` — 验证设备可用性时使用 `try_output_stream_for_device`
+- `ensure_engine` — 创建音频引擎时使用 `try_output_stream_for_device`，失败后回退到 `OutputStream::try_default()`
+
 ### analyzer.rs - FFT 频谱分析器
 
 **文件位置：** `src-tauri/src/analyzer.rs`

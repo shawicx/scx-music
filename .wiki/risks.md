@@ -61,6 +61,11 @@
 **风险：** OutputStream 未正确释放
 **缓解：** 使用 `_stream` 字段保持生命周期，stop 时正确清理
 
+### 音频输出设备兼容性
+**风险：** CPAL/CoreAudio 在部分 macOS 设备上 `default_output_config()` 和 `supported_output_configs()` 均失败
+**影响：** 用户无法切换到特定输出设备
+**缓解：** 三层回退链（标准路径 → supported_configs → 硬编码配置），复合设备优先使用 `default_output_device()` 句柄避免匹配到输入变体
+
 ### 前端状态
 **风险：** 大量歌曲数据占用内存
 **影响：** 浏览器内存压力
