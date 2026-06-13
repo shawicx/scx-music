@@ -56,7 +56,7 @@ Rust 命令 → IPC emit → Pinia Store → UI 更新
 
 ### 后端
 
-- `audio.rs` — 音频引擎（Rodio，通过 `Arc<Mutex<T>>` 保证线程安全，独立进度线程每 500ms 推送）
+- `audio/` — 音频引擎模块（engine.rs 核心逻辑、commands.rs 播放命令、device.rs 设备管理、types.rs 类型定义、analyzer_cmds.rs 频谱命令、mod.rs 进度线程）
 - `analyzer.rs` — FFT 频谱（256 点 → 64 bins，30fps，通过 `audio:spectrum` 事件推送）
 - `commands/` — IPC 处理器：bootstrap、songs、playlists、settings、lyrics、import_export
 - `db/` — SQLite 数据库，含迁移（V1-V3）和数据模型（Song、Playlist、PlaylistSong、Lyric）

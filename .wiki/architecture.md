@@ -69,7 +69,7 @@ graph TB
 
 | 模块 | 作用 | 关键文件 |
 |------|------|----------|
-| 播放器 | 音频播放控制 | stores/player.ts, audio.rs |
+| 播放器 | 音频播放控制 | stores/player.ts, audio/ |
 | 音乐库 | 歌曲和播放列表管理 | stores/library.ts, commands/ |
 | 设置主题 | 深色/浅色模式 + 主题颜色 | stores/settings.ts |
 | 歌词 | LRC 解析 + 同步显示 | composables/useLyrics.ts, commands/lyrics.rs, LyricsDisplay.vue |

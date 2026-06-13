@@ -15,19 +15,19 @@ const result = await invokeCommand('command_name', { param: value })
 | command | frontend caller | rust file | purpose |
 |---------|----------------|-----------|---------|
 | **播放器** | | | |
-| `player_set_queue` | stores/player.ts | audio.rs | 设置播放队列并开始播放 |
-| `player_pause` | stores/player.ts | audio.rs | 暂停播放 |
-| `player_resume` | stores/player.ts | audio.rs | 恢复播放 |
-| `player_stop` | stores/player.ts | audio.rs | 停止播放 |
-| `player_seek` | stores/player.ts | audio.rs | 跳转播放位置 |
-| `player_set_volume` | stores/player.ts | audio.rs | 设置音量 |
-| `player_next` | stores/player.ts | audio.rs | 下一曲 |
-| `player_previous` | stores/player.ts | audio.rs | 上一曲 |
-| `player_set_mode` | stores/player.ts | audio.rs | 设置播放模式 |
-| `player_get_state` | stores/player.ts | audio.rs | 获取当前播放状态 |
-| `player_get_output_devices` | - | audio.rs | 枚举音频输出设备 |
-| `player_set_output_device` | - | audio.rs | 切换音频输出设备 |
-| `player_get_current_device` | - | audio.rs | 获取当前输出设备 |
+| `player_set_queue` | stores/player.ts | audio/commands.rs | 设置播放队列并开始播放 |
+| `player_pause` | stores/player.ts | audio/commands.rs | 暂停播放 |
+| `player_resume` | stores/player.ts | audio/commands.rs | 恢复播放 |
+| `player_stop` | stores/player.ts | audio/commands.rs | 停止播放 |
+| `player_seek` | stores/player.ts | audio/commands.rs | 跳转播放位置 |
+| `player_set_volume` | stores/player.ts | audio/commands.rs | 设置音量 |
+| `player_next` | stores/player.ts | audio/commands.rs | 下一曲 |
+| `player_previous` | stores/player.ts | audio/commands.rs | 上一曲 |
+| `player_set_mode` | stores/player.ts | audio/commands.rs | 设置播放模式 |
+| `player_get_state` | stores/player.ts | audio/commands.rs | 获取当前播放状态 |
+| `player_get_output_devices` | - | audio/device.rs | 枚举音频输出设备 |
+| `player_set_output_device` | - | audio/device.rs | 切换音频输出设备 |
+| `player_get_current_device` | - | audio/device.rs | 获取当前输出设备 |
 | **歌曲** | | | |
 | `get_all_songs` | - | commands/songs.rs | 获取所有歌曲 |
 | `upsert_songs` | stores/library.ts | commands/songs.rs | 批量插入/更新歌曲 |
@@ -61,8 +61,8 @@ const result = await invokeCommand('command_name', { param: value })
 | `export_settings` | composables/useImportExport.ts | commands/import_export.rs | 导出设置到 JSON |
 | `import_settings` | composables/useImportExport.ts | commands/import_export.rs | 从 JSON 导入设置 |
 | **频谱分析** | | | |
-| `analyzer_start` | visualization/useAudioAnalyzer.ts | audio.rs | 启动频谱分析 |
-| `analyzer_stop` | visualization/useAudioAnalyzer.ts | audio.rs | 停止频谱分析 |
+| `analyzer_start` | visualization/useAudioAnalyzer.ts | audio/analyzer_cmds.rs | 启动频谱分析 |
+| `analyzer_stop` | visualization/useAudioAnalyzer.ts | audio/analyzer_cmds.rs | 停止频谱分析 |
 
 ## 前后端调用链
 
@@ -87,10 +87,10 @@ App.vue onMounted
    ├─ repeat_one → 仅当前歌曲
    └─ shuffle → Fisher-Yates 洗牌，当前歌曲排首位
 -> invokeCommand('player_set_queue', {songs: ordered, index})
--> audio.rs::player_set_queue()
--> audio.rs::play_file_at_index()
--> audio.rs::ensure_engine()
--> audio.rs::start_progress_thread()
+-> audio/commands.rs::player_set_queue()
+-> audio/engine.rs::play_file_at_index()
+-> audio/engine.rs::ensure_engine()
+-> audio/mod.rs::start_progress_thread()
 -> emit('audio:state_change')
 -> usePlayerStore 监听器
 -> UI 更新
