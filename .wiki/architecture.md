@@ -7,6 +7,7 @@
 - **UI 库：** Vuetify 4.0
 - **工具库：** VueUse 14.3
 - **动画：** GSAP (with Flip, ScrollTo plugins)
+- **图表：** ECharts 6 + vue-echarts 8
 - **构建：** Vite 6.0
 - **国际化：** vue-i18n v11
 
@@ -73,6 +74,7 @@ graph TB
 | 音乐库 | 歌曲和播放列表管理 | stores/library.ts, commands/ |
 | 设置主题 | 深色/浅色模式 + 主题颜色 | stores/settings.ts |
 | 歌词 | LRC 解析 + 同步显示 | composables/useLyrics.ts, commands/lyrics.rs, LyricsDisplay.vue |
+| 曲库分析 | 音乐库统计图表 | AnalysisView.vue, commands/stats.rs |
 | 音频可视化 | FFT 频谱渲染 | visualization/, analyzer.rs |
 | 启动加载 | 单次批量数据获取 | commands/bootstrap.rs |
 | 数据库 | 数据持久化 | db/mod.rs, db/migrations.rs |
@@ -85,7 +87,7 @@ graph TB
 项目使用完整的 TypeScript 类型定义：
 
 **核心数据类型：**
-- `Song` - 歌曲信息 (id, title, artist, album, duration, durationSecs, quality, filePath, artGradient)
+- `Song` - 歌曲信息 (id, title, artist, album, duration, durationSecs, quality, filePath, artGradient, genre, fileSize)
 - `Playlist` - 播放列表
 
 **播放器类型：**
@@ -112,6 +114,10 @@ graph TB
 **音频设备类型：**
 - `AudioDeviceInfo` - 音频设备信息
 - `AudioDevicesResponse` - 音频设备列表响应
+
+**曲库分析类型：**
+- `LibraryStats` - 聚合统计（总量 + 艺术家/专辑排行 + 流派/音质/时长分布）
+- `ArtistCount`, `AlbumCount`, `GenreCount`, `QualityCount`, `DurationBucket` - 各分布项
 
 ## 性能优化
 

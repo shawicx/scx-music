@@ -9,6 +9,8 @@ export interface Song {
   quality: string
   filePath: string
   artGradient: string
+  genre: string
+  fileSize: number
 }
 
 export interface Playlist {
@@ -59,4 +61,45 @@ export interface AudioDeviceInfo {
 export interface AudioDevicesResponse {
   devices: AudioDeviceInfo[]
   defaultDeviceName: string | null
+}
+
+// 曲库分析
+export interface LibraryStats {
+  totalSongs: number
+  totalArtists: number
+  totalAlbums: number
+  totalDurationSecs: number
+  totalFileSize: number
+  artistRanking: ArtistCount[]
+  albumRanking: AlbumCount[]
+  genreDistribution: GenreCount[]
+  qualityDistribution: QualityCount[]
+  durationDistribution: DurationBucket[]
+}
+
+export interface ArtistCount {
+  artist: string
+  songCount: number
+  totalDurationSecs: number
+}
+
+export interface AlbumCount {
+  album: string
+  artist: string
+  songCount: number
+}
+
+export interface GenreCount {
+  genre: string
+  songCount: number
+}
+
+export interface QualityCount {
+  quality: string
+  songCount: number
+}
+
+export interface DurationBucket {
+  label: string
+  songCount: number
 }

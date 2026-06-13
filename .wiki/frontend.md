@@ -7,12 +7,13 @@
 - **PlayerBar.vue** - 底部播放控制条
 - **PlayQueueDrawer.vue** - 播放队列右侧抽屉（GSAP Flip 重排动画、当前歌曲高亮、模式切换）
 - **SettingsView.vue** - 设置页面
+- **AnalysisView.vue** - 曲库分析（概览卡片 + ECharts 图表 + 排行列表）
 - **NowPlayingOverlay.vue** - 正在播放覆盖层
 - **LyricsDisplay.vue** - 歌词显示组件（LRC 解析、同步滚动、点击跳转）
 
 ## Router
 
-无复杂路由，使用 `activeView` 状态切换视图。
+无复杂路由，使用 `activeView` 状态切换视图：library / settings / analysis。
 
 ## 状态管理 (Pinia Stores)
 
@@ -90,6 +91,21 @@
 - `loadThemeFromDb()` -> `get_setting`
 - `setColorTheme()` / `setMode()` -> `set_setting`
 
+### stores/analysis.ts - 曲库分析 (useAnalysisStore)
+
+**薄 Store 包装：** 实际逻辑在 `composables/useLibraryAnalysis.ts`
+
+**关键状态：**
+- `stats` - LibraryStats 聚合数据（总量、排行、分布）
+- `loading` - 加载状态
+
+**IPC 封装：**
+- `loadStats()` -> `get_library_stats`
+
+**工具方法：**
+- `formattedTotalSize` / `formattedTotalDuration` - 格式化计算属性
+- `formatFileSize()` / `formatDuration()` - 格式化工具
+
 **主题系统：**
 - 使用 Vuetify 3.x 主题系统
 - 支持 6 种主题颜色：青色、靛蓝、蓝色、深紫、红色、琥珀
@@ -110,6 +126,7 @@
 - **PlayerBar.vue** - 底部播放控制（toggleQueue 事件触发 PlayQueueDrawer）
 - **PlayQueueDrawer.vue** - 播放队列抽屉（GSAP Flip 列表重排动画、点击歌曲播放、模式切换按钮）
 - **SettingsView.vue** - 设置页面
+- **AnalysisView.vue** - 曲库分析（5 概览卡片 + 4 ECharts 图表 + 专辑排行列表）
 - **NowPlayingOverlay.vue** - 正在播放覆盖层
 - **LyricsDisplay.vue** - 歌词显示（同步滚动、点击跳转、骨架屏加载态）
 - **IconButtonWithTooltip.vue** - 通用图标按钮 + Tooltip 组件
@@ -158,6 +175,7 @@
 - **composables/useOptimizedSort.ts** - 排序缓存（中文 locale 支持）
 - **composables/useImportExport.ts** - 导入导出功能（歌单导出 M3U/PLS、音乐库备份恢复、设置迁移）
 - **composables/useAutoUpdate.ts** - 自动更新逻辑（启动延迟检查、下载进度跟踪、重启安装）
+- **composables/useLibraryAnalysis.ts** - 曲库分析（loadStats IPC、格式化工具）
 
 ## Animation System
 
@@ -268,7 +286,7 @@ App.vue onMounted
 - `src/composables/useI18n.ts`: i18n 组合式函数
 
 ### 命名空间
-common / sidebar / library / player / settings / playbackMode / toast / empty / importExport / update
+common / sidebar / library / player / settings / playbackMode / toast / empty / importExport / update / analysis
 
 ### player 命名空间（播放队列相关）
 - `playQueue` - "播放队列" / "Play Queue"

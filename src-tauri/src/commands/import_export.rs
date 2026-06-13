@@ -50,7 +50,7 @@ fn get_playlist_songs_from_db(
 ) -> Result<Vec<Song>, String> {
     let mut stmt = conn
         .prepare(
-            "SELECT s.id, s.title, s.artist, s.album, s.duration, s.duration_secs, s.quality, s.file_path, s.art_gradient
+            "SELECT s.id, s.title, s.artist, s.album, s.duration, s.duration_secs, s.quality, s.file_path, s.art_gradient, s.genre, s.file_size
              FROM songs s
              INNER JOIN playlist_songs ps ON s.id = ps.song_id
              WHERE ps.playlist_id = ?1
@@ -69,6 +69,8 @@ fn get_playlist_songs_from_db(
                 quality: row.get(6)?,
                 file_path: row.get(7)?,
                 art_gradient: row.get(8)?,
+                genre: row.get(9)?,
+                file_size: row.get(10)?,
             })
         })
         .map_err(|e| e.to_string())?
@@ -135,7 +137,7 @@ pub fn export_backup(
 
     // Songs
     let mut stmt = conn
-        .prepare("SELECT id, title, artist, album, duration, duration_secs, quality, file_path, art_gradient FROM songs ORDER BY created_at")
+        .prepare("SELECT id, title, artist, album, duration, duration_secs, quality, file_path, art_gradient, genre, file_size FROM songs ORDER BY created_at")
         .map_err(|e| e.to_string())?;
     let songs: Vec<Song> = stmt
         .query_map([], |row| {
@@ -149,6 +151,8 @@ pub fn export_backup(
                 quality: row.get(6)?,
                 file_path: row.get(7)?,
                 art_gradient: row.get(8)?,
+                genre: row.get(9)?,
+                file_size: row.get(10)?,
             })
         })
         .map_err(|e| e.to_string())?
@@ -271,14 +275,14 @@ pub fn import_backup(
     let mut songs_imported = 0usize;
     for s in &data.songs {
         let query = if strategy == "replace" {
-            "INSERT INTO songs (id, title, artist, album, duration, duration_secs, quality, file_path, art_gradient) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)"
+            "INSERT INTO songs (id, title, artist, album, duration, duration_secs, quality, file_path, art_gradient, genre, file_size) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)"
         } else {
-            "INSERT OR IGNORE INTO songs (id, title, artist, album, duration, duration_secs, quality, file_path, art_gradient) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)"
+            "INSERT OR IGNORE INTO songs (id, title, artist, album, duration, duration_secs, quality, file_path, art_gradient, genre, file_size) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)"
         };
         let rows = tx
             .execute(
                 query,
-                params![s.id, s.title, s.artist, s.album, s.duration, s.duration_secs, s.quality, s.file_path, s.art_gradient],
+                params![s.id, s.title, s.artist, s.album, s.duration, s.duration_secs, s.quality, s.file_path, s.art_gradient, s.genre, s.file_size],
             )
             .map_err(|e| e.to_string())?;
         songs_imported += rows;

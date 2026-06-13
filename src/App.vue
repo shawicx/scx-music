@@ -7,6 +7,7 @@ import { usePlayerStore } from './stores/player'
 import AppSidebar from './components/AppSidebar.vue'
 const LibraryView = defineAsyncComponent(() => import('./components/LibraryView.vue'))
 const SettingsView = defineAsyncComponent(() => import('./components/SettingsView.vue'))
+const AnalysisView = defineAsyncComponent(() => import('./components/AnalysisView.vue'))
 const PlayerBar = defineAsyncComponent(() => import('./components/PlayerBar.vue'))
 const NowPlayingOverlay = defineAsyncComponent(() => import('./components/NowPlayingOverlay.vue'))
 const PlayQueueDrawer = defineAsyncComponent(() => import('./components/PlayQueueDrawer.vue'))
@@ -91,6 +92,7 @@ const showQueue = ref(false)
       <div class="main-area">
         <Transition :css="false" mode="out-in" @enter="onPageEnter" @leave="onPageLeave">
           <SettingsView v-if="activeView === 'settings'" key="settings" @back="activeView = 'library'" />
+          <AnalysisView v-else-if="activeView === 'analysis'" key="analysis" @back="activeView = 'library'" />
           <div v-else key="library" class="library-wrapper">
             <LibraryView />
             <PlayerBar @expand="showNowPlaying = true" @toggle-queue="showQueue = !showQueue" />

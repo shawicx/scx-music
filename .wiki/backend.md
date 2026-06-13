@@ -74,6 +74,9 @@
 - `export_settings` - 导出设置为 JSON 文件
 - `import_settings` - 从 JSON 文件导入设置
 
+**commands/stats.rs** - 曲库统计分析
+- `get_library_stats` - 返回聚合统计（歌曲/艺术家/专辑总量、存储大小、艺术家排行、专辑排行、流派/音质/时长分布）
+
 **commands/songs.rs - rename_song 详解**
 
 **文件位置：** `src-tauri/src/commands/songs.rs`
@@ -106,7 +109,7 @@
 **辅助函数：** `sanitize_filename(name)` — 将 `/ \ : * ? " < > |` 替换为 `_`
 
 **lib.rs** - 文件扫描
-- `scan_music_folder` - 扫描音乐文件夹并提取元数据
+- `scan_music_folder` - 扫描音乐文件夹并提取元数据（含 genre、file_size）
 
 ## 自动更新
 
@@ -234,17 +237,18 @@ macOS CoreAudio 通过 CPAL 暴露设备时存在两个已知问题：
 
 **被谁调用：** lib.rs 在应用启动时初始化
 
-### db/migrations.rs - 数据库迁移
+### db/migrations.rs - 数据库初始化
 
-**Schema 版本：**
-- V1: 核心表 (songs, playlists, playlist_songs, settings) + 基础索引
-- V2: 性能索引 (title, created_at, playlist position)
-- V3: 歌词表 (lyrics)
+**单一 Schema：** 所有表、列、索引在一次 `INIT_SCHEMA` 中创建（`CREATE TABLE IF NOT EXISTS`）
+- songs (含 genre, file_size 列)
+- playlists, playlist_songs, settings, lyrics
+- 全部索引
+- 默认收藏歌单
 
 ### db/models.rs - 数据模型
 
 **Rust 结构体：**
-- `Song` - id, title, artist, album, duration, duration_secs, quality, file_path, art_gradient
+- `Song` - id, title, artist, album, duration, duration_secs, quality, file_path, art_gradient, genre, file_size
 - `Playlist` - id, name, sort_order
 - `PlaylistSong` - playlist_id, song_id, sort_order
 - `Lyric` - song_id, raw_lrc, source

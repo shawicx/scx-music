@@ -9,6 +9,7 @@ export default {
   sidebar: {
     playlists: '歌单',
     settings: '设置',
+    analysis: '曲库分析',
     importFolder: '导入文件夹',
     exportPlaylist: '导出歌单',
     clearPlaylist: '清空歌单',
@@ -155,5 +156,19 @@ export default {
     error: '更新失败',
     retry: '重试',
     close: '关闭',
+  },
+  analysis: {
+    title: '曲库分析',
+    totalSongs: '歌曲总数',
+    totalArtists: '艺术家',
+    totalAlbums: '专辑',
+    totalDuration: '总时长',
+    storageSize: '存储空间',
+    artistRanking: '艺术家排行',
+    albumRanking: '专辑排行',
+    genreDistribution: '流派分布',
+    qualityDistribution: '音质分布',
+    durationDistribution: '时长分布',
+    loadingStats: '正在加载统计数据...',
   },
 }

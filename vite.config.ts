@@ -24,6 +24,7 @@ export default defineConfig(async () => ({
           vue: ["vue", "pinia"],
           vuetify: ["vuetify"],
           vueuse: ["@vueuse/core"],
+          echarts: ["echarts", "vue-echarts"],
         },
       },
     },

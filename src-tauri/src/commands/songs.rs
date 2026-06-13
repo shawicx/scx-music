@@ -8,7 +8,7 @@ use rusqlite::params;
 pub fn get_all_songs(db: tauri::State<'_, Db>) -> Result<Vec<Song>, String> {
     let conn = db.0.lock().map_err(|e| e.to_string())?;
     let mut stmt = conn
-        .prepare("SELECT id, title, artist, album, duration, duration_secs, quality, file_path, art_gradient FROM songs ORDER BY created_at")
+        .prepare("SELECT id, title, artist, album, duration, duration_secs, quality, file_path, art_gradient, genre, file_size FROM songs ORDER BY created_at")
         .map_err(|e| e.to_string())?;
     let songs = stmt
         .query_map([], |row| {
@@ -22,6 +22,8 @@ pub fn get_all_songs(db: tauri::State<'_, Db>) -> Result<Vec<Song>, String> {
                 quality: row.get(6)?,
                 file_path: row.get(7)?,
                 art_gradient: row.get(8)?,
+                genre: row.get(9)?,
+                file_size: row.get(10)?,
             })
         })
         .map_err(|e| e.to_string())?
@@ -36,8 +38,8 @@ pub fn upsert_songs(db: tauri::State<'_, Db>, songs: Vec<Song>) -> Result<Vec<St
     let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
     for s in &songs {
         tx.execute(
-            "INSERT INTO songs (id, title, artist, album, duration, duration_secs, quality, file_path, art_gradient)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+            "INSERT INTO songs (id, title, artist, album, duration, duration_secs, quality, file_path, art_gradient, genre, file_size)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
              ON CONFLICT(file_path) DO UPDATE SET
                title = excluded.title,
                artist = excluded.artist,
@@ -45,8 +47,10 @@ pub fn upsert_songs(db: tauri::State<'_, Db>, songs: Vec<Song>) -> Result<Vec<St
                duration = excluded.duration,
                duration_secs = excluded.duration_secs,
                quality = excluded.quality,
-               art_gradient = excluded.art_gradient",
-            params![s.id, s.title, s.artist, s.album, s.duration, s.duration_secs, s.quality, s.file_path, s.art_gradient],
+               art_gradient = excluded.art_gradient,
+               genre = excluded.genre,
+               file_size = excluded.file_size",
+            params![s.id, s.title, s.artist, s.album, s.duration, s.duration_secs, s.quality, s.file_path, s.art_gradient, s.genre, s.file_size],
         )
         .map_err(|e| e.to_string())?;
     }
@@ -161,7 +165,7 @@ pub fn rename_song(
     // 7. Return updated song
     let song = conn
         .query_row(
-            "SELECT id, title, artist, album, duration, duration_secs, quality, file_path, art_gradient FROM songs WHERE id = ?1",
+            "SELECT id, title, artist, album, duration, duration_secs, quality, file_path, art_gradient, genre, file_size FROM songs WHERE id = ?1",
             params![song_id],
             |row| {
                 Ok(Song {
@@ -174,6 +178,8 @@ pub fn rename_song(
                     quality: row.get(6)?,
                     file_path: row.get(7)?,
                     art_gradient: row.get(8)?,
+                    genre: row.get(9)?,
+                    file_size: row.get(10)?,
                 })
             },
         )

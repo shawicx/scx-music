@@ -24,6 +24,8 @@ struct SongEntry {
     duration_secs: f64,
     quality: String,
     file_path: String,
+    genre: String,
+    file_size: u64,
 }
 
 #[tauri::command]
@@ -66,7 +68,8 @@ fn scan_dir(dir: &Path, exts: &[&str], files: &mut Vec<SongEntry>) -> Result<(),
             .unwrap_or("Unknown")
             .to_string();
 
-        let (title, artist, album, duration_secs) = extract_metadata(&path);
+        let (title, artist, album, duration_secs, genre) = extract_metadata(&path);
+        let file_size = fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
         let quality = match ext.as_str() {
             "flac" => "FLAC".to_string(),
             "mp3" => "MP3".to_string(),
@@ -98,12 +101,14 @@ fn scan_dir(dir: &Path, exts: &[&str], files: &mut Vec<SongEntry>) -> Result<(),
             duration_secs: secs,
             quality,
             file_path,
+            genre: genre.unwrap_or_default(),
+            file_size,
         });
     }
     Ok(())
 }
 
-fn extract_metadata(path: &Path) -> (Option<String>, Option<String>, Option<String>, Option<f64>) {
+fn extract_metadata(path: &Path) -> (Option<String>, Option<String>, Option<String>, Option<f64>, Option<String>) {
     match lofty::read_from_path(path) {
         Ok(tagged) => {
             let dur = AudioFileTrait::properties(&tagged).duration();
@@ -119,10 +124,13 @@ fn extract_metadata(path: &Path) -> (Option<String>, Option<String>, Option<Stri
             let album = tag
                 .and_then(|t| t.get_string(&ItemKey::AlbumTitle))
                 .map(|s| s.to_string());
+            let genre = tag
+                .and_then(|t| t.get_string(&ItemKey::Genre))
+                .map(|s| s.to_string());
 
-            (title, artist, album, Some(duration_secs))
+            (title, artist, album, Some(duration_secs), genre)
         }
-        Err(_) => (None, None, None, None),
+        Err(_) => (None, None, None, None, None),
     }
 }
 
@@ -200,6 +208,7 @@ pub fn run() {
             commands::import_export::import_backup,
             commands::import_export::export_settings,
             commands::import_export::import_settings,
+            commands::stats::get_library_stats,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

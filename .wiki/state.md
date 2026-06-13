@@ -109,6 +109,17 @@ listen('audio:state_change', (e) => {
 - `currentLineIndex` - 当前行索引
 - `isLoading` - 加载状态
 
+### 曲库分析状态 (stores/analysis.ts - useAnalysisStore)
+
+**来源：** Rust commands/stats.rs (SQL 聚合查询)
+**更新方式：**
+- 进入分析页时调用 `loadStats()` 触发 IPC
+
+**关键状态：**
+- `stats` - LibraryStats（总量、排行、分布数据）
+- `loading` - 加载状态
+- `formattedTotalSize` / `formattedTotalDuration` - 格式化计算属性
+
 ## 状态持久化策略
 
 **前端状态：** Pinia Store (Vue reactive refs)

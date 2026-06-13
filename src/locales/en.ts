@@ -9,6 +9,7 @@ export default {
   sidebar: {
     playlists: 'Playlists',
     settings: 'Settings',
+    analysis: 'Library Analysis',
     importFolder: 'Import Folder',
     exportPlaylist: 'Export Playlist',
     clearPlaylist: 'Clear Playlist',
@@ -155,5 +156,19 @@ export default {
     error: 'Update Failed',
     retry: 'Retry',
     close: 'Close',
+  },
+  analysis: {
+    title: 'Library Analysis',
+    totalSongs: 'Total Songs',
+    totalArtists: 'Artists',
+    totalAlbums: 'Albums',
+    totalDuration: 'Total Duration',
+    storageSize: 'Storage',
+    artistRanking: 'Artist Ranking',
+    albumRanking: 'Album Ranking',
+    genreDistribution: 'Genre Distribution',
+    qualityDistribution: 'Quality Distribution',
+    durationDistribution: 'Duration Distribution',
+    loadingStats: 'Loading statistics...',
   },
 }

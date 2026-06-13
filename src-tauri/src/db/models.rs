@@ -12,6 +12,8 @@ pub struct Song {
     pub quality: String,
     pub file_path: String,
     pub art_gradient: String,
+    pub genre: String,
+    pub file_size: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

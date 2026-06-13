@@ -63,7 +63,7 @@ pub fn get_playlist_songs(db: tauri::State<'_, Db>, playlist_id: String) -> Resu
     let conn = db.0.lock().map_err(|e| e.to_string())?;
     let mut stmt = conn
         .prepare(
-            "SELECT s.id, s.title, s.artist, s.album, s.duration, s.duration_secs, s.quality, s.file_path, s.art_gradient
+            "SELECT s.id, s.title, s.artist, s.album, s.duration, s.duration_secs, s.quality, s.file_path, s.art_gradient, s.genre, s.file_size
              FROM songs s
              INNER JOIN playlist_songs ps ON s.id = ps.song_id
              WHERE ps.playlist_id = ?1
@@ -82,6 +82,8 @@ pub fn get_playlist_songs(db: tauri::State<'_, Db>, playlist_id: String) -> Resu
                 quality: row.get(6)?,
                 file_path: row.get(7)?,
                 art_gradient: row.get(8)?,
+                genre: row.get(9)?,
+                file_size: row.get(10)?,
             })
         })
         .map_err(|e| e.to_string())?

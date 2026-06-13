@@ -19,7 +19,7 @@ pub fn get_bootstrap_data(db: tauri::State<'_, Db>) -> Result<BootstrapData, Str
 
     // Songs
     let mut stmt = conn
-        .prepare("SELECT id, title, artist, album, duration, duration_secs, quality, file_path, art_gradient FROM songs ORDER BY created_at")
+        .prepare("SELECT id, title, artist, album, duration, duration_secs, quality, file_path, art_gradient, genre, file_size FROM songs ORDER BY created_at")
         .map_err(|e| e.to_string())?;
     let songs = stmt
         .query_map([], |row| {
@@ -33,6 +33,8 @@ pub fn get_bootstrap_data(db: tauri::State<'_, Db>) -> Result<BootstrapData, Str
                 quality: row.get(6)?,
                 file_path: row.get(7)?,
                 art_gradient: row.get(8)?,
+                genre: row.get(9)?,
+                file_size: row.get(10)?,
             })
         })
         .map_err(|e| e.to_string())?

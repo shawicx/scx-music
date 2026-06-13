@@ -271,6 +271,8 @@ export function useLibrary() {
         duration_secs: number
         quality: string
         file_path: string
+        genre: string
+        file_size: number
       }> = await invokeCommand('scan_music_folder', { dirPath: selected })
 
       const newSongs: Song[] = files.map((f, i) => ({
@@ -283,6 +285,8 @@ export function useLibrary() {
         quality: f.quality,
         filePath: f.file_path,
         artGradient: getGradientForIndex(songs.value.length + i),
+        genre: f.genre ?? '',
+        fileSize: f.file_size ?? 0,
       }))
 
       const dbIds: string[] = await invokeCommand('upsert_songs', { songs: newSongs })

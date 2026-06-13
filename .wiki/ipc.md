@@ -60,6 +60,8 @@ const result = await invokeCommand('command_name', { param: value })
 | `import_backup` | composables/useImportExport.ts | commands/import_export.rs | 导入备份（replace/merge） |
 | `export_settings` | composables/useImportExport.ts | commands/import_export.rs | 导出设置到 JSON |
 | `import_settings` | composables/useImportExport.ts | commands/import_export.rs | 从 JSON 导入设置 |
+| **曲库分析** | | | |
+| `get_library_stats` | stores/analysis.ts | commands/stats.rs | 获取曲库聚合统计数据 |
 | **频谱分析** | | | |
 | `analyzer_start` | visualization/useAudioAnalyzer.ts | audio/analyzer_cmds.rs | 启动频谱分析 |
 | `analyzer_stop` | visualization/useAudioAnalyzer.ts | audio/analyzer_cmds.rs | 停止频谱分析 |
