@@ -197,6 +197,20 @@ App.vue onMounted
 | `audio:error` | `string` | 音频错误发生 | stores/player.ts |
 | `audio:spectrum` | `number[64]` | 每 33ms (播放时) | visualization/useAudioAnalyzer.ts |
 
+## 桌面歌词相关事件（自定义）
+
+| 事件 | 方向 | Payload | 说明 |
+|------|------|---------|------|
+| `desktop-lyrics:config-changed` | 主窗口 → 歌词窗口 | `{ key: keyof DesktopLyricsConfig, value: any }` | SettingsView 修改配置后广播，歌词窗口实时响应 |
+| `desktop-lyrics:lock-changed` | 双向 | `boolean` | 锁定状态同步（任一窗口切换时广播） |
+
+### 复用的既有事件
+
+歌词窗口直接订阅以下广播事件，无需新增 IPC：
+
+- `audio:progress`（payload `{ current, duration }`，500ms 间隔）：驱动歌词当前行高亮
+- `audio:track_change`（payload 是 `Song` 对象）：歌曲切换时重新加载歌词
+
 ## 错误处理
 
 所有 IPC 调用都通过 `utils/errorHandler.ts` 统一处理：

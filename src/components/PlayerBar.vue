@@ -5,6 +5,7 @@ import { usePlayerStore } from '../stores/player'
 import { useLibraryStore } from '../stores/library'
 import IconButtonWithTooltip from './IconButtonWithTooltip.vue'
 import { usePlaybackMode } from '../composables/usePlaybackMode'
+import { useDesktopLyrics } from '../composables/useDesktopLyrics'
 import { useI18n } from '../composables/useI18n'
 
 const emit = defineEmits<{ expand: []; toggleQueue: [] }>()
@@ -12,6 +13,7 @@ const emit = defineEmits<{ expand: []; toggleQueue: [] }>()
 const playerStore = usePlayerStore()
 const libraryStore = useLibraryStore()
 const { modeIcon, modeLabel, isModeActive, cycleMode } = usePlaybackMode()
+const { visible: desktopLyricsVisible, toggle: toggleDesktopLyrics } = useDesktopLyrics()
 const { t } = useI18n()
 
 const {
@@ -160,6 +162,15 @@ const displayProgress = computed(() => {
       </div>
     </div>
     <div class="player-right">
+      <IconButtonWithTooltip
+        icon="mdi-monitor-eye"
+        icon-active="mdi-monitor-eye"
+        :active="desktopLyricsVisible"
+        :tooltip="t('lyrics.desktopLyrics.toggle')"
+        color="secondary"
+        size="x-small"
+        @click.stop="toggleDesktopLyrics"
+      />
       <IconButtonWithTooltip
         icon="mdi-playlist-music"
         :tooltip="t('player.playlist')"

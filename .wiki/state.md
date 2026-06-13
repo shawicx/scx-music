@@ -129,6 +129,23 @@ listen('audio:state_change', (e) => {
 - 设置变化：立即保存到数据库
 - 批量操作：事务提交
 
+## 桌面歌词设置项
+
+所有键以 `desktop-lyrics.*` 前缀存入既有 `settings(key TEXT PK, value TEXT)` 表，**无数据库迁移**。首次启动时表内无这些 key，使用默认值；首次状态变更才写入。
+
+| Key | 默认值 | 类型 | 说明 |
+|---|---|---|---|
+| `desktop-lyrics.bg-opacity` | `0.3` | float 0-1 | 背景透明度 |
+| `desktop-lyrics.font-size` | `32` | int px | 当前句字号（下一句自动按 0.75x 缩放） |
+| `desktop-lyrics.color-current` | `#FFFFFF` | hex | 当前句文字颜色 |
+| `desktop-lyrics.color-next` | `rgba(255,255,255,0.5)` | css color | 下一句文字颜色 |
+| `desktop-lyrics.glow` | `medium` | enum: off/weak/medium/strong | 当前句发光强度 |
+| `desktop-lyrics.locked` | `false` | bool | 锁定状态（点击穿透） |
+| `desktop-lyrics.position-x` | 运行时计算 | int | 窗口 X 坐标（默认水平居中） |
+| `desktop-lyrics.position-y` | 运行时计算 | int | 窗口 Y 坐标（默认底部上方 100px） |
+
+**注意**：可见性 (`visible`) 不持久化 —— 主窗口 PlayerBar 按钮态由本地 ref 维护，应用重启后 lyrics 窗口默认隐藏（来自 `tauri.conf.json`），符合"不做启动自动打开"的设计。
+
 ## 最关键状态
 
 1. **播放队列** - queue + queueIndex

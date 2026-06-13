@@ -323,6 +323,34 @@ common / sidebar / library / player / settings / playbackMode / toast / empty / 
 
 所有 IPC 调用集中在 Pinia Stores 中，组件通过 Store 操作数据，不直接调用 `invoke`。错误处理通过 `utils/errorHandler.ts` 统一管理。
 
+## 桌面歌词窗口（Desktop Lyrics Window）
+
+独立 Tauri 窗口（label: `desktop-lyrics`），半透明、置顶、双行显示当前播放歌词（当前句高亮 + 下一句预览）。
+
+### 文件结构
+
+- `src/main.ts`：检测 `window.location.hash === '#desktop-lyrics'`，条件挂载 `DesktopLyricsApp.vue`（极简根）或 `App.vue`（主窗口根）
+- `src/desktop-lyrics/DesktopLyricsApp.vue`：歌词窗口根组件（无 AppShell/Sidebar/PlayerBar）
+- `src/components/desktop-lyrics/DesktopLyricsWindow.vue`：主容器（拖拽、状态恢复、渲染）
+- `src/components/desktop-lyrics/LyricLinePair.vue`：双行渲染
+- `src/components/desktop-lyrics/LockBadge.vue`：悬浮锁定按钮（仅 unlocked 态可见）
+- `src/composables/useDesktopLyrics.ts`：状态 + IPC + 持久化，**在主窗口与歌词窗口两端实例化**，按 `getCurrentWindow().label === 'desktop-lyrics'` 区分行为
+
+### 窗口属性
+
+`tauri.conf.json` 第二个窗口：`transparent: true`、`decorations: false`、`alwaysOnTop: true`、`skipTaskbar: true`、`closable: false`（防 Alt+F4 销毁）、`visible: false`（默认隐藏，PlayerBar 按钮触发显示）。
+
+### 与主窗口的关系
+
+- **事件复用**：`audio:progress` / `audio:track_change` 已广播到所有 webview，歌词窗口自动接收，无需新增 IPC
+- **配置同步**：自定义事件 `desktop-lyrics:config-changed`（主窗口 → 歌词窗口）、`desktop-lyrics:lock-changed`（双向）
+- **持久化**：所有配置走既有 settings 表，前缀 `desktop-lyrics.*`，无数据库迁移
+
+### 锁定/点击穿透状态机
+
+- **unlocked**：可拖拽、LockBadge 可见、点击 LockBadge 进入 locked
+- **locked**：`setIgnoreCursorEvents(true)` 整窗光标穿透、LockBadge 不可点击、只能通过 SettingsView 解锁
+
 ## 关键业务逻辑
 
 1. **播放控制** - stores/player.ts 封装所有播放相关 IPC + 事件监听 + 队列生成（通过 usePlayQueue）

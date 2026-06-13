@@ -118,3 +118,11 @@
 ### 文件 IO
 **风险：** 文件不存在、权限不足
 **缓解：** 使用 `?` 传播错误，前端显示错误提示
+
+## 桌面歌词窗口跨平台风险
+
+- **macOS 透明窗口在某些桌面壁纸下出现黑边**：已通过 `shadow: false` + 圆角 8px 缓解，但仍可能在动态壁纸/特定主题下出现
+- **Windows 透明窗口 + alwaysOnTop 在部分全屏应用（游戏、视频播放器全屏）下可能被遮挡**：MVP 接受此限制，用户可退出全屏或调整 always-on-top 行为（未来扩展）
+- **锁定后无法从窗口本身解锁**：`setIgnoreCursorEvents(true)` 是整窗穿透，LockBadge 也不可点击；依赖 SettingsView "锁定"复选框作为唯一解锁入口（已加 tooltip 提示"锁定后窗口点击穿透，可在此解锁"）
+- **窗口位置在多显示器场景的持久化**：拖到副屏后位置仍持久化，但若副屏被移除/分辨率变化，Tauri 自动夹紧到主屏可见区
+- **跨 webview 的事件订阅开销**：`audio:progress` 每 500ms 广播到所有 webview，desktop-lyrics 窗口隐藏时仍接收；useLyrics 内部仅更新 `currentLineIndex` ref，开销可忽略

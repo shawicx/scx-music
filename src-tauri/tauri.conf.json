@@ -12,9 +12,29 @@
   "app": {
     "windows": [
       {
+        "label": "main",
         "title": "scx-music",
         "width": 1200,
         "height": 800
+      },
+      {
+        "label": "desktop-lyrics",
+        "url": "index.html#desktop-lyrics",
+        "title": "Desktop Lyrics",
+        "width": 1000,
+        "height": 120,
+        "x": 0,
+        "y": 200,
+        "visible": false,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "resizable": false,
+        "maximizable": false,
+        "minimizable": false,
+        "closable": false,
+        "shadow": false
       }
     ],
     "security": {

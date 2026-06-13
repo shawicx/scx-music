@@ -8,6 +8,10 @@
     "opener:default",
     "dialog:default",
     "updater:default",
-    "process:default"
+    "process:default",
+    "core:window:allow-show",
+    "core:window:allow-hide",
+    "core:window:allow-set-focus",
+    "core:window:allow-is-visible"
   ]
 }
