@@ -4,10 +4,12 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
 use rodio::{Decoder, OutputStream, OutputStreamHandle, Sink, Source};
+use tauri::Manager;
 
 use crate::analyzer::{AnalyzerHandle, TeeSource};
 
 use super::device::{find_device_by_name, try_output_stream_for_device};
+use super::tracker::{finalize_session, PlaySession};
 use super::types::*;
 
 pub(super) struct AudioEngine {
@@ -36,6 +38,7 @@ pub struct AudioStateInner {
     pub(super) progress_thread_handle: Option<std::thread::JoinHandle<()>>,
     pub(super) output_device_name: Option<String>,
     pub analyzer: AnalyzerHandle,
+    pub play_session: Option<PlaySession>,
 }
 
 impl AudioStateInner {
@@ -54,6 +57,7 @@ impl AudioStateInner {
             progress_thread_handle: None,
             output_device_name: None,
             analyzer: AnalyzerHandle::new(),
+            play_session: None,
         }
     }
 
@@ -112,7 +116,7 @@ impl AudioStateInner {
         self.output_device_name = device_name;
 
         if let Some(index) = current_index {
-            self.play_file_at_index(index)?;
+            self.play_file_at_index(index, None)?;
             if current_position > 0.0 {
                 let _ = self.seek_by_restart(current_position);
             }
@@ -132,13 +136,29 @@ impl AudioStateInner {
                 .unwrap_or(0.0)
     }
 
-    pub(super) fn play_file_at_index(&mut self, index: usize) -> Result<(), String> {
+    pub(super) fn play_file_at_index(
+        &mut self,
+        index: usize,
+        app: Option<&tauri::AppHandle>,
+    ) -> Result<(), String> {
         if index >= self.queue.len() {
-            self.stop_internal();
+            self.stop_internal(app);
             return Ok(());
         }
 
+        // Finalize old play session
+        if let Some(session) = self.play_session.take() {
+            if let Some(app) = app {
+                if let Some(db) = app.try_state::<crate::db::Db>() {
+                    if let Ok(conn) = db.0.lock() {
+                        let _ = finalize_session(&conn, &session);
+                    }
+                }
+            }
+        }
+
         let song = self.queue[index].clone();
+        self.play_session = Some(PlaySession::new(song.id.clone(), song.duration_secs));
         self.queue_index = index;
 
         self.ensure_engine()?;
@@ -182,7 +202,18 @@ impl AudioStateInner {
         Ok(())
     }
 
-    pub fn stop_internal(&mut self) {
+    pub fn stop_internal(&mut self, app: Option<&tauri::AppHandle>) {
+        // Finalize play session
+        if let Some(session) = self.play_session.take() {
+            if let Some(app) = app {
+                if let Some(db) = app.try_state::<crate::db::Db>() {
+                    if let Ok(conn) = db.0.lock() {
+                        let _ = finalize_session(&conn, &session);
+                    }
+                }
+            }
+        }
+
         self.progress_stop.store(true, Ordering::Relaxed);
         if let Some(engine) = &mut self.engine {
             if let Some(sink) = engine.sink.take() {
@@ -205,6 +236,9 @@ impl AudioStateInner {
         self.position_base_secs = self.current_position_secs();
         self.segment_started_at = None;
         self.state = PlaybackState::Paused;
+        if let Some(ref mut s) = self.play_session {
+            s.pause();
+        }
     }
 
     pub(super) fn resume_internal(&mut self) {
@@ -215,6 +249,9 @@ impl AudioStateInner {
         }
         self.segment_started_at = Some(Instant::now());
         self.state = PlaybackState::Playing;
+        if let Some(ref mut s) = self.play_session {
+            s.resume();
+        }
     }
 
     pub(super) fn seek_by_restart(&mut self, position_secs: f64) -> Result<(), String> {

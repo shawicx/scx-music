@@ -51,8 +51,42 @@ CREATE INDEX IF NOT EXISTS idx_playlist_songs_playlist_position ON playlist_song
 INSERT OR IGNORE INTO playlists (id, name, sort_order) VALUES ('fav', '我喜欢的', 0);
 ";
 
+const V6_PLAY_HISTORY: &str = "
+CREATE TABLE IF NOT EXISTS play_history (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    song_id       TEXT NOT NULL REFERENCES songs(id) ON DELETE CASCADE,
+    played_at     TEXT NOT NULL DEFAULT (datetime('now')),
+    duration_secs REAL NOT NULL DEFAULT 0.0
+);
+
+CREATE INDEX IF NOT EXISTS idx_play_history_song ON play_history(song_id);
+CREATE INDEX IF NOT EXISTS idx_play_history_played_at ON play_history(played_at);
+";
+
 pub fn run_migrations(conn: &rusqlite::Connection) -> Result<(), Box<dyn std::error::Error>> {
     conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;")?;
     conn.execute_batch(INIT_SCHEMA)?;
+
+    // V6: play_history table + songs cache fields
+    let play_history_exists: bool = conn
+        .query_row(
+            "SELECT COUNT(*) > 0 FROM sqlite_master WHERE type='table' AND name='play_history'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap_or(false);
+
+    if !play_history_exists {
+        conn.execute_batch(V6_PLAY_HISTORY)?;
+
+        // Add cache columns to songs table (idempotent via try-catch style)
+        let _ = conn.execute_batch(
+            "ALTER TABLE songs ADD COLUMN play_count INTEGER NOT NULL DEFAULT 0;",
+        );
+        let _ = conn.execute_batch(
+            "ALTER TABLE songs ADD COLUMN total_play_duration REAL NOT NULL DEFAULT 0.0;",
+        );
+    }
+
     Ok(())
 }

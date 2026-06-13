@@ -25,7 +25,7 @@ pub fn player_set_queue(
         let mut s = arc.lock().unwrap();
         s.progress_stop.store(false, Ordering::Relaxed);
         s.queue = songs;
-        s.play_file_at_index(index)?;
+        s.play_file_at_index(index, Some(&app))?;
         let payload = s.get_state_payload();
         drop(s);
         let _ = app.emit("audio:track_change", &payload.current_song);
@@ -63,9 +63,9 @@ pub fn player_resume(
 }
 
 #[tauri::command]
-pub fn player_stop(state: tauri::State<'_, AudioState>) -> Result<(), String> {
+pub fn player_stop(app: AppHandle, state: tauri::State<'_, AudioState>) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
-    s.stop_internal();
+    s.stop_internal(Some(&app));
     Ok(())
 }
 
@@ -121,7 +121,7 @@ pub fn player_next(app: AppHandle, state: tauri::State<'_, AudioState>) -> Resul
         let payload;
         {
             let mut s = arc.lock().unwrap();
-            s.play_file_at_index(idx)?;
+            s.play_file_at_index(idx, Some(&app))?;
             payload = s.get_state_payload();
         }
         let _ = app.emit("audio:track_change", &payload.current_song);
@@ -147,7 +147,7 @@ pub fn player_previous(app: AppHandle, state: tauri::State<'_, AudioState>) -> R
         let payload;
         {
             let mut s = arc.lock().unwrap();
-            s.play_file_at_index(idx)?;
+            s.play_file_at_index(idx, Some(&app))?;
             payload = s.get_state_payload();
         }
         let _ = app.emit("audio:track_change", &payload.current_song);

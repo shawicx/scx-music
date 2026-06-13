@@ -103,3 +103,38 @@ export interface DurationBucket {
   label: string
   songCount: number
 }
+
+// 听歌统计
+export interface ListeningOverview {
+  playCount: number
+  totalDurationSecs: number
+  genreCount: number
+  artistCount: number
+}
+
+export interface TopSong {
+  songId: string
+  title: string
+  artist: string
+  playCount: number
+  totalDurationSecs: number
+}
+
+export interface TopArtist {
+  artist: string
+  playCount: number
+  totalDurationSecs: number
+  songCount: number
+}
+
+export interface GenreDuration {
+  genre: string
+  durationSecs: number
+}
+
+export interface DayDuration {
+  date: string
+  durationSecs: number
+}
+
+export type ListeningRange = '7d' | '30d' | 'all'

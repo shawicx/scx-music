@@ -74,8 +74,14 @@
 - `export_settings` - 导出设置为 JSON 文件
 - `import_settings` - 从 JSON 文件导入设置
 
-**commands/stats.rs** - 曲库统计分析
-- `get_library_stats` - 返回聚合统计（歌曲/艺术家/专辑总量、存储大小、艺术家排行、专辑排行、流派/音质/时长分布）
+**commands/stats.rs** - 统计分析
+- `get_library_stats` - 曲库聚合统计（歌曲/艺术家/专辑总量、存储大小、艺术家排行、专辑排行、流派/音质/时长分布）
+- `stats_listening_overview` - 听歌概览（播放次数、时长、流派数、歌手数），支持 7d/30d/all 时间范围
+- `stats_top_songs` - 最爱歌曲 Top N（按播放次数排序）
+- `stats_top_artists` - 最爱歌手 Top N（按播放次数排序）
+- `stats_genre_distribution` - 流派播放时长分布
+- `stats_trend` - 按天聚合的播放时长趋势
+- `stats_heatmap` - 最近 365 天每日播放时长（GitHub 风格热力图数据）
 
 **commands/songs.rs - rename_song 详解**
 
@@ -144,9 +150,10 @@
 - `commands.rs` — 10 个播放控制命令（player_set_queue、player_pause 等）
 - `device.rs` — 设备辅助函数（`try_output_stream_for_device` 等）+ 3 个设备命令
 - `analyzer_cmds.rs` — `analyzer_start` / `analyzer_stop` 命令
+- `tracker.rs` — 播放会话追踪（`PlaySession` struct + `flush_session` 写入数据库）
 
 **核心结构：**
-- `AudioStateInner` - 音频状态（队列、模式、音量、进度、分析器、输出设备）
+- `AudioStateInner` - 音频状态（队列、模式、音量、进度、分析器、输出设备、播放会话）
 - `AudioEngine` - Rodio OutputStream 和 Sink 封装
 - `QueuedSong` - 队列中的歌曲数据结构
 
@@ -239,11 +246,12 @@ macOS CoreAudio 通过 CPAL 暴露设备时存在两个已知问题：
 
 ### db/migrations.rs - 数据库初始化
 
-**单一 Schema：** 所有表、列、索引在一次 `INIT_SCHEMA` 中创建（`CREATE TABLE IF NOT EXISTS`）
-- songs (含 genre, file_size 列)
-- playlists, playlist_songs, settings, lyrics
-- 全部索引
-- 默认收藏歌单
+**Schema 结构：**
+- `INIT_SCHEMA` — 核心表（songs、playlists、playlist_songs、settings、lyrics）
+- `V6_PLAY_HISTORY` — 播放历史表（play_history）+ songs 缓存字段（play_count、total_play_duration）
+
+**play_history 表：** id (自增主键), song_id (FK), played_at (时间戳), duration_secs (播放时长)
+**songs 缓存字段：** play_count (播放次数), total_play_duration (累计播放时长)
 
 ### db/models.rs - 数据模型
 
@@ -258,7 +266,14 @@ macOS CoreAudio 通过 CPAL 暴露设备时存在两个已知问题：
 **audio/mod.rs** 中的进度跟踪线程
 - 独立线程每 500ms 推送播放进度
 - 检测曲目播放完毕并自动播放下一曲
+- 每 30 秒自动 flush 播放会话到数据库（防崩溃丢数据）
 - 使用 `Arc<AtomicBool>` 控制线程生命周期
+
+**播放会话追踪（tracker.rs）：**
+- `PlaySession` 追踪当前歌曲的播放时长（支持暂停/恢复累积）
+- 播放/暂停/恢复/切歌时更新会话状态
+- 切歌或停止时将累计时长 >= 5s 的会话写入 play_history 表
+- 事务内同时更新 songs.play_count 和 songs.total_play_duration 缓存字段
 
 ## 多线程
 

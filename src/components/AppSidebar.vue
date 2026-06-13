@@ -207,6 +207,15 @@ function handleExportPlaylist() {
       <v-btn
         block
         variant="text"
+        prepend-icon="mdi-chart-timeline-variant"
+        :class="['settings-btn', { active: activeView === 'stats' }]"
+        @click="emit('navigate', 'stats')"
+      >
+        {{ t('sidebar.listeningStats') }}
+      </v-btn>
+      <v-btn
+        block
+        variant="text"
         prepend-icon="mdi-chart-bar"
         :class="['settings-btn', { active: activeView === 'analysis' }]"
         @click="emit('navigate', 'analysis')"

@@ -209,6 +209,12 @@ pub fn run() {
             commands::import_export::export_settings,
             commands::import_export::import_settings,
             commands::stats::get_library_stats,
+            commands::stats::stats_listening_overview,
+            commands::stats::stats_top_songs,
+            commands::stats::stats_top_artists,
+            commands::stats::stats_genre_distribution,
+            commands::stats::stats_trend,
+            commands::stats::stats_heatmap,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

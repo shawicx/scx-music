@@ -8,12 +8,13 @@
 - **PlayQueueDrawer.vue** - 播放队列右侧抽屉（GSAP Flip 重排动画、当前歌曲高亮、模式切换）
 - **SettingsView.vue** - 设置页面
 - **AnalysisView.vue** - 曲库分析（概览卡片 + ECharts 图表 + 排行列表）
+- **StatsView.vue** - 听歌统计（概览卡片 + 最爱歌曲/歌手排行 + 流派分布 + 播放趋势 + 年度热力图）
 - **NowPlayingOverlay.vue** - 正在播放覆盖层
 - **LyricsDisplay.vue** - 歌词显示组件（LRC 解析、同步滚动、点击跳转）
 
 ## Router
 
-无复杂路由，使用 `activeView` 状态切换视图：library / settings / analysis。
+无复杂路由，使用 `activeView` 状态切换视图：library / settings / analysis / stats。
 
 ## 状态管理 (Pinia Stores)
 

@@ -8,6 +8,7 @@ import AppSidebar from './components/AppSidebar.vue'
 const LibraryView = defineAsyncComponent(() => import('./components/LibraryView.vue'))
 const SettingsView = defineAsyncComponent(() => import('./components/SettingsView.vue'))
 const AnalysisView = defineAsyncComponent(() => import('./components/AnalysisView.vue'))
+const StatsView = defineAsyncComponent(() => import('./components/StatsView.vue'))
 const PlayerBar = defineAsyncComponent(() => import('./components/PlayerBar.vue'))
 const NowPlayingOverlay = defineAsyncComponent(() => import('./components/NowPlayingOverlay.vue'))
 const PlayQueueDrawer = defineAsyncComponent(() => import('./components/PlayQueueDrawer.vue'))
@@ -93,6 +94,7 @@ const showQueue = ref(false)
         <Transition :css="false" mode="out-in" @enter="onPageEnter" @leave="onPageLeave">
           <SettingsView v-if="activeView === 'settings'" key="settings" @back="activeView = 'library'" />
           <AnalysisView v-else-if="activeView === 'analysis'" key="analysis" @back="activeView = 'library'" />
+          <StatsView v-else-if="activeView === 'stats'" key="stats" @back="activeView = 'library'" />
           <div v-else key="library" class="library-wrapper">
             <LibraryView />
             <PlayerBar @expand="showNowPlaying = true" @toggle-queue="showQueue = !showQueue" />
