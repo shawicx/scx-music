@@ -76,12 +76,15 @@
 
 **commands/stats.rs** - 统计分析
 - `get_library_stats` - 曲库聚合统计（歌曲/艺术家/专辑总量、存储大小、艺术家排行、专辑排行、流派/音质/时长分布）
-- `stats_listening_overview` - 听歌概览（播放次数、时长、流派数、歌手数），支持 7d/30d/all 时间范围
+- `stats_listening_overview` - 听歌概览（播放次数、时长、流派数、歌手数、独立歌曲数），支持 `range?`（7d/30d/all）或 `start`/`end` 绝对日期范围
 - `stats_top_songs` - 最爱歌曲 Top N（按播放次数排序）
 - `stats_top_artists` - 最爱歌手 Top N（按播放次数排序）
 - `stats_genre_distribution` - 流派播放时长分布
 - `stats_trend` - 按天聚合的播放时长趋势
 - `stats_heatmap` - 最近 365 天每日播放时长（GitHub 风格热力图数据）
+- `stats_hourly_distribution(start, end)` — 指定时间范围内按小时（0-23，本地时区）聚合的听歌时长分布。用于周/月/年报告的时段分布图表。返回 `Vec<HourDuration>`。
+
+**参数签名变化（所有 `stats_*` 命令）：** `range: String` → `range: Option<String>`，并新增可选 `start`/`end` 参数（绝对日期，格式 `YYYY-MM-DD HH:MM:SS` UTC）。向后兼容：统计 Tab 传 `range`，报告 Tab 传 `start`/`end`。
 
 **commands/songs.rs - rename_song 详解**
 
@@ -260,6 +263,24 @@ macOS CoreAudio 通过 CPAL 暴露设备时存在两个已知问题：
 - `Playlist` - id, name, sort_order
 - `PlaylistSong` - playlist_id, song_id, sort_order
 - `Lyric` - song_id, raw_lrc, source
+- `ListeningOverview` - 总播放次数、总播放时长、流派数、歌手数、**独立歌曲数（unique_song_count）**
+- `HourDuration` - 小时（0-23）+ 累计播放时长（用于时段分布图）
+
+### build_time_filter
+
+`stats.rs` 中的私有函数，支持两种时间过滤模式：
+
+- `range: Option<"7d" | "30d" | "all">` — 滚动窗口（统计 Tab 使用）
+- `start/end: Option<String>` — 绝对日期范围（报告 Tab 使用，格式 `YYYY-MM-DD HH:MM:SS` UTC）
+
+当 `start` + `end` 同时提供时优先使用绝对日期，否则回退到滚动窗口。所有 `stats_*` 命令的 `range` 参数为 `Option<String>` 以兼容此函数签名。
+
+### 时区约定
+
+`play_history.played_at` 使用 SQLite `datetime('now')` 默认值，存储为 **UTC 时间**。
+
+- **过滤**：前端将本地时间转为 UTC 字符串后传入 `start`/`end`，SQL 直接比较原始列（索引友好）
+- **小时聚合**：`strftime('%H', played_at, 'localtime')` 将 UTC 转为本地时间后提取小时
 
 ## Async Task
 

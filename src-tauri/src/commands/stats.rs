@@ -196,6 +196,7 @@ pub struct ListeningOverview {
     pub total_duration_secs: f64,
     pub genre_count: i64,
     pub artist_count: i64,
+    pub unique_song_count: i64,
 }
 
 #[derive(Serialize)]
@@ -231,18 +232,37 @@ pub struct DayDuration {
     pub duration_secs: f64,
 }
 
-fn range_filter(range: &str) -> String {
+/// 支持「滚动窗口」(range) 和「绝对日期」(start/end) 两种过滤模式。
+/// 报告 Tab 传 start/end（自然周期），统计 Tab 传 range（滚动窗口）。
+fn build_time_filter(
+    range: Option<&str>,
+    start: Option<&str>,
+    end: Option<&str>,
+) -> String {
+    // 优先使用绝对日期（报告模式）
+    if let (Some(s), Some(e)) = (start, end) {
+        return format!(
+            "AND ph.played_at >= '{}' AND ph.played_at < '{}'",
+            s, e
+        );
+    }
+    // 回退到滚动窗口（现有 StatsView 模式）
     match range {
-        "7d" => "AND ph.played_at >= datetime('now', '-7 days')".to_string(),
-        "30d" => "AND ph.played_at >= datetime('now', '-30 days')".to_string(),
-        _ => String::new(), // "all" = no filter
+        Some("7d") => "AND ph.played_at >= datetime('now', '-7 days')".to_string(),
+        Some("30d") => "AND ph.played_at >= datetime('now', '-30 days')".to_string(),
+        _ => String::new(),
     }
 }
 
 #[tauri::command]
-pub fn stats_listening_overview(range: String, db: State<'_, Db>) -> Result<ListeningOverview, String> {
+pub fn stats_listening_overview(
+    range: Option<String>,
+    start: Option<String>,
+    end: Option<String>,
+    db: State<'_, Db>,
+) -> Result<ListeningOverview, String> {
     let conn = db.0.lock().map_err(|e| e.to_string())?;
-    let filter = range_filter(&range);
+    let filter = build_time_filter(range.as_deref(), start.as_deref(), end.as_deref());
 
     let play_count: i64 = conn.query_row(
         "SELECT COALESCE(SUM(play_count), 0) FROM songs",
@@ -264,14 +284,23 @@ pub fn stats_listening_overview(range: String, db: State<'_, Db>) -> Result<List
         [], |r| r.get(0),
     ).unwrap_or(0);
 
-    Ok(ListeningOverview { play_count, total_duration_secs, genre_count, artist_count })
+    let unique_song_count: i64 = conn.query_row(
+        &format!("SELECT COUNT(DISTINCT ph.song_id) FROM play_history ph WHERE 1=1 {}", filter),
+        [], |r| r.get(0),
+    ).unwrap_or(0);
+
+    Ok(ListeningOverview { play_count, total_duration_secs, genre_count, artist_count, unique_song_count })
 }
 
 #[tauri::command]
-pub fn stats_top_songs(range: String, limit: Option<i64>, db: State<'_, Db>) -> Result<Vec<TopSong>, String> {
+pub fn stats_top_songs(
+    range: Option<String>,
+    limit: Option<i64>,
+    db: State<'_, Db>,
+) -> Result<Vec<TopSong>, String> {
     let conn = db.0.lock().map_err(|e| e.to_string())?;
     let limit = limit.unwrap_or(10);
-    let filter = range_filter(&range);
+    let filter = build_time_filter(range.as_deref(), None, None);
 
     let mut stmt = conn.prepare(&format!(
         "SELECT s.id, s.title, s.artist, s.play_count, COALESCE(SUM(ph.duration_secs), 0) as dur
@@ -289,10 +318,14 @@ pub fn stats_top_songs(range: String, limit: Option<i64>, db: State<'_, Db>) -> 
 }
 
 #[tauri::command]
-pub fn stats_top_artists(range: String, limit: Option<i64>, db: State<'_, Db>) -> Result<Vec<TopArtist>, String> {
+pub fn stats_top_artists(
+    range: Option<String>,
+    limit: Option<i64>,
+    db: State<'_, Db>,
+) -> Result<Vec<TopArtist>, String> {
     let conn = db.0.lock().map_err(|e| e.to_string())?;
     let limit = limit.unwrap_or(10);
-    let filter = range_filter(&range);
+    let filter = build_time_filter(range.as_deref(), None, None);
 
     let mut stmt = conn.prepare(&format!(
         "SELECT s.artist, SUM(s.play_count) as cnt, COALESCE(SUM(ph.duration_secs), 0) as dur, COUNT(DISTINCT s.id) as songs
@@ -310,9 +343,12 @@ pub fn stats_top_artists(range: String, limit: Option<i64>, db: State<'_, Db>) -
 }
 
 #[tauri::command]
-pub fn stats_genre_distribution(range: String, db: State<'_, Db>) -> Result<Vec<GenreDuration>, String> {
+pub fn stats_genre_distribution(
+    range: Option<String>,
+    db: State<'_, Db>,
+) -> Result<Vec<GenreDuration>, String> {
     let conn = db.0.lock().map_err(|e| e.to_string())?;
-    let filter = range_filter(&range);
+    let filter = build_time_filter(range.as_deref(), None, None);
 
     let mut stmt = conn.prepare(&format!(
         "SELECT COALESCE(NULLIF(s.genre, ''), 'Unknown') as genre, SUM(ph.duration_secs) as dur
@@ -327,9 +363,12 @@ pub fn stats_genre_distribution(range: String, db: State<'_, Db>) -> Result<Vec<
 }
 
 #[tauri::command]
-pub fn stats_trend(range: String, db: State<'_, Db>) -> Result<Vec<DayDuration>, String> {
+pub fn stats_trend(
+    range: Option<String>,
+    db: State<'_, Db>,
+) -> Result<Vec<DayDuration>, String> {
     let conn = db.0.lock().map_err(|e| e.to_string())?;
-    let filter = range_filter(&range);
+    let filter = build_time_filter(range.as_deref(), None, None);
 
     let mut stmt = conn.prepare(&format!(
         "SELECT DATE(ph.played_at) as day, SUM(ph.duration_secs) as dur
@@ -355,5 +394,41 @@ pub fn stats_heatmap(db: State<'_, Db>) -> Result<Vec<DayDuration>, String> {
     let rows: Vec<DayDuration> = stmt.query_map([], |row| {
         Ok(DayDuration { date: row.get(0)?, duration_secs: row.get(1)? })
     }).map_err(|e| e.to_string())?.collect::<Result<Vec<_>, _>>().map_err(|e| e.to_string())?;
+    Ok(rows)
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HourDuration {
+    pub hour: i64,
+    pub duration_secs: f64,
+}
+
+#[tauri::command]
+pub fn stats_hourly_distribution(
+    start: String,
+    end: String,
+    db: State<'_, Db>,
+) -> Result<Vec<HourDuration>, String> {
+    let conn = db.0.lock().map_err(|e| e.to_string())?;
+
+    let mut stmt = conn.prepare(
+        "SELECT CAST(strftime('%H', ph.played_at, 'localtime') AS INTEGER) as hour,
+                SUM(ph.duration_secs) as dur
+         FROM play_history ph
+         WHERE ph.played_at >= ?1 AND ph.played_at < ?2
+         GROUP BY hour ORDER BY hour"
+    ).map_err(|e| e.to_string())?;
+
+    let rows: Vec<HourDuration> = stmt
+        .query_map(rusqlite::params![start, end], |row| {
+            Ok(HourDuration {
+                hour: row.get(0)?,
+                duration_secs: row.get(1)?,
+            })
+        })
+        .map_err(|e| e.to_string())?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())?;
     Ok(rows)
 }

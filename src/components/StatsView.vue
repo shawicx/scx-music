@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, computed } from 'vue'
+import { onMounted, computed, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { use } from 'echarts/core'
 import { BarChart, PieChart, LineChart, HeatmapChart } from 'echarts/charts'
@@ -16,6 +16,7 @@ import VChart from 'vue-echarts'
 import { useStatsStore } from '../stores/stats'
 import { useI18n } from '../composables/useI18n'
 import type { ListeningRange } from '../types'
+import ReportTab from './ReportTab.vue'
 
 use([
   BarChart, PieChart, LineChart, HeatmapChart,
@@ -27,6 +28,8 @@ const emit = defineEmits<{ back: [] }>()
 const statsStore = useStatsStore()
 const { overview, topSongs, topArtists, genreDistribution, trend, heatmap, loading, currentRange, formattedTotalDuration } = storeToRefs(statsStore)
 const { t } = useI18n()
+
+const activeTab = ref<'stats' | 'report'>('stats')
 
 onMounted(() => {
   statsStore.loadData('7d')
@@ -198,92 +201,106 @@ function switchRange(range: ListeningRange) {
         <v-icon icon="mdi-arrow-left" size="20" />
       </v-btn>
       <h2 class="stats-title">{{ t('stats.title') }}</h2>
-      <div class="range-selector">
-        <v-btn-toggle v-model="currentRange" mandatory density="compact" variant="outlined" divided @update:model-value="switchRange">
-          <v-btn value="7d" size="small">{{ t('stats.last7days') }}</v-btn>
-          <v-btn value="30d" size="small">{{ t('stats.last30days') }}</v-btn>
-          <v-btn value="all" size="small">{{ t('stats.all') }}</v-btn>
-        </v-btn-toggle>
-      </div>
     </div>
 
-    <div v-if="loading" class="loading-state">
-      <v-progress-circular indeterminate color="primary" size="32" />
-      <span>{{ t('stats.loadingStats') }}</span>
-    </div>
+    <v-tabs v-model="activeTab" density="compact" color="primary" class="stats-tabs">
+      <v-tab value="stats">{{ t('stats.title') }}</v-tab>
+      <v-tab value="report">{{ t('report.tab') }}</v-tab>
+    </v-tabs>
 
-    <template v-else-if="overview">
-      <!-- Overview Cards -->
-      <div class="overview-grid">
-        <div class="stat-card">
-          <div class="stat-label">{{ t('stats.playCount') }}</div>
-          <div class="stat-value">{{ overview.playCount.toLocaleString() }}</div>
-          <div class="stat-unit">{{ t('stats.times') }}</div>
+    <v-window v-model="activeTab" class="stats-window">
+      <v-window-item value="stats">
+        <div class="range-selector">
+          <v-btn-toggle v-model="currentRange" mandatory density="compact" variant="outlined" divided @update:model-value="switchRange">
+            <v-btn value="7d" size="small">{{ t('stats.last7days') }}</v-btn>
+            <v-btn value="30d" size="small">{{ t('stats.last30days') }}</v-btn>
+            <v-btn value="all" size="small">{{ t('stats.all') }}</v-btn>
+          </v-btn-toggle>
         </div>
-        <div class="stat-card">
-          <div class="stat-label">{{ t('stats.totalDuration') }}</div>
-          <div class="stat-value">{{ formattedTotalDuration }}</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">{{ t('stats.genresListened') }}</div>
-          <div class="stat-value">{{ overview.genreCount }}</div>
-          <div class="stat-unit">{{ t('stats.kinds') }}</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">{{ t('stats.artistsListened') }}</div>
-          <div class="stat-value">{{ overview.artistCount }}</div>
-          <div class="stat-unit">{{ t('stats.artists') }}</div>
-        </div>
-      </div>
 
-      <!-- Charts Grid -->
-      <div class="charts-grid">
-        <v-card class="chart-card" variant="flat" color="surface">
-          <div class="card-header">
-            <span class="card-title">{{ t('stats.topSongs') }}</span>
+        <div v-if="loading" class="loading-state">
+          <v-progress-circular indeterminate color="primary" size="32" />
+          <span>{{ t('stats.loadingStats') }}</span>
+        </div>
+
+        <template v-else-if="overview">
+          <!-- Overview Cards -->
+          <div class="overview-grid">
+            <div class="stat-card">
+              <div class="stat-label">{{ t('stats.playCount') }}</div>
+              <div class="stat-value">{{ overview.playCount.toLocaleString() }}</div>
+              <div class="stat-unit">{{ t('stats.times') }}</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">{{ t('stats.totalDuration') }}</div>
+              <div class="stat-value">{{ formattedTotalDuration }}</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">{{ t('stats.genresListened') }}</div>
+              <div class="stat-value">{{ overview.genreCount }}</div>
+              <div class="stat-unit">{{ t('stats.kinds') }}</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">{{ t('stats.artistsListened') }}</div>
+              <div class="stat-value">{{ overview.artistCount }}</div>
+              <div class="stat-unit">{{ t('stats.artists') }}</div>
+            </div>
           </div>
-          <VChart v-if="topSongs.length" :option="topSongsOption" autoresize style="height: 320px" />
-          <div v-else class="empty-chart">{{ t('stats.emptyState') }}</div>
-        </v-card>
 
-        <v-card class="chart-card" variant="flat" color="surface">
-          <div class="card-header">
-            <span class="card-title">{{ t('stats.topArtists') }}</span>
+          <!-- Charts Grid -->
+          <div class="charts-grid">
+            <v-card class="chart-card" variant="flat" color="surface">
+              <div class="card-header">
+                <span class="card-title">{{ t('stats.topSongs') }}</span>
+              </div>
+              <VChart v-if="topSongs.length" :option="topSongsOption" autoresize style="height: 320px" />
+              <div v-else class="empty-chart">{{ t('stats.emptyState') }}</div>
+            </v-card>
+
+            <v-card class="chart-card" variant="flat" color="surface">
+              <div class="card-header">
+                <span class="card-title">{{ t('stats.topArtists') }}</span>
+              </div>
+              <VChart v-if="topArtists.length" :option="topArtistsOption" autoresize style="height: 320px" />
+              <div v-else class="empty-chart">{{ t('stats.emptyState') }}</div>
+            </v-card>
+
+            <v-card class="chart-card" variant="flat" color="surface">
+              <div class="card-header">
+                <span class="card-title">{{ t('stats.genreDistribution') }}</span>
+              </div>
+              <VChart v-if="genreDistribution.length" :option="genreOption" autoresize style="height: 320px" />
+              <div v-else class="empty-chart">{{ t('stats.emptyState') }}</div>
+            </v-card>
+
+            <v-card class="chart-card" variant="flat" color="surface">
+              <div class="card-header">
+                <span class="card-title">{{ t('stats.trend') }}</span>
+              </div>
+              <VChart v-if="trend.length" :option="trendOption" autoresize style="height: 320px" />
+              <div v-else class="empty-chart">{{ t('stats.emptyState') }}</div>
+            </v-card>
           </div>
-          <VChart v-if="topArtists.length" :option="topArtistsOption" autoresize style="height: 320px" />
-          <div v-else class="empty-chart">{{ t('stats.emptyState') }}</div>
-        </v-card>
 
-        <v-card class="chart-card" variant="flat" color="surface">
-          <div class="card-header">
-            <span class="card-title">{{ t('stats.genreDistribution') }}</span>
-          </div>
-          <VChart v-if="genreDistribution.length" :option="genreOption" autoresize style="height: 320px" />
-          <div v-else class="empty-chart">{{ t('stats.emptyState') }}</div>
-        </v-card>
+          <!-- Heatmap -->
+          <v-card class="chart-card" variant="flat" color="surface">
+            <div class="card-header">
+              <span class="card-title">{{ t('stats.heatmap') }}</span>
+            </div>
+            <VChart v-if="heatmap.length" :option="heatmapOption" autoresize style="height: 200px" />
+            <div v-else class="empty-chart">{{ t('stats.emptyState') }}</div>
+          </v-card>
+        </template>
 
-        <v-card class="chart-card" variant="flat" color="surface">
-          <div class="card-header">
-            <span class="card-title">{{ t('stats.trend') }}</span>
-          </div>
-          <VChart v-if="trend.length" :option="trendOption" autoresize style="height: 320px" />
-          <div v-else class="empty-chart">{{ t('stats.emptyState') }}</div>
-        </v-card>
-      </div>
-
-      <!-- Heatmap -->
-      <v-card class="chart-card" variant="flat" color="surface">
-        <div class="card-header">
-          <span class="card-title">{{ t('stats.heatmap') }}</span>
+        <div v-else class="empty-state">
+          <p>{{ t('stats.emptyState') }}</p>
         </div>
-        <VChart v-if="heatmap.length" :option="heatmapOption" autoresize style="height: 200px" />
-        <div v-else class="empty-chart">{{ t('stats.emptyState') }}</div>
-      </v-card>
-    </template>
+      </v-window-item>
 
-    <div v-else class="empty-state">
-      <p>{{ t('stats.emptyState') }}</p>
-    </div>
+      <v-window-item value="report">
+        <ReportTab />
+      </v-window-item>
+    </v-window>
   </div>
 </template>
 
@@ -298,7 +315,7 @@ function switchRange(range: ListeningRange) {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 24px;
+  margin-bottom: 16px;
 }
 
 .stats-title {
@@ -308,8 +325,12 @@ function switchRange(range: ListeningRange) {
   flex: 1;
 }
 
+.stats-tabs {
+  margin-bottom: 16px;
+}
+
 .range-selector {
-  margin-left: auto;
+  margin-bottom: 16px;
 }
 
 .loading-state,

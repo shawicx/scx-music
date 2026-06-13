@@ -215,6 +215,7 @@ pub fn run() {
             commands::stats::stats_genre_distribution,
             commands::stats::stats_trend,
             commands::stats::stats_heatmap,
+            commands::stats::stats_hourly_distribution,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

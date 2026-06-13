@@ -62,6 +62,14 @@ const result = await invokeCommand('command_name', { param: value })
 | `import_settings` | composables/useImportExport.ts | commands/import_export.rs | 从 JSON 导入设置 |
 | **曲库分析** | | | |
 | `get_library_stats` | stores/analysis.ts | commands/stats.rs | 获取曲库聚合统计数据 |
+| **听歌统计/报告** | | | |
+| `stats_listening_overview` | stores/stats.ts, composables/useListeningReport.ts | commands/stats.rs | 概览卡（统计 Tab 传 range，报告 Tab 传 start/end） |
+| `stats_top_songs` | stores/stats.ts | commands/stats.rs | 最爱歌曲 Top N（统计 Tab） |
+| `stats_top_artists` | stores/stats.ts | commands/stats.rs | 最爱歌手 Top N（统计 Tab） |
+| `stats_genre_distribution` | stores/stats.ts | commands/stats.rs | 流派播放时长分布（统计 Tab） |
+| `stats_trend` | stores/stats.ts | commands/stats.rs | 按天聚合播放时长趋势（统计 Tab） |
+| `stats_heatmap` | stores/stats.ts | commands/stats.rs | 365 天每日播放时长热力图（统计 Tab） |
+| `stats_hourly_distribution` | `{ start, end }` | `HourDuration[]` | 报告 Tab 时段分布图 |
 | **频谱分析** | | | |
 | `analyzer_start` | visualization/useAudioAnalyzer.ts | audio/analyzer_cmds.rs | 启动频谱分析 |
 | `analyzer_stop` | visualization/useAudioAnalyzer.ts | audio/analyzer_cmds.rs | 停止频谱分析 |
@@ -197,3 +205,7 @@ App.vue onMounted
 - **safeInvoke** - 返回 Result 类型
 - **batchInvoke** - 批量调用
 - **retry** - 重试机制
+
+## 参数签名变化
+
+所有 `stats_*` 命令的 `range` 参数从 `String` 改为 `Option<String>`（向后兼容：传 `undefined` 时回退到默认值或绝对日期）。新增可选 `start`/`end` 参数支持绝对日期范围过滤，由 `commands/stats.rs` 内部的 `build_time_filter` 统一处理。统计 Tab 仍传 `range: "7d" | "30d" | "all"`，报告 Tab 传 `start`/`end`（UTC 字符串）。

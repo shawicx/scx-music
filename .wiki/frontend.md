@@ -8,7 +8,7 @@
 - **PlayQueueDrawer.vue** - 播放队列右侧抽屉（GSAP Flip 重排动画、当前歌曲高亮、模式切换）
 - **SettingsView.vue** - 设置页面
 - **AnalysisView.vue** - 曲库分析（概览卡片 + ECharts 图表 + 排行列表）
-- **StatsView.vue** - 听歌统计（概览卡片 + 最爱歌曲/歌手排行 + 流派分布 + 播放趋势 + 年度热力图）
+- **StatsView.vue** - 听歌统计（双 Tab：`统计`=概览卡片+最爱歌曲/歌手排行+流派分布+播放趋势+年度热力图；`报告`=基于自然周期的听歌总结）
 - **NowPlayingOverlay.vue** - 正在播放覆盖层
 - **LyricsDisplay.vue** - 歌词显示组件（LRC 解析、同步滚动、点击跳转）
 
@@ -132,6 +132,17 @@
 - **LyricsDisplay.vue** - 歌词显示（同步滚动、点击跳转、骨架屏加载态）
 - **IconButtonWithTooltip.vue** - 通用图标按钮 + Tooltip 组件
 
+### ReportTab.vue
+
+报告 Tab 组件，展示基于自然周期（周/月/年）的听歌总结。嵌入 StatsView 的 `v-window-item value="report"` 中。
+
+**依赖**: `useListeningReport` composable
+**功能**:
+- 周期选择器（周/月/年 + offset 翻页 + 进行中标记）
+- 4 张概览卡（时长/次数/独立歌曲/艺术家）
+- 24 小时听歌时段分布柱状图（ECharts，按 4 时段配色）
+- 峰值时段洞察标签（夜猫子/早起鸟/通用模板）
+
 ### Library 子组件 (components/library/)
 - **BrowseCards.vue** - 浏览卡片视图（专辑/艺术家网格）
 - **EmptyStates.vue** - 空状态提示组件
@@ -177,6 +188,20 @@
 - **composables/useImportExport.ts** - 导入导出功能（歌单导出 M3U/PLS、音乐库备份恢复、设置迁移）
 - **composables/useAutoUpdate.ts** - 自动更新逻辑（启动延迟检查、下载进度跟踪、重启安装）
 - **composables/useLibraryAnalysis.ts** - 曲库分析（loadStats IPC、格式化工具）
+- **composables/useListeningReport.ts** - 报告周期状态管理（见下文）
+
+### useListeningReport.ts
+
+管理报告周期状态（`PeriodState: { kind, offset }`），推导自然周期的 start/end UTC 时间范围。
+
+**核心导出**:
+- `periodState` — 当前周期状态（周/月/年 + offset）
+- `periodRange` — 计算出的 start/end（Date 对象 + UTC 字符串）
+- `periodLabel` — 周期显示标签
+- `isInProgress` — 当前周期是否未结束
+- `overview` / `hourlyDistribution` — 加载的统计数据
+- `dominantSlot` / `peakHourRange` — 峰值时段计算
+- `shiftPeriod` / `setKind` — 周期导航方法
 
 ## Animation System
 
@@ -287,7 +312,7 @@ App.vue onMounted
 - `src/composables/useI18n.ts`: i18n 组合式函数
 
 ### 命名空间
-common / sidebar / library / player / settings / playbackMode / toast / empty / importExport / update / analysis
+common / sidebar / library / player / settings / playbackMode / toast / empty / importExport / update / analysis / report
 
 ### player 命名空间（播放队列相关）
 - `playQueue` - "播放队列" / "Play Queue"

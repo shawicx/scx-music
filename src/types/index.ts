@@ -110,6 +110,7 @@ export interface ListeningOverview {
   totalDurationSecs: number
   genreCount: number
   artistCount: number
+  uniqueSongCount: number
 }
 
 export interface TopSong {
@@ -138,3 +139,15 @@ export interface DayDuration {
 }
 
 export type ListeningRange = '7d' | '30d' | 'all'
+
+export type PeriodKind = 'week' | 'month' | 'year'
+
+export interface HourDuration {
+  hour: number
+  durationSecs: number
+}
+
+export interface PeriodState {
+  kind: PeriodKind
+  offset: number
+}
