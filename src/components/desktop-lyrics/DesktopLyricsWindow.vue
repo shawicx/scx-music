@@ -58,7 +58,7 @@ onMounted(async () => {
     />
     <div v-else class="dl-fallback">
       {{ currentSong?.title ?? '—' }}
-      锁定态：歌词窗口点击穿透，独立锁窗口显示在右上角（始终可点击）→ 点击解锁    </div>
+    </div>
   </div>
 </template>
 

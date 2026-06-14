@@ -59,6 +59,9 @@ export function useDesktopLyrics() {
   // 锁定状态初始化 + 监听器：两个窗口都需要（主窗口用于 SettingsView 复选框状态同步）
   setupStateSync()
 
+  // 配置初始化：两个窗口都需要（主窗口用于 SettingsView 颜色选择器显示存储值）
+  restoreConfig()
+
   if (isLyricsWindow) {
     setupLyricsWindow(current)
   }
@@ -225,8 +228,7 @@ export function useDesktopLyrics() {
     await emit('desktop-lyrics:config-changed', { key, value })
   }
 
-  async function restoreFromSettings() {
-    if (!isLyricsWindow) return
+  async function restoreConfig() {
     const all = await invoke<Record<string, string>>('get_all_settings')
     try {
       if (all[STORAGE_KEYS.bgOpacity]) config.bgOpacity = parseFloat(all[STORAGE_KEYS.bgOpacity])
@@ -240,6 +242,11 @@ export function useDesktopLyrics() {
       // 配置值非法 → 沿用默认值
       console.warn('[desktop-lyrics] 配置值损坏，沿用默认值')
     }
+  }
+
+  async function restoreFromSettings() {
+    if (!isLyricsWindow) return
+    const all = await invoke<Record<string, string>>('get_all_settings')
 
     // 固定逻辑宽度（与 tauri.conf.json 一致），不读 outerSize 以避免物理/逻辑混用导致尺寸翻倍
     const WIN_LOGICAL_WIDTH = 1000
