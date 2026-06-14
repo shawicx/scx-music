@@ -35,6 +35,25 @@
         "minimizable": false,
         "closable": false,
         "shadow": false
+      },
+      {
+        "label": "desktop-lyrics-lock",
+        "url": "index.html#desktop-lyrics-lock",
+        "title": "Desktop Lyrics Lock",
+        "width": 36,
+        "height": 36,
+        "x": 0,
+        "y": 0,
+        "visible": false,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "resizable": false,
+        "maximizable": false,
+        "minimizable": false,
+        "closable": false,
+        "shadow": false
       }
     ],
     "security": {

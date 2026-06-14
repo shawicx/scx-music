@@ -45,7 +45,7 @@ onMounted(async () => {
 
 <template>
   <div class="dl-root" :class="{ locked }" :style="rootStyle" @mousedown="onDragStart">
-    <LockBadge :locked="locked" @toggle="toggleLock" />
+    <LockBadge v-if="!locked" :locked="locked" @toggle="toggleLock" />
 
     <LyricLinePair
       v-if="hasLyrics"
@@ -58,8 +58,7 @@ onMounted(async () => {
     />
     <div v-else class="dl-fallback">
       {{ currentSong?.title ?? '—' }}
-      <span v-if="currentSong?.artist"> — {{ currentSong.artist }}</span>
-    </div>
+      锁定态：歌词窗口点击穿透，独立锁窗口显示在右上角（始终可点击）→ 点击解锁    </div>
   </div>
 </template>
 
@@ -75,6 +74,7 @@ onMounted(async () => {
   justify-content: center;
   border-radius: 8px;
   overflow: hidden;
+  background-color: #fff;
   transition: opacity 0.2s ease, background 0.3s ease;
 }
 .dl-root:hover .lock-badge {

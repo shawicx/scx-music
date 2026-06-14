@@ -4,11 +4,15 @@ import vuetify from './plugins/vuetify'
 import i18n from './i18n'
 
 async function bootstrap() {
-  const app = createApp(
-    window.location.hash === '#desktop-lyrics'
-      ? (await import('./desktop-lyrics/DesktopLyricsApp.vue')).default
-      : (await import('./App.vue')).default,
-  )
+  let component
+  if (window.location.hash === '#desktop-lyrics') {
+    component = (await import('./desktop-lyrics/DesktopLyricsApp.vue')).default
+  } else if (window.location.hash === '#desktop-lyrics-lock') {
+    component = (await import('./desktop-lyrics/DesktopLyricsLockApp.vue')).default
+  } else {
+    component = (await import('./App.vue')).default
+  }
+  const app = createApp(component)
   const pinia = createPinia()
 
   app.use(pinia)

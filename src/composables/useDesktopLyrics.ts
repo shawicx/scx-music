@@ -4,6 +4,7 @@ import {
   getCurrentWindow,
   LogicalPosition,
   LogicalSize,
+  PhysicalPosition,
   currentMonitor,
   type Window,
 } from '@tauri-apps/api/window'
@@ -55,8 +56,76 @@ export function useDesktopLyrics() {
   const lines = lyrics?.lines ?? ref<LrcLine[]>([])
   const currentLineIndex = lyrics?.currentLineIndex ?? ref(-1)
 
+  // 锁定状态初始化 + 监听器：两个窗口都需要（主窗口用于 SettingsView 复选框状态同步）
+  setupStateSync()
+
   if (isLyricsWindow) {
     setupLyricsWindow(current)
+  }
+
+  // 锁状态初始化与同步 —— 与 setupLyricsWindow 解耦，确保主窗口也能收到锁状态变化
+  async function setupStateSync() {
+    let initialLocked = false
+    try {
+      const all = await invoke<Record<string, string>>('get_all_settings')
+      initialLocked = all[STORAGE_KEYS.locked] === 'true'
+    } catch {
+      // 容错：读取失败时按未锁定处理
+    }
+    locked.value = initialLocked
+    if (isLyricsWindow && initialLocked) {
+      await current.setIgnoreCursorEvents(true).catch(() => {})
+    }
+
+    const un = await listen<boolean>('desktop-lyrics:lock-changed', (e) => {
+      locked.value = e.payload
+      if (isLyricsWindow) {
+        current.setIgnoreCursorEvents(e.payload).catch(() => {})
+        updateLockWindowVisibility()
+      }
+    })
+    unlistens.push(un)
+  }
+
+  // 锁按钮独立小窗口（永远可点击）—— 仅在歌词窗口上下文管理
+  const LOCK_WINDOW_LABEL = 'desktop-lyrics-lock'
+  const LOCK_WINDOW_SIZE = 36
+  const LOCK_OFFSET_X = 12
+  const LOCK_OFFSET_Y = 8
+
+  async function syncLockWindowPosition() {
+    if (!isLyricsWindow) return
+    try {
+      const lockWin = await WebviewWindow.getByLabel(LOCK_WINDOW_LABEL)
+      if (!lockWin) return
+      const pos = await current.outerPosition()
+      const size = await current.outerSize()
+      const monitor = await currentMonitor()
+      const scale = monitor?.scaleFactor ?? 1
+      const lockX = Math.round(pos.x + size.width - (LOCK_WINDOW_SIZE + LOCK_OFFSET_X) * scale)
+      const lockY = Math.round(pos.y + LOCK_OFFSET_Y * scale)
+      await lockWin.setPosition(new PhysicalPosition(lockX, lockY))
+    } catch {
+      // 静默失败：窗口可能尚未就绪
+    }
+  }
+
+  async function updateLockWindowVisibility() {
+    if (!isLyricsWindow) return
+    try {
+      const lockWin = await WebviewWindow.getByLabel(LOCK_WINDOW_LABEL)
+      if (!lockWin) return
+      const lyricsVisible = await current.isVisible()
+      if (locked.value && lyricsVisible) {
+        await syncLockWindowPosition()
+        await lockWin.show()
+        await lockWin.setFocus()
+      } else {
+        await lockWin.hide()
+      }
+    } catch {
+      // 静默失败
+    }
   }
 
   async function setupLyricsWindow(win: Window) {
@@ -77,6 +146,8 @@ export function useDesktopLyrics() {
     // 位置持久化（debounce 500ms）—— 存 LOGICAL 坐标，避免 physical/logical 混用导致每次启动翻倍
     let moveTimer: ReturnType<typeof setTimeout> | null = null
     const un2 = await listen('tauri://move', () => {
+      // 实时跟随：锁窗口位置同步（无 debounce，拖动时立即响应）
+      syncLockWindowPosition()
       if (moveTimer) clearTimeout(moveTimer)
       moveTimer = setTimeout(async () => {
         try {
@@ -104,12 +175,11 @@ export function useDesktopLyrics() {
     )
     unlistens.push(un3)
 
-    // 接收锁定状态同步（主窗口 SettingsView 解锁时触发）
-    const un4 = await listen<boolean>('desktop-lyrics:lock-changed', (e) => {
-      locked.value = e.payload
-      win.setIgnoreCursorEvents(e.payload).catch(() => {})
+    // 监听歌词窗口可见性变化（主窗口 toggle 调用时通知）—— 用于同步锁窗口显示/隐藏
+    const un5 = await listen('desktop-lyrics:visibility-changed', () => {
+      updateLockWindowVisibility()
     })
-    unlistens.push(un4)
+    unlistens.push(un5)
   }
 
   async function toggleLock(value?: boolean) {
@@ -121,6 +191,9 @@ export function useDesktopLyrics() {
     await invoke('set_setting', { key: STORAGE_KEYS.locked, value: String(locked.value) })
     // 通知另一侧窗口（主窗口 SettingsView 同步复选框 / 歌词窗口同步视觉态）
     await emit('desktop-lyrics:lock-changed', locked.value)
+    if (isLyricsWindow) {
+      await updateLockWindowVisibility()
+    }
   }
 
   async function toggle() {
@@ -133,6 +206,12 @@ export function useDesktopLyrics() {
       await target.show()
       await target.setFocus()
       visible.value = true
+    }
+    // 歌词窗口可见性变化时，同步锁窗口（直接处理或通知歌词窗口处理）
+    if (isLyricsWindow) {
+      await updateLockWindowVisibility()
+    } else {
+      await emit('desktop-lyrics:visibility-changed')
     }
   }
 
@@ -156,10 +235,6 @@ export function useDesktopLyrics() {
       if (all[STORAGE_KEYS.colorNext]) config.colorNext = all[STORAGE_KEYS.colorNext]
       if (all[STORAGE_KEYS.glowStrength]) {
         config.glowStrength = all[STORAGE_KEYS.glowStrength] as GlowStrength
-      }
-      if (all[STORAGE_KEYS.locked] === 'true') {
-        locked.value = true
-        await current.setIgnoreCursorEvents(true)
       }
     } catch {
       // 配置值非法 → 沿用默认值

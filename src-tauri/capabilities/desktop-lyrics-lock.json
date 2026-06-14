@@ -1,0 +1,9 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "desktop-lyrics-lock",
+  "description": "Capability for the desktop lyrics lock button window",
+  "windows": ["desktop-lyrics-lock"],
+  "permissions": [
+    "core:default"
+  ]
+}
