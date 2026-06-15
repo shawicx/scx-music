@@ -41,7 +41,7 @@ function getThemeColors() {
 
 const textColor = computed(() => {
   const style = getComputedStyle(document.documentElement)
-  return `rgb(${style.getPropertyValue('--v-theme-on-surface-variant').trim() || '128,128,128'})`
+  return `rgb(${style.getPropertyValue('--v-theme-on-surface').trim() || '128,128,128'})`
 })
 
 const artistChartOption = computed(() => {
@@ -283,7 +283,7 @@ const durationChartOption = computed(() => {
   align-items: center;
   gap: 12px;
   padding: 64px 0;
-  color: var(--v-text-secondary);
+  color: rgb(var(--v-theme-on-surface));
   font-size: var(--text-sm);
 }
 
@@ -306,7 +306,7 @@ const durationChartOption = computed(() => {
 }
 
 .stat-icon {
-  color: rgb(var(--v-theme-primary));
+  color: rgb(var(--v-theme-on-surface));
   margin-bottom: 4px;
 }
 
@@ -318,7 +318,7 @@ const durationChartOption = computed(() => {
 
 .stat-label {
   font-size: var(--text-xs);
-  color: var(--v-text-secondary);
+  color: rgb(var(--v-theme-on-surface));
 }
 
 .charts-grid {
@@ -341,7 +341,7 @@ const durationChartOption = computed(() => {
 }
 
 .card-icon {
-  color: rgb(var(--v-theme-primary));
+  color: rgb(var(--v-theme-on-surface));
 }
 
 .card-title {
@@ -392,7 +392,7 @@ const durationChartOption = computed(() => {
 
 .album-artist {
   font-size: var(--text-xs);
-  color: var(--v-text-secondary);
+  color: rgb(var(--v-theme-on-surface));
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -400,7 +400,7 @@ const durationChartOption = computed(() => {
 
 .album-count {
   font-size: var(--text-xs);
-  color: var(--v-text-secondary);
+  color: rgb(var(--v-theme-on-surface));
   white-space: nowrap;
 }
 </style>

@@ -51,7 +51,7 @@ function getThemeColors() {
 
 const textColor = computed(() => {
   const style = getComputedStyle(document.documentElement)
-  return `rgb(${style.getPropertyValue('--v-theme-on-surface-variant').trim() || '128,128,128'})`
+  return `rgb(${style.getPropertyValue('--v-theme-on-surface').trim() || '128,128,128'})`
 })
 
 const topSongsOption = computed(() => {
@@ -340,7 +340,7 @@ function switchRange(range: ListeningRange) {
   align-items: center;
   gap: 12px;
   padding: 64px 0;
-  color: var(--v-text-secondary);
+  color: rgb(var(--v-theme-on-surface));
   font-size: var(--text-sm);
 }
 
@@ -364,7 +364,7 @@ function switchRange(range: ListeningRange) {
 
 .stat-label {
   font-size: var(--text-xs);
-  color: var(--v-text-secondary);
+  color: rgb(var(--v-theme-on-surface));
 }
 
 .stat-value {
@@ -375,7 +375,7 @@ function switchRange(range: ListeningRange) {
 
 .stat-unit {
   font-size: var(--text-xs);
-  color: var(--v-text-secondary);
+  color: rgb(var(--v-theme-on-surface));
 }
 
 .charts-grid {
@@ -407,7 +407,7 @@ function switchRange(range: ListeningRange) {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--v-text-secondary);
+  color: rgb(var(--v-theme-on-surface));
   font-size: var(--text-sm);
 }
 </style>

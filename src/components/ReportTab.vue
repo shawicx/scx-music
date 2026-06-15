@@ -38,7 +38,7 @@ const primaryColor = getComputedStyle(document.documentElement)
 
 const textColor = computed(() => {
   const style = getComputedStyle(document.documentElement)
-  return `rgb(${style.getPropertyValue('--v-theme-on-surface-variant').trim() || '128,128,128'})`
+  return `rgb(${style.getPropertyValue('--v-theme-on-surface').trim() || '128,128,128'})`
 })
 
 const hourlyOption = computed(() => {
@@ -239,7 +239,7 @@ const hasData = computed(
 .in-progress-tag {
   font-size: 10px;
   font-weight: 500;
-  color: var(--v-theme-primary);
+  color: rgb(var(--v-theme-primary));
   background: rgba(var(--v-theme-primary), 0.1);
   padding: 2px 8px;
   border-radius: 10px;
@@ -252,7 +252,7 @@ const hasData = computed(
   align-items: center;
   gap: 12px;
   padding: 64px 0;
-  color: var(--v-text-secondary);
+  color: rgb(var(--v-theme-on-surface));
   font-size: var(--text-sm);
 }
 
@@ -280,7 +280,7 @@ const hasData = computed(
 
 .stat-label {
   font-size: var(--text-xs);
-  color: var(--v-text-secondary);
+  color: rgb(var(--v-theme-on-surface));
 }
 
 .stat-value {
@@ -291,7 +291,7 @@ const hasData = computed(
 
 .stat-unit {
   font-size: var(--text-xs);
-  color: var(--v-text-secondary);
+  color: rgb(var(--v-theme-on-surface));
 }
 
 .chart-card {
@@ -315,7 +315,7 @@ const hasData = computed(
 
 .insight-tag {
   font-size: var(--text-xs);
-  color: var(--v-theme-primary);
+  color: rgb(var(--v-theme-primary));
   background: rgba(var(--v-theme-primary), 0.1);
   padding: 4px 12px;
   border-radius: 12px;
