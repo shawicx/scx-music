@@ -1,0 +1,189 @@
+import { ref, onUnmounted } from 'vue'
+import { invoke } from '@tauri-apps/api/core'
+import {
+  getCurrentWindow,
+  LogicalPosition,
+  LogicalSize,
+  currentMonitor,
+} from '@tauri-apps/api/window'
+import { WebviewWindow } from '@tauri-apps/api/webviewWindow'
+import { listen, emit, type UnlistenFn } from '@tauri-apps/api/event'
+
+const STORAGE_KEYS = {
+  active: 'mini-player.active',
+  alwaysOnTop: 'mini-player.always-on-top',
+  posX: 'mini-player.position-x',
+  posY: 'mini-player.position-y',
+} as const
+
+const WIN_LOGICAL_WIDTH = 360
+const WIN_LOGICAL_HEIGHT = 120
+const EDGE_MARGIN = 20
+
+// 模块级共享：跨多个 useMiniPlayer() 实例（主窗口中 App.vue + PlayerBar 都调用）防止并发 toggle
+let toggling = false
+
+export function useMiniPlayer() {
+  const current = getCurrentWindow()
+  const isMiniPlayerWindow = current.label === 'mini-player'
+
+  const active = ref(false)
+  const alwaysOnTop = ref(true)
+  const unlistens: UnlistenFn[] = []
+  let moveTimer: ReturnType<typeof setTimeout> | null = null
+
+  setupStateSync()
+
+  async function setupStateSync() {
+    try {
+      const all = await invoke<Record<string, string>>('get_all_settings')
+      active.value = all[STORAGE_KEYS.active] === 'true'
+      alwaysOnTop.value = all[STORAGE_KEYS.alwaysOnTop] !== 'false' // 默认 true
+    } catch {
+      // 容错：读取失败时沿用默认值
+    }
+
+    if (isMiniPlayerWindow) {
+      await current.setAlwaysOnTop(alwaysOnTop.value).catch(() => {})
+    }
+
+    const un1 = await listen<boolean>('mini-player:active-changed', (e) => {
+      active.value = e.payload
+    })
+    const un2 = await listen<boolean>('mini-player:always-on-top-changed', (e) => {
+      alwaysOnTop.value = e.payload
+      if (isMiniPlayerWindow) {
+        current.setAlwaysOnTop(e.payload).catch(() => {})
+      }
+    })
+    unlistens.push(un1, un2)
+  }
+
+  async function enter() {
+    try {
+      const main = await WebviewWindow.getByLabel('main')
+      const mini = isMiniPlayerWindow ? current : await WebviewWindow.getByLabel('mini-player')
+      if (!main || !mini) return
+
+      // 顺序很关键：先 show+focus mini，再 hide main。
+      // 如果先 hide main，macOS 的 Cmd+M 会最小化整个 app，导致 mini.show() 无法显示。
+      await mini.show()
+      await mini.setFocus()
+      await main.hide()
+      active.value = true
+      await invoke('set_setting', { key: STORAGE_KEYS.active, value: 'true' })
+      await emit('mini-player:active-changed', true)
+    } catch (e) {
+      console.error('[mini-player] enter failed:', e)
+    }
+  }
+
+  async function exit() {
+    try {
+      const main = await WebviewWindow.getByLabel('main')
+      const mini = isMiniPlayerWindow ? current : await WebviewWindow.getByLabel('mini-player')
+      if (!main || !mini) return
+
+      await mini.hide()
+      await main.show()
+      await main.setFocus()
+      active.value = false
+      await invoke('set_setting', { key: STORAGE_KEYS.active, value: 'false' })
+      await emit('mini-player:active-changed', false)
+    } catch (e) {
+      console.error('[mini-player] exit failed:', e)
+    }
+  }
+
+  async function toggle() {
+    if (toggling) return
+    toggling = true
+    try {
+      if (active.value) {
+        await exit()
+      } else {
+        await enter()
+      }
+    } finally {
+      toggling = false
+    }
+  }
+
+  async function toggleAlwaysOnTop() {
+    alwaysOnTop.value = !alwaysOnTop.value
+    if (isMiniPlayerWindow) {
+      await current.setAlwaysOnTop(alwaysOnTop.value).catch(() => {})
+    }
+    await invoke('set_setting', { key: STORAGE_KEYS.alwaysOnTop, value: String(alwaysOnTop.value) })
+    await emit('mini-player:always-on-top-changed', alwaysOnTop.value)
+  }
+
+  async function restoreFromSettings() {
+    if (!isMiniPlayerWindow) return
+
+    await current.setSize(new LogicalSize(WIN_LOGICAL_WIDTH, WIN_LOGICAL_HEIGHT))
+
+    let monitor = await currentMonitor()
+    for (let i = 0; i < 3 && !monitor; i++) {
+      await new Promise((r) => setTimeout(r, 200))
+      monitor = await currentMonitor()
+    }
+
+    const scale = monitor?.scaleFactor ?? 1
+    const screenLogicalWidth = (monitor?.size.width ?? 1920 * scale) / scale
+    const screenLogicalHeight = (monitor?.size.height ?? 1080 * scale) / scale
+
+    const defaultX = Math.round(screenLogicalWidth - WIN_LOGICAL_WIDTH - EDGE_MARGIN)
+    const defaultY = Math.round(screenLogicalHeight - WIN_LOGICAL_HEIGHT - EDGE_MARGIN)
+
+    const all = await invoke<Record<string, string>>('get_all_settings')
+    const storedX = all[STORAGE_KEYS.posX] ? parseInt(all[STORAGE_KEYS.posX]) : NaN
+    const storedY = all[STORAGE_KEYS.posY] ? parseInt(all[STORAGE_KEYS.posY]) : NaN
+
+    let x = defaultX
+    let y = defaultY
+    if (!Number.isNaN(storedX) && storedX >= -WIN_LOGICAL_WIDTH && storedX <= screenLogicalWidth) {
+      x = storedX
+    }
+    if (!Number.isNaN(storedY) && storedY >= 0 && storedY <= screenLogicalHeight) {
+      y = storedY
+    }
+
+    await current.setPosition(new LogicalPosition(x, y))
+
+    // 位置持久化（debounce 500ms，存逻辑坐标）
+    const un = await current.onMoved(async () => {
+      if (moveTimer) clearTimeout(moveTimer)
+      moveTimer = setTimeout(async () => {
+        try {
+          const pos = await current.outerPosition()
+          const m = await currentMonitor()
+          const sf = m?.scaleFactor ?? 1
+          const logicalX = Math.round(pos.x / sf)
+          const logicalY = Math.round(pos.y / sf)
+          await invoke('set_setting', { key: STORAGE_KEYS.posX, value: String(logicalX) })
+          await invoke('set_setting', { key: STORAGE_KEYS.posY, value: String(logicalY) })
+        } catch {
+          // 静默失败
+        }
+      }, 500)
+    })
+    unlistens.push(un)
+  }
+
+  onUnmounted(() => {
+    if (moveTimer) clearTimeout(moveTimer)
+    unlistens.forEach((un) => un())
+  })
+
+  return {
+    active,
+    alwaysOnTop,
+    isMiniPlayerWindow,
+    enter,
+    exit,
+    toggle,
+    toggleAlwaysOnTop,
+    restoreFromSettings,
+  }
+}
