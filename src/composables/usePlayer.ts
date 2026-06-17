@@ -180,7 +180,6 @@ export function usePlayer() {
   }
 
   async function next() {
-    if (queue.value.length === 0) return
     try {
       await invokeCommand('player_next')
     } catch (error) {
@@ -190,7 +189,6 @@ export function usePlayer() {
   }
 
   async function previous() {
-    if (queue.value.length === 0) return
     try {
       await invokeCommand('player_previous')
     } catch (error) {

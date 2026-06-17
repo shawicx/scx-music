@@ -6,6 +6,7 @@ import { useLibraryStore } from '../stores/library'
 import IconButtonWithTooltip from './IconButtonWithTooltip.vue'
 import { usePlaybackMode } from '../composables/usePlaybackMode'
 import { useDesktopLyrics } from '../composables/useDesktopLyrics'
+import { useMiniPlayer } from '../composables/useMiniPlayer'
 import { useI18n } from '../composables/useI18n'
 
 const emit = defineEmits<{ expand: []; toggleQueue: [] }>()
@@ -14,6 +15,7 @@ const playerStore = usePlayerStore()
 const libraryStore = useLibraryStore()
 const { modeIcon, modeLabel, isModeActive, cycleMode } = usePlaybackMode()
 const { visible: desktopLyricsVisible, toggle: toggleDesktopLyrics } = useDesktopLyrics()
+const { enter: enterMini } = useMiniPlayer()
 const { t } = useI18n()
 
 const {
@@ -162,6 +164,12 @@ const displayProgress = computed(() => {
       </div>
     </div>
     <div class="player-right">
+      <IconButtonWithTooltip
+        icon="mdi-chevron-double-up"
+        :tooltip="t('miniPlayer.enter')"
+        size="x-small"
+        @click.stop="enterMini"
+      />
       <IconButtonWithTooltip
         icon="mdi-monitor-eye"
         icon-active="mdi-monitor-eye"

@@ -15,7 +15,8 @@
         "label": "main",
         "title": "scx-music",
         "width": 1200,
-        "height": 800
+        "height": 800,
+        "visible": false
       },
       {
         "label": "desktop-lyrics",
@@ -54,6 +55,22 @@
         "minimizable": false,
         "closable": false,
         "shadow": false
+      },
+      {
+        "label": "mini-player",
+        "url": "index.html#mini-player",
+        "title": "Mini Player",
+        "width": 360,
+        "height": 120,
+        "visible": false,
+        "decorations": false,
+        "transparent": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": false,
+        "resizable": false,
+        "maximizable": false,
+        "minimizable": false,
+        "shadow": true
       }
     ],
     "security": {

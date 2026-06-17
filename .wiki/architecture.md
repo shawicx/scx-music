@@ -38,6 +38,36 @@
 Rust Handler -> IPC Event -> Pinia Store -> UI Update
 ```
 
+## 窗口系统
+
+应用包含 4 个 Tauri 窗口（在 `tauri.conf.json` 中声明），通过 `src/main.ts` 根据 `window.location.hash` 挂载不同根组件：
+
+| Label | Hash | 根组件 | 用途 |
+|-------|------|--------|------|
+| `main` | (默认) | `App.vue` | 主窗口，侧边栏 + 主区域 + PlayerBar |
+| `desktop-lyrics` | `#desktop-lyrics` | `DesktopLyricsApp.vue` | 桌面歌词悬浮窗口（透明、置顶、双行） |
+| `desktop-lyrics-lock` | — | — | 锁定态辅助窗口（光标穿透占位） |
+| `mini-player` | `#mini-player` | `MiniPlayerApp.vue` | 迷你播放器悬浮窗口，与主窗口互斥切换 |
+
+### mini-player 窗口
+
+**用途：** 迷你播放器悬浮窗口，与主窗口互斥切换。
+
+**配置（`tauri.conf.json`）：**
+- Label: `mini-player`
+- URL: `index.html#mini-player`
+- 尺寸：固定 360×100（不可调整）
+- 装饰：无边框（`decorations: false`），不透明背景，系统阴影
+- 默认置顶（`alwaysOnTop: true`），可通过按钮切换
+- `visible: false` 初始隐藏，由 `useMiniPlayer` composable 控制
+
+**互斥切换：** 主窗口 `main` 和迷你窗口 `mini-player` 互斥 — 进入迷你模式时主窗口完全 `hide()`，反之亦然。状态通过 `mini-player.active` settings 持久化，启动时恢复。
+
+**触发入口：**
+- PlayerBar 上的迷你模式按钮
+- Cmd/Ctrl+M 快捷键
+- 系统最小化按钮（拦截为进入迷你模式）
+
 ## 启动数据流
 
 ```
@@ -74,6 +104,8 @@ graph TB
 | 音乐库 | 歌曲和播放列表管理 | stores/library.ts, commands/ |
 | 设置主题 | 深色/浅色模式 + 主题颜色 | stores/settings.ts |
 | 歌词 | LRC 解析 + 同步显示 | composables/useLyrics.ts, commands/lyrics.rs, LyricsDisplay.vue |
+| 桌面歌词窗口 | 悬浮透明歌词 | composables/useDesktopLyrics.ts, components/desktop-lyrics/ |
+| 迷你播放器窗口 | 悬浮迷你模式（与主窗口互斥） | composables/useMiniPlayer.ts, mini-player/ |
 | 曲库分析 | 音乐库统计图表 | AnalysisView.vue, commands/stats.rs |
 | 音频可视化 | FFT 频谱渲染 | visualization/, analyzer.rs |
 | 启动加载 | 单次批量数据获取 | commands/bootstrap.rs |

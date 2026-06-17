@@ -12,6 +12,11 @@
 - **NowPlayingOverlay.vue** - 正在播放覆盖层
 - **LyricsDisplay.vue** - 歌词显示组件（LRC 解析、同步滚动、点击跳转）
 
+### 独立窗口根组件
+- **App.vue** - 主窗口根（侧边栏 + 主区域 + PlayerBar）
+- **DesktopLyricsApp.vue** - 桌面歌词窗口根（极简，无 AppShell）
+- **MiniPlayerApp.vue** - 迷你播放器窗口根（挂载 `MiniPlayer.vue`）
+
 ## Router
 
 无复杂路由，使用 `activeView` 状态切换视图：library / settings / analysis / stats。
@@ -189,6 +194,7 @@
 - **composables/useAutoUpdate.ts** - 自动更新逻辑（启动延迟检查、下载进度跟踪、重启安装）
 - **composables/useLibraryAnalysis.ts** - 曲库分析（loadStats IPC、格式化工具）
 - **composables/useListeningReport.ts** - 报告周期状态管理（见下文）
+- **composables/useMiniPlayer.ts** - 迷你播放器窗口生命周期管理（互斥切换、置顶、位置持久化，见下文）
 
 ### useListeningReport.ts
 
@@ -202,6 +208,30 @@
 - `overview` / `hourlyDistribution` — 加载的统计数据
 - `dominantSlot` / `peakHourRange` — 峰值时段计算
 - `shiftPeriod` / `setKind` — 周期导航方法
+
+### useMiniPlayer.ts
+
+迷你播放器窗口生命周期管理 composable。镜像 `useDesktopLyrics` 模式，按 `getCurrentWindow().label === 'mini-player'` 区分主窗口/迷你窗口两端行为。
+
+**职责：**
+- **窗口切换**：`enter()` 主窗口 hide + 迷你窗口 show；`exit()` 反之；`toggle()` 根据 `active` 状态分派
+- **置顶管理**：`toggleAlwaysOnTop()` 切换 `alwaysOnTop` 并通过事件跨窗口同步
+- **位置持久化**：`restoreFromSettings()` 仅迷你窗口调用，恢复尺寸/位置（物理/逻辑坐标已处理）
+- **状态同步**：通过 `mini-player:active-changed` 和 `mini-player:always-on-top-changed` 事件跨窗口同步
+
+**核心导出：**
+- `active` / `alwaysOnTop` — 响应式状态
+- `enter()` / `exit()` / `toggle()` — 窗口切换方法
+- `toggleAlwaysOnTop()` — 置顶切换
+- `restoreFromSettings()` — 位置恢复（仅迷你窗口）
+- `isMiniPlayerWindow` — 当前是否处于迷你窗口
+
+**持久化键（settings 表，无数据库迁移）：**
+- `mini-player.active` — 是否处于迷你模式
+- `mini-player.always-on-top` — 置顶状态
+- `mini-player.position-x` / `mini-player.position-y` — 窗口位置（逻辑坐标）
+
+**多实例说明：** `useMiniPlayer()` 可在主窗口被多处调用（App.vue、PlayerBar.vue）。`toggling` 标志已提升到模块级，跨实例共享，防止并发 toggle 竞争。
 
 ## Animation System
 
@@ -350,6 +380,35 @@ common / sidebar / library / player / settings / playbackMode / toast / empty / 
 
 - **unlocked**：可拖拽、LockBadge 可见、点击 LockBadge 进入 locked
 - **locked**：`setIgnoreCursorEvents(true)` 整窗光标穿透、LockBadge 不可点击、只能通过 SettingsView 解锁
+
+## 迷你播放器窗口（Mini Player Window）
+
+独立 Tauri 窗口（label: `mini-player`），与主窗口互斥切换。无边框、置顶、固定尺寸，提供极简播放控制（封面 + 标题/艺术家 + 上一首/播放暂停/下一首 + 置顶 + 展开 + 关闭）。
+
+### 文件结构
+
+- `src/main.ts`：检测 `window.location.hash === '#mini-player'`，条件挂载 `MiniPlayerApp.vue`
+- `src/mini-player/MiniPlayerApp.vue`：迷你窗口根组件（无 AppShell/Sidebar/PlayerBar）
+- `src/mini-player/MiniPlayer.vue`：主容器（拖拽、置顶按钮、展开/关闭、还原位置）
+- `src/composables/useMiniPlayer.ts`：状态 + IPC + 持久化，**在主窗口与迷你窗口两端实例化**，按 `getCurrentWindow().label === 'mini-player'` 区分行为
+
+### 窗口属性
+
+`tauri.conf.json` 第三个业务窗口：`transparent: false`（不透明）、`decorations: false`、`alwaysOnTop: true`、`resizable: false`、固定 360×100、`visible: false`（默认隐藏，由 PlayerBar 按钮 / 快捷键 / 最小化按钮触发显示）。
+
+### 与主窗口的关系（互斥）
+
+- **互斥切换**：进入迷你模式时主窗口完全 `hide()`，退出时主窗口 `show()` + 迷你窗口 `hide()`。与桌面歌词窗口的"共存"模式不同。
+- **事件复用**：`audio:progress` / `audio:track_change` / `audio:state_change` 已广播到所有 webview，迷你窗口自动接收，无需新增 IPC
+- **状态同步**：自定义事件 `mini-player:active-changed`（双向）、`mini-player:always-on-top-changed`（双向）
+- **持久化**：所有配置走既有 settings 表，前缀 `mini-player.*`，无数据库迁移
+- **启动恢复**：App.vue onMounted 读取 `mini-player.active`，若为 `true` 则直接进入迷你模式（主窗口不显示）
+
+### 触发入口
+
+- PlayerBar 上的迷你模式按钮（`enter()`）
+- Cmd/Ctrl+M 快捷键（App.vue 注册，`toggle()`）
+- 系统最小化按钮拦截（可选，进入迷你模式而非最小化）
 
 ## 关键业务逻辑
 

@@ -75,6 +75,13 @@ export default {
       lockHint: 'When locked, the window is click-through. Unlock here.',
     },
   },
+  miniPlayer: {
+    enter: 'Mini Mode',
+    expand: 'Expand',
+    alwaysOnTop: 'Always on Top',
+    close: 'Close',
+    title: 'Mini Player',
+  },
   settings: {
     title: 'Settings',
     themeMode: 'Theme Mode',

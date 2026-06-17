@@ -9,6 +9,8 @@ async function bootstrap() {
     component = (await import('./desktop-lyrics/DesktopLyricsApp.vue')).default
   } else if (window.location.hash === '#desktop-lyrics-lock') {
     component = (await import('./desktop-lyrics/DesktopLyricsLockApp.vue')).default
+  } else if (window.location.hash === '#mini-player') {
+    component = (await import('./mini-player/MiniPlayerApp.vue')).default
   } else {
     component = (await import('./App.vue')).default
   }

@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { ref, onMounted, defineAsyncComponent } from 'vue'
 import { onKeyStroke } from '@vueuse/core'
+import { getCurrentWindow } from '@tauri-apps/api/window'
+import { invoke } from '@tauri-apps/api/core'
 import { useSettingsStore } from './stores/settings'
 import { useLibraryStore } from './stores/library'
 import { usePlayerStore } from './stores/player'
@@ -17,6 +19,7 @@ import { useI18n } from './composables/useI18n'
 import { usePageTransition } from './composables/usePageTransition'
 import { usePlayerExpand } from './composables/usePlayerExpand'
 import { useAutoUpdate } from './composables/useAutoUpdate'
+import { useMiniPlayer } from './composables/useMiniPlayer'
 import UpdateDialog from './components/UpdateDialog.vue'
 
 const settingsStore = useSettingsStore()
@@ -27,6 +30,7 @@ const { initLocale } = useI18n()
 const { onEnter: onPageEnter, onLeave: onPageLeave } = usePageTransition()
 const { onEnter: onOverlayEnter, onLeave: onOverlayLeave } = usePlayerExpand()
 const { startCheck } = useAutoUpdate()
+const { enter: enterMini } = useMiniPlayer()
 
 function isEditable(e: Event) {
   const el = e.target as HTMLElement
@@ -65,6 +69,15 @@ onKeyStroke('ArrowDown', (e) => {
 onKeyStroke('MediaTrackNext', () => playerStore.next())
 onKeyStroke('MediaTrackPrevious', () => playerStore.previous())
 
+onKeyStroke('m', (e) => {
+  if (isEditable(e)) return
+  // 用 Shift 修饰避开 macOS 默认 Window→Minimize 加速器（Cmd+M）
+  if ((e.metaKey || e.ctrlKey) && e.shiftKey) {
+    e.preventDefault()
+    enterMini()
+  }
+})
+
 onMounted(async () => {
   const t0 = performance.now()
   await initLocale()
@@ -79,6 +92,20 @@ onMounted(async () => {
   console.log(`[perf] App initialized in ${(performance.now() - t0).toFixed(0)}ms`)
 
   startCheck()
+
+  // 启动恢复迷你模式：根据上次状态决定显示哪个窗口
+  // 主窗口默认 visible:false（tauri.conf.json），必须显式 show
+  try {
+    const settings = await invoke<Record<string, string>>('get_all_settings')
+    if (settings['mini-player.active'] === 'true') {
+      await enterMini()
+    } else {
+      await getCurrentWindow().show()
+    }
+  } catch {
+    // 容错：失败时确保主窗口可见
+    await getCurrentWindow().show().catch(() => {})
+  }
 })
 
 const activeView = ref('library')

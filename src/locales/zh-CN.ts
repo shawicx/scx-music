@@ -75,6 +75,13 @@ export default {
       lockHint: '锁定后窗口点击穿透，可在此解锁',
     },
   },
+  miniPlayer: {
+    enter: '迷你模式',
+    expand: '展开',
+    alwaysOnTop: '置顶',
+    close: '关闭',
+    title: '迷你播放器',
+  },
   settings: {
     title: '设置',
     themeMode: '主题模式',
