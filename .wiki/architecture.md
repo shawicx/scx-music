@@ -30,6 +30,19 @@
 
 - `tauri-plugin-opener` - URL 打开
 - `tauri-plugin-dialog` - 文件对话框
+- `tauri-plugin-global-shortcut` - 系统级全局快捷键
+
+## 全局快捷键 (Global Shortcuts)
+
+通过 `tauri-plugin-global-shortcut` 在 OS 层注册系统级快捷键，应用未聚焦时也能触发。
+
+**架构：** Rust 侧（`commands/shortcuts.rs`）维护「组合字符串 → action_id」反查表（`ShortcutRegistry`），OS 触发回调仅做 `app.emit("shortcut-triggered", action_id)`；前端 `useGlobalShortcuts` composable 监听该事件并按 action_id 路由到现有 stores/composables。
+
+**默认行为：** 媒体键 Play/Pause/Next/Previous 默认开，其他 8 个动作默认关。
+
+**存储：** 复用 SQLite `settings` 表，键名 `shortcut.<action-id>` 和 `shortcut.<action-id>.enabled`，懒写入。
+
+**关键约束：** 主窗口必须用 `hide()` 而非 `close()`，否则 webview 销毁后 `shortcut-triggered` 事件无监听者。
 
 ## 数据流
 

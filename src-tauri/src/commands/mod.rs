@@ -3,5 +3,7 @@ pub mod import_export;
 pub mod lyrics;
 pub mod playlists;
 pub mod settings;
+pub mod shortcuts;
 pub mod songs;
 pub mod stats;
+pub mod window;

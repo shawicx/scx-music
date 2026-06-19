@@ -86,6 +86,16 @@
 
 **参数签名变化（所有 `stats_*` 命令）：** `range: String` → `range: Option<String>`，并新增可选 `start`/`end` 参数（绝对日期，格式 `YYYY-MM-DD HH:MM:SS` UTC）。向后兼容：统计 Tab 传 `range`，报告 Tab 传 `start`/`end`。
 
+**commands/shortcuts.rs** - 全局快捷键管理
+- `shortcuts_list_defaults` - 返回内置动作清单（11 项，3 默认开 + 8 默认关）+ 默认绑定
+- `shortcuts_register` - 注册单个快捷键（`action_id`, `combo`），失败返回错误
+- `shortcuts_unregister` - 注销快捷键（`action_id`）
+- `shortcuts_is_registered` - 检查组合键是否已被注册（`combo`）— 系统层冲突预检
+- `shortcuts_register_all` - 批量注册（`bindings: Vec<(String, String)>`，启动场景）
+
+**commands/window.rs** - 窗口可见性管理
+- `app_toggle_main_window` - 切换主窗口可见性（hide ↔ show + set_focus）；仅操作 main 窗口，不影响 mini-player / desktop-lyrics
+
 **commands/songs.rs - rename_song 详解**
 
 **文件位置：** `src-tauri/src/commands/songs.rs`
@@ -226,6 +236,33 @@ macOS CoreAudio 通过 CPAL 暴露设备时存在两个已知问题：
 - 参数：track_name, artist_name, duration
 - 优先选择有 synced_lyrics 的结果
 - 持久化 source 标记 (embedded / lrclib / none)
+
+### commands/shortcuts.rs - 全局快捷键
+
+**文件位置：** `src-tauri/src/commands/shortcuts.rs`
+
+**作用：** 通过 `tauri-plugin-global-shortcut` 注册 OS 级全局快捷键，触发时 emit `shortcut-triggered` 事件给前端。
+
+**核心结构：**
+- `ShortcutDefault` — 内置动作定义（`action_id`、`description`、`default_combo`、`default_enabled`）
+- `ShortcutRegistry` — App state，保存「combo → action_id」映射；线程安全（`Mutex<HashMap<String, String>>`）
+
+**关键函数：**
+- `defaults() -> Vec<ShortcutDefault>` — 内置动作清单（11 项，3 默认开 + 8 默认关）
+- `shortcut_to_string(&Shortcut) -> String` — 把 Tauri 的 Shortcut 结构序列化为字符串（用于反查；macOS 与 Windows 分别识别 SUPER/CONTROL 作为 CommandOrCtrl）
+- `find_combo_by_action` — 私有助手，反向查找当前 action_id 绑定的 combo
+
+**命令（5 个 `#[tauri::command]`）：**
+- `shortcuts_list_defaults` / `shortcuts_register` / `shortcuts_unregister` / `shortcuts_is_registered` / `shortcuts_register_all`
+
+### commands/window.rs - 窗口可见性
+
+**文件位置：** `src-tauri/src/commands/window.rs`
+
+**作用：** 提供主窗口可见性切换命令，供「显示/隐藏主窗口」全局快捷键调用。
+
+**命令：**
+- `app_toggle_main_window` — 切换主窗口可见性（hide ↔ show + set_focus）；仅操作 `main` 窗口，不影响 `mini-player` / `desktop-lyrics`
 
 ### bootstrap.rs - 启动数据聚合
 

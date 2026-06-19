@@ -20,6 +20,7 @@ import { usePageTransition } from './composables/usePageTransition'
 import { usePlayerExpand } from './composables/usePlayerExpand'
 import { useAutoUpdate } from './composables/useAutoUpdate'
 import { useMiniPlayer } from './composables/useMiniPlayer'
+import { useGlobalShortcuts } from './composables/useGlobalShortcuts'
 import UpdateDialog from './components/UpdateDialog.vue'
 
 const settingsStore = useSettingsStore()
@@ -31,6 +32,7 @@ const { onEnter: onPageEnter, onLeave: onPageLeave } = usePageTransition()
 const { onEnter: onOverlayEnter, onLeave: onOverlayLeave } = usePlayerExpand()
 const { startCheck } = useAutoUpdate()
 const { enter: enterMini } = useMiniPlayer()
+const { init: initGlobalShortcuts } = useGlobalShortcuts()
 
 function isEditable(e: Event) {
   const el = e.target as HTMLElement
@@ -66,9 +68,6 @@ onKeyStroke('ArrowDown', (e) => {
   playerStore.adjustVolume(-0.05)
 })
 
-onKeyStroke('MediaTrackNext', () => playerStore.next())
-onKeyStroke('MediaTrackPrevious', () => playerStore.previous())
-
 onKeyStroke('m', (e) => {
   if (isEditable(e)) return
   // 用 Shift 修饰避开 macOS 默认 Window→Minimize 加速器（Cmd+M）
@@ -87,6 +86,7 @@ onMounted(async () => {
     settingsStore.loadThemeFromDb(),
     libraryStore.loadFromDb(),
     playerStore.setupListeners().then(() => playerStore.getState()),
+    initGlobalShortcuts(),
   ])
 
   console.log(`[perf] App initialized in ${(performance.now() - t0).toFixed(0)}ms`)

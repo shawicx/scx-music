@@ -10,6 +10,7 @@ import { useI18n } from '../composables/useI18n'
 import { useImportExport } from '../composables/useImportExport'
 import { useDesktopLyrics, type GlowStrength } from '../composables/useDesktopLyrics'
 import type { LocaleSetting } from '../composables/useI18n'
+import ShortcutSettings from './settings/ShortcutSettings.vue'
 
 const emit = defineEmits<{ back: [] }>()
 const settingsStore = useSettingsStore()
@@ -319,6 +320,8 @@ async function confirmRestore() {
 
       <div class="desktop-lyrics-hint">{{ t('lyrics.desktopLyrics.lockHint') }}</div>
     </v-card>
+
+    <ShortcutSettings />
 
     <v-card class="settings-card" variant="flat" color="surface">
       <div class="card-header">

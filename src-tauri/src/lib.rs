@@ -7,12 +7,14 @@ use sha2::{Sha256, Digest};
 use std::sync::{Arc, Mutex};
 
 use audio::AudioStateInner;
+use commands::shortcuts::{self, ShortcutRegistry};
 use lofty::file::{AudioFile as AudioFileTrait, TaggedFileExt};
 use lofty::tag::ItemKey;
 use serde::Serialize;
 use std::fs;
 use std::path::Path;
-use tauri::Manager;
+use tauri::{Emitter, Manager};
+use tauri_plugin_global_shortcut::{Builder as ShortcutBuilder, GlobalShortcutExt, ShortcutState};
 
 #[derive(Serialize)]
 struct SongEntry {
@@ -141,6 +143,20 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
+        .plugin(
+            ShortcutBuilder::new().with_handler(|app: &tauri::AppHandle, shortcut, event| {
+                if event.state != ShortcutState::Pressed {
+                    return;
+                }
+                let combo = shortcuts::shortcut_to_string(shortcut);
+                let registry: tauri::State<ShortcutRegistry> = app.state();
+                if let Some(action_id) = registry.get(&combo) {
+                    let _ = app.emit("shortcut-triggered", action_id);
+                }
+            })
+            .build(),
+        )
+        .manage(ShortcutRegistry::default())
         .setup(|app| {
             let mut audio_inner = AudioStateInner::new();
 
@@ -162,6 +178,11 @@ pub fn run() {
 
             let audio_state: Arc<Mutex<AudioStateInner>> = Arc::new(Mutex::new(audio_inner));
             app.manage(audio_state);
+
+            // 注册启动时应启用的全局快捷键
+            if let Err(e) = setup_shortcuts_at_start(app.handle().clone()) {
+                eprintln!("[shortcuts] startup registration failed: {e}");
+            }
 
             Ok(())
         })
@@ -216,7 +237,59 @@ pub fn run() {
             commands::stats::stats_trend,
             commands::stats::stats_heatmap,
             commands::stats::stats_hourly_distribution,
+            commands::shortcuts::shortcuts_list_defaults,
+            commands::shortcuts::shortcuts_register,
+            commands::shortcuts::shortcuts_unregister,
+            commands::shortcuts::shortcuts_is_registered,
+            commands::shortcuts::shortcuts_register_all,
+            commands::window::app_toggle_main_window,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+/// 应用启动时从 settings 表读取快捷键绑定，批量注册 enabled 的项
+fn setup_shortcuts_at_start(app: tauri::AppHandle) -> Result<(), Box<dyn std::error::Error>> {
+    let db_state: tauri::State<db::Db> = app.state();
+    let conn = db_state.0.lock().map_err(|e| e.to_string())?;
+
+    let mut stmt = conn.prepare("SELECT key, value FROM settings")?;
+    let stored: std::collections::HashMap<String, String> = stmt
+        .query_map([], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)))?
+        .filter_map(|r| r.ok())
+        .collect();
+    drop(stmt);
+    drop(conn); // 释放 Db Mutex
+
+    let defaults = shortcuts::defaults();
+    let mut to_register: Vec<(String, String)> = Vec::new();
+    for def in &defaults {
+        let combo = stored
+            .get(&format!("shortcut.{}", def.id))
+            .cloned()
+            .unwrap_or_else(|| def.combo.clone());
+        let enabled = stored
+            .get(&format!("shortcut.{}.enabled", def.id))
+            .map(|v| v == "true")
+            .unwrap_or(def.enabled);
+        if enabled && !combo.is_empty() {
+            to_register.push((def.id.clone(), combo));
+        }
+    }
+
+    let registry: tauri::State<ShortcutRegistry> = app.state();
+    for (action_id, combo) in to_register {
+        let shortcut: tauri_plugin_global_shortcut::Shortcut = match combo.parse() {
+            Ok(s) => s,
+            Err(e) => {
+                eprintln!("[shortcuts] skip {action_id}: invalid combo {combo:?}: {e}");
+                continue;
+            }
+        };
+        match app.global_shortcut().register(shortcut) {
+            Ok(()) => registry.set(combo, action_id),
+            Err(e) => eprintln!("[shortcuts] register failed for {action_id}: {e}"),
+        }
+    }
+    Ok(())
 }

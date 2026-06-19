@@ -73,6 +73,13 @@ const result = await invokeCommand('command_name', { param: value })
 | **频谱分析** | | | |
 | `analyzer_start` | visualization/useAudioAnalyzer.ts | audio/analyzer_cmds.rs | 启动频谱分析 |
 | `analyzer_stop` | visualization/useAudioAnalyzer.ts | audio/analyzer_cmds.rs | 停止频谱分析 |
+| **快捷键** | | | |
+| `shortcuts_list_defaults` | composables/useGlobalShortcuts.ts | commands/shortcuts.rs | 返回内置动作清单+默认绑定 |
+| `shortcuts_register` | composables/useGlobalShortcuts.ts | commands/shortcuts.rs | 注册单个快捷键，失败返回错误 |
+| `shortcuts_unregister` | composables/useGlobalShortcuts.ts | commands/shortcuts.rs | 注销快捷键 |
+| `shortcuts_is_registered` | composables/useGlobalShortcuts.ts | commands/shortcuts.rs | 检查组合键是否已被注册（系统层冲突预检） |
+| `shortcuts_register_all` | composables/useGlobalShortcuts.ts | commands/shortcuts.rs | 批量注册（启动场景） |
+| `app_toggle_main_window` | composables/useGlobalShortcuts.ts | commands/window.rs | 切换主窗口可见性（仅 main，不影响其他窗口） |
 
 ## 前后端调用链
 
@@ -210,6 +217,12 @@ App.vue onMounted
 
 - `audio:progress`（payload `{ current, duration }`，500ms 间隔）：驱动歌词当前行高亮
 - `audio:track_change`（payload 是 `Song` 对象）：歌曲切换时重新加载歌词
+
+## 全局快捷键相关事件
+
+| 事件 | 方向 | Payload | 说明 |
+|------|------|---------|------|
+| `shortcut-triggered` | Rust → 前端 | `String`（action_id） | 全局快捷键被按下时由 OS 回调触发，前端按 action_id 路由到对应 handler |
 
 ## 错误处理
 

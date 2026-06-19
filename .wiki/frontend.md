@@ -159,6 +159,16 @@
 - **SortMenu.vue** - 排序菜单（标题/艺术家/专辑/时长排序）
 - **VirtualSongTable.vue** - 虚拟滚动表格（大数据优化，>100首歌）
 
+### Settings 子组件 (components/settings/)
+
+### `ShortcutSettings` / `KeyCaptureField`
+
+`src/components/settings/ShortcutSettings.vue` 和 `KeyCaptureField.vue`
+
+- `ShortcutSettings` — 设置面板子组件，分组列出 11 个动作，处理冲突检测、rebind、reset
+- `KeyCaptureField` — 单行控件，捕获用户按下的组合键并 emit `rebind` 事件
+- 捕获流程：点击「重新绑定」→ 显示「请按下组合键…」→ 捕获到完整组合 → 显示预览 + 「保存」按钮
+
 ### 组件使用策略
 - **小数据量** (< 100首歌): 使用 SongTable.vue 或 SongGrid.vue
 - **大数据量** (> 100首歌): 自动切换到 VirtualSongTable.vue 提升性能
@@ -195,6 +205,7 @@
 - **composables/useLibraryAnalysis.ts** - 曲库分析（loadStats IPC、格式化工具）
 - **composables/useListeningReport.ts** - 报告周期状态管理（见下文）
 - **composables/useMiniPlayer.ts** - 迷你播放器窗口生命周期管理（互斥切换、置顶、位置持久化，见下文）
+- **composables/useGlobalShortcuts.ts** - 全局快捷键注册与路由（见下文）
 
 ### useListeningReport.ts
 
@@ -232,6 +243,19 @@
 - `mini-player.position-x` / `mini-player.position-y` — 窗口位置（逻辑坐标）
 
 **多实例说明：** `useMiniPlayer()` 可在主窗口被多处调用（App.vue、PlayerBar.vue）。`toggling` 标志已提升到模块级，跨实例共享，防止并发 toggle 竞争。
+
+### `useGlobalShortcuts`
+
+`src/composables/useGlobalShortcuts.ts`
+
+- 模块级单例 — 多次调用 `useGlobalShortcuts()` 共享状态（`unlisten`、`defaultsCache`、`initPromise`）
+- `init()` — 应用启动时调用；拉取默认值 + 存储绑定，批量注册，监听 `shortcut-triggered` 事件
+- `rebind(actionId, newCombo)` — 事务性重绑，失败回滚到原组合
+- `setEnabled(actionId, enabled)` — 启用/禁用某动作
+- `isComboRegistered(combo)` — 系统层冲突预检
+- `resetAll()` — 重置到默认值
+- 内部维护 `ACTION_HANDLERS` 表，把 action_id 路由到 `usePlayerStore`、`useMiniPlayer`、`useDesktopLyrics`、`usePlaybackMode` 等
+- mute 通过模块级 `mutedVolume` 变量 + `shortcut.muted-volume` 设置项实现（usePlayer 无 toggleMute）
 
 ## Animation System
 
