@@ -1,12 +1,31 @@
 /**
+ * Tauri global-hotkey 的媒体/音频键代码 → 友好展示
+ * 故意不与 action label 重合，让用户能区分「动作描述」和「物理键位」
+ */
+const KEY_DISPLAY: Record<string, string> = {
+  MediaPlayPause: 'Media Play/Pause',
+  MediaTrackNext: 'Media Next',
+  MediaTrackPrevious: 'Media Previous',
+  MediaStop: 'Media Stop',
+  AudioVolumeUp: 'Volume Up',
+  AudioVolumeDown: 'Volume Down',
+  AudioMute: 'Mute',
+}
+
+/**
  * 把 Tauri globalShortcut 的组合字符串转成平台友好的展示形式
  * 输入示例：'CommandOrControl+Shift+M'
  *   macOS 输出：'⌘+Shift+M'
  *   Windows 输出：'Ctrl+Shift+M'
  * 输入示例：'MediaPlayPause'
- *   两平台输出：'MediaPlayPause'（媒体键不修饰）
+ *   输出：'Media Play/Pause'
+ * 输入示例：'CommandOrControl+Shift+KeyM'
+ *   输出：'⌘+Shift+M'（Key 前缀被剥离）
  */
-export function formatCombo(combo: string, platform: 'mac' | 'win' = detectPlatform()): string {
+export function formatCombo(
+  combo: string,
+  platform: 'mac' | 'win' = detectPlatform(),
+): string {
   if (!combo) return ''
   return combo
     .split('+')
@@ -18,6 +37,9 @@ export function formatCombo(combo: string, platform: 'mac' | 'win' = detectPlatf
       if (trimmed === 'Alt') return platform === 'mac' ? '⌥' : 'Alt'
       if (trimmed === 'Shift') return platform === 'mac' ? '⇧' : 'Shift'
       if (trimmed === 'Super' || trimmed === 'Meta') return platform === 'mac' ? '⌃' : 'Win'
+      if (KEY_DISPLAY[trimmed]) return KEY_DISPLAY[trimmed]
+      if (/^Key[A-Z]$/.test(trimmed)) return trimmed.slice(3)
+      if (/^Digit\d$/.test(trimmed)) return trimmed.slice(5)
       return trimmed
     })
     .join('+')
