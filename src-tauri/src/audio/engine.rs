@@ -3,6 +3,7 @@ use std::io::BufReader;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
+use rand::seq::SliceRandom;
 use rodio::{Decoder, OutputStream, OutputStreamHandle, Sink, Source};
 use tauri::Manager;
 
@@ -291,15 +292,28 @@ impl AudioStateInner {
             return None;
         }
         match self.mode {
-            PlaybackMode::Sequential => Some((self.queue_index + 1) % self.queue.len()),
-            PlaybackMode::RepeatAll => Some((self.queue_index + 1) % self.queue.len()),
-            PlaybackMode::RepeatOne => Some(self.queue_index),
-            PlaybackMode::Shuffle => {
+            // 顺序播放：到末尾停止（返回 None）。当前歌曲自然播完后，
+            // 进度线程检测到 None 不切歌，歌曲停止；这是 Sequential 的期望语义。
+            PlaybackMode::Sequential => {
                 if self.queue_index + 1 < self.queue.len() {
                     Some(self.queue_index + 1)
                 } else {
-                    Some(0)
+                    None
                 }
+            }
+            // 列表循环：回到第一首
+            PlaybackMode::RepeatAll => Some((self.queue_index + 1) % self.queue.len()),
+            // 单曲循环：保持当前
+            PlaybackMode::RepeatOne => Some(self.queue_index),
+            // 随机：避免连续两次播放同一首（len==1 时退化为单曲循环）
+            PlaybackMode::Shuffle => {
+                if self.queue.len() == 1 {
+                    return Some(0);
+                }
+                let candidates: Vec<usize> = (0..self.queue.len())
+                    .filter(|&i| i != self.queue_index)
+                    .collect();
+                candidates.choose(&mut rand::thread_rng()).copied()
             }
         }
     }
