@@ -98,7 +98,12 @@ onMounted(async () => {
   try {
     const settings = await invoke<Record<string, string>>('get_all_settings')
     if (settings['mini-player.active'] === 'true') {
-      await enterMini()
+      const ok = await enterMini()
+      if (!ok) {
+        // mini 窗口未就绪等失败情况：重置 DB 并显示主窗口，避免两边都隐藏
+        await invoke('set_setting', { key: 'mini-player.active', value: 'false' }).catch(() => {})
+        await getCurrentWindow().show()
+      }
     } else {
       await getCurrentWindow().show()
     }

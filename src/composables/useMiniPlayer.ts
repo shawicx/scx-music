@@ -59,39 +59,49 @@ export function useMiniPlayer() {
     unlistens.push(un1, un2)
   }
 
-  async function enter() {
+  async function enter(): Promise<boolean> {
     try {
       const main = await WebviewWindow.getByLabel('main')
       const mini = isMiniPlayerWindow ? current : await WebviewWindow.getByLabel('mini-player')
-      if (!main || !mini) return
+      if (!main || !mini) return false
+
+      // 持久化先于可见性切换：即使后续 show/hide 失败或被 app 关闭打断，
+      // DB 状态已经正确，下次启动恢复一致。
+      active.value = true
+      await invoke('set_setting', { key: STORAGE_KEYS.active, value: 'true' })
+      await emit('mini-player:active-changed', true)
 
       // 顺序很关键：先 show+focus mini，再 hide main。
       // 如果先 hide main，macOS 的 Cmd+M 会最小化整个 app，导致 mini.show() 无法显示。
       await mini.show()
       await mini.setFocus()
       await main.hide()
-      active.value = true
-      await invoke('set_setting', { key: STORAGE_KEYS.active, value: 'true' })
-      await emit('mini-player:active-changed', true)
+      return true
     } catch (e) {
       console.error('[mini-player] enter failed:', e)
+      return false
     }
   }
 
-  async function exit() {
+  async function exit(): Promise<boolean> {
     try {
       const main = await WebviewWindow.getByLabel('main')
       const mini = isMiniPlayerWindow ? current : await WebviewWindow.getByLabel('mini-player')
-      if (!main || !mini) return
+      if (!main || !mini) return false
+
+      // 持久化先于可见性切换：用户看到主窗口出现后可能立刻 Cmd+Q，
+      // 如果持久化排在 show/hide 后面，IPC 可能来不及完成，导致下次启动误恢复迷你模式。
+      active.value = false
+      await invoke('set_setting', { key: STORAGE_KEYS.active, value: 'false' })
+      await emit('mini-player:active-changed', false)
 
       await mini.hide()
       await main.show()
       await main.setFocus()
-      active.value = false
-      await invoke('set_setting', { key: STORAGE_KEYS.active, value: 'false' })
-      await emit('mini-player:active-changed', false)
+      return true
     } catch (e) {
       console.error('[mini-player] exit failed:', e)
+      return false
     }
   }
 

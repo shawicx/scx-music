@@ -60,7 +60,10 @@ const ACTION_HANDLERS: Record<string, () => ActionHandler> = {
   },
   'app.mini-player': () => {
     const { enter, exit, active } = useMiniPlayer()
-    return () => (active.value ? exit() : enter())
+    return async () => {
+      if (active.value) await exit()
+      else await enter()
+    }
   },
   'app.desktop-lyrics': () => {
     const { toggle } = useDesktopLyrics()

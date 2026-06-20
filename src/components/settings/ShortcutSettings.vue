@@ -102,18 +102,13 @@ onMounted(loadAll)
 </script>
 
 <template>
-  <v-card variant="outlined" class="mb-4">
-    <v-card-title class="text-h6">
-      <v-icon class="mr-2">mdi-keyboard-settings</v-icon>
-      {{ t('settings.shortcuts.title') }}
-    </v-card-title>
-    <v-card-subtitle class="text-wrap">
-      {{ t('settings.shortcuts.subtitle') }}
-    </v-card-subtitle>
+  <v-card class="settings-card" variant="flat" color="surface">
+    <div class="card-header">
+      <v-icon icon="mdi-keyboard-settings" size="18" class="card-icon" />
+      <span class="card-title">{{ t('settings.shortcuts.title') }}</span>
+    </div>
 
-    <v-divider />
-
-    <v-list density="compact">
+    <v-list density="compact" bg-color="transparent" class="shortcuts-list">
       <v-list-subheader>{{ t('settings.shortcuts.group.media') }}</v-list-subheader>
       <KeyCaptureField
         v-for="action in mediaActions"
@@ -141,12 +136,54 @@ onMounted(loadAll)
       />
     </v-list>
 
-    <v-divider />
-    <v-card-actions>
-      <v-btn color="error" variant="text" @click="onResetAll">
-        <v-icon class="mr-1">mdi-restore</v-icon>
+    <div class="shortcuts-hint">{{ t('settings.shortcuts.subtitle') }}</div>
+
+    <div class="action-row">
+      <v-btn color="error" variant="text" prepend-icon="mdi-restore" @click="onResetAll">
         {{ t('settings.shortcuts.resetAll') }}
       </v-btn>
-    </v-card-actions>
+    </div>
   </v-card>
 </template>
+
+<style scoped>
+/* 与 SettingsView 中其他 settings-card 保持视觉一致 */
+.settings-card {
+  padding: 20px;
+  margin-bottom: 16px;
+  border-radius: 12px;
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.card-icon {
+  color: rgb(var(--v-theme-primary));
+}
+
+.card-title {
+  font-size: var(--text-md);
+  font-weight: 600;
+}
+
+.shortcuts-list {
+  padding: 0;
+}
+
+.shortcuts-hint {
+  margin-top: 16px;
+  font-size: var(--text-sm);
+  color: var(--v-text-secondary);
+  line-height: 1.5;
+}
+
+.action-row {
+  display: flex;
+  gap: 12px;
+  margin-top: 12px;
+}
+</style>
