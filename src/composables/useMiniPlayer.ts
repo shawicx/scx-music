@@ -1,4 +1,4 @@
-import { ref, onUnmounted } from 'vue'
+import { ref } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import {
   getCurrentWindow,
@@ -23,40 +23,52 @@ const EDGE_MARGIN = 20
 // 模块级共享：跨多个 useMiniPlayer() 实例（主窗口中 App.vue + PlayerBar 都调用）防止并发 toggle
 let toggling = false
 
+// 模块级状态：跨多次 useMiniPlayer() 调用共享，避免重复注册监听器导致的累积泄漏。
+// 参考 usePlayer.ts 的 listenersSetup 模式 —— 模块级 ref + 幂等 init guard。
+const active = ref(false)
+const alwaysOnTop = ref(true)
+const unlistens: UnlistenFn[] = []
+let stateSyncDone = false
+
+async function setupStateSync(
+  isMiniPlayerWindow: boolean,
+  current: ReturnType<typeof getCurrentWindow>,
+) {
+  try {
+    const all = await invoke<Record<string, string>>('get_all_settings')
+    active.value = all[STORAGE_KEYS.active] === 'true'
+    alwaysOnTop.value = all[STORAGE_KEYS.alwaysOnTop] !== 'false' // 默认 true
+  } catch {
+    // 容错：读取失败时沿用默认值
+  }
+
+  if (isMiniPlayerWindow) {
+    await current.setAlwaysOnTop(alwaysOnTop.value).catch(() => {})
+  }
+
+  const un1 = await listen<boolean>('mini-player:active-changed', (e) => {
+    active.value = e.payload
+  })
+  const un2 = await listen<boolean>('mini-player:always-on-top-changed', (e) => {
+    alwaysOnTop.value = e.payload
+    if (isMiniPlayerWindow) {
+      current.setAlwaysOnTop(e.payload).catch(() => {})
+    }
+  })
+  unlistens.push(un1, un2)
+}
+
 export function useMiniPlayer() {
   const current = getCurrentWindow()
   const isMiniPlayerWindow = current.label === 'mini-player'
 
-  const active = ref(false)
-  const alwaysOnTop = ref(true)
-  const unlistens: UnlistenFn[] = []
+  // moveTimer 保留为函数局部：restoreFromSettings 只在迷你窗口 setup 阶段调用一次，
+  // 不存在跨多次 useMiniPlayer() 调用共享的场景。
   let moveTimer: ReturnType<typeof setTimeout> | null = null
 
-  setupStateSync()
-
-  async function setupStateSync() {
-    try {
-      const all = await invoke<Record<string, string>>('get_all_settings')
-      active.value = all[STORAGE_KEYS.active] === 'true'
-      alwaysOnTop.value = all[STORAGE_KEYS.alwaysOnTop] !== 'false' // 默认 true
-    } catch {
-      // 容错：读取失败时沿用默认值
-    }
-
-    if (isMiniPlayerWindow) {
-      await current.setAlwaysOnTop(alwaysOnTop.value).catch(() => {})
-    }
-
-    const un1 = await listen<boolean>('mini-player:active-changed', (e) => {
-      active.value = e.payload
-    })
-    const un2 = await listen<boolean>('mini-player:always-on-top-changed', (e) => {
-      alwaysOnTop.value = e.payload
-      if (isMiniPlayerWindow) {
-        current.setAlwaysOnTop(e.payload).catch(() => {})
-      }
-    })
-    unlistens.push(un1, un2)
+  if (!stateSyncDone) {
+    stateSyncDone = true
+    void setupStateSync(isMiniPlayerWindow, current)
   }
 
   async function enter(): Promise<boolean> {
@@ -181,10 +193,8 @@ export function useMiniPlayer() {
     unlistens.push(un)
   }
 
-  onUnmounted(() => {
-    if (moveTimer) clearTimeout(moveTimer)
-    unlistens.forEach((un) => un())
-  })
+  // 模块级监听器随 webview 销毁自动清理，无需 onUnmounted。
+  // moveTimer 至多 500ms 后自然 expire，webview 销毁时也会被运行时回收。
 
   return {
     active,

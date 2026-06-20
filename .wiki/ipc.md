@@ -44,7 +44,7 @@ const result = await invokeCommand('command_name', { param: value })
 | **设置** | | | |
 | `get_all_settings` | - | commands/settings.rs | 获取所有设置 |
 | `get_setting` | stores/settings.ts | commands/settings.rs | 获取单个设置 |
-| `set_setting` | stores/settings.ts, stores/library.ts | commands/settings.rs | 设置单个键值对 |
+| `set_setting` | stores/settings.ts, stores/library.ts | commands/settings.rs | 设置单个键值对（**key 白名单校验**：精确 9 项 + 前缀 4 项；前缀必须带非空子键） |
 | `get_system_locale` | composables/useI18n.ts | commands/settings.rs | 获取系统语言 |
 | **文件扫描** | | | |
 | `scan_music_folder` | stores/library.ts | lib.rs | 扫描音乐文件夹 |
@@ -54,18 +54,18 @@ const result = await invokeCommand('command_name', { param: value })
 | `get_lyrics` | composables/useLyrics.ts | commands/lyrics.rs | 获取歌词 (缓存→内嵌→LRCLIB) |
 | `refresh_lyrics` | - | commands/lyrics.rs | 强制刷新歌词 |
 | **导入导出** | | | |
-| `export_playlist_m3u` | composables/useImportExport.ts | commands/import_export.rs | 导出播放列表为 M3U 格式 |
-| `export_playlist_pls` | composables/useImportExport.ts | commands/import_export.rs | 导出播放列表为 PLS 格式 |
-| `export_backup` | composables/useImportExport.ts | commands/import_export.rs | 导出完整备份到 JSON |
-| `import_backup` | composables/useImportExport.ts | commands/import_export.rs | 导入备份（replace/merge） |
-| `export_settings` | composables/useImportExport.ts | commands/import_export.rs | 导出设置到 JSON |
-| `import_settings` | composables/useImportExport.ts | commands/import_export.rs | 从 JSON 导入设置 |
+| `export_playlist_m3u` | composables/useImportExport.ts | commands/import_export.rs | 导出播放列表为 M3U 格式（**路径校验**：绝对路径 + 拒绝 `..`） |
+| `export_playlist_pls` | composables/useImportExport.ts | commands/import_export.rs | 导出播放列表为 PLS 格式（同上） |
+| `export_backup` | composables/useImportExport.ts | commands/import_export.rs | 导出完整备份到 JSON（同上） |
+| `import_backup` | composables/useImportExport.ts | commands/import_export.rs | 导入备份（replace/merge）（同上） |
+| `export_settings` | composables/useImportExport.ts | commands/import_export.rs | 导出设置到 JSON（同上） |
+| `import_settings` | composables/useImportExport.ts | commands/import_export.rs | 从 JSON 导入设置（同上） |
 | **曲库分析** | | | |
 | `get_library_stats` | stores/analysis.ts | commands/stats.rs | 获取曲库聚合统计数据 |
 | **听歌统计/报告** | | | |
-| `stats_listening_overview` | stores/stats.ts, composables/useListeningReport.ts | commands/stats.rs | 概览卡（统计 Tab 传 range，报告 Tab 传 start/end） |
-| `stats_top_songs` | stores/stats.ts | commands/stats.rs | 最爱歌曲 Top N（统计 Tab） |
-| `stats_top_artists` | stores/stats.ts | commands/stats.rs | 最爱歌手 Top N（统计 Tab） |
+| `stats_listening_overview` | stores/stats.ts, composables/useListeningReport.ts | commands/stats.rs | 概览卡（统计 Tab 传 range，报告 Tab 传 start/end）。`play_count` 从 `play_history` 派生（`COUNT(*)`），与 `total_duration_secs` 等其他指标一致地参与时间过滤 |
+| `stats_top_songs` | stores/stats.ts | commands/stats.rs | 最爱歌曲 Top N（统计 Tab）。`play_count` 字段是窗口内 `COUNT(*) FROM play_history`，不是 `songs.play_count` 全库累计 |
+| `stats_top_artists` | stores/stats.ts | commands/stats.rs | 最爱歌手 Top N（统计 Tab）。`play_count` 字段同上 |
 | `stats_genre_distribution` | stores/stats.ts | commands/stats.rs | 流派播放时长分布（统计 Tab） |
 | `stats_trend` | stores/stats.ts | commands/stats.rs | 按天聚合播放时长趋势（统计 Tab） |
 | `stats_heatmap` | stores/stats.ts | commands/stats.rs | 365 天每日播放时长热力图（统计 Tab） |

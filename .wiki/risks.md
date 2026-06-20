@@ -30,14 +30,58 @@
 **当前状态：** 无直接 shell 调用
 **未来风险：** 如果添加 shell plugin 需要严格参数验证
 
-## Capability 风险
+## Capability 风险（最小权限设计，2026-06-20 收紧）
 
-**当前权限：**
-- `core:default` - 核心窗口和生命周期 API
-- `opener:default` - URL 打开
-- `dialog:default` - 文件对话框
+**当前权限分布（按窗口）：**
+- **主窗口 `default.json`**：`core:default` + `opener:default` + `dialog:default` + `updater:default` + `process:default` + 7 个具体 window 权限
+- **`shortcuts.json`**：3 个具体 global-shortcut 权限（注册/注销/查询）
+- **`desktop-lyrics.json`**：15 项（webview/app/event + 11 个 window allow-*）
+- **`mini-player.json`**：16 项（同上 + set-always-on-top / is-visible / set-focus）
+- **`desktop-lyrics-lock.json`**：4 项（webview/app/event listen/emit，36×36 锁按钮窗口最小集）
 
-**风险：** 无敏感权限，风险较低
+**风险：** 3 个子窗口已移除 `core:default` 聚合权限，改用具体 allow-* 列表。命令级权限（自定义 permission 文件）尚未引入，所有 `#[tauri::command]` 默认对拥有 `core:webview:default` 的窗口可达 —— 这是已知 P1 收紧方向。
+
+**风险：** Tauri v2 权限模型按**发起调用的窗口**检查 capability。跨窗口调用（如 `mini-player` 窗口调 `main.setFocus()`）需要发起方持有相应权限，不是目标窗口。所有子窗口的 capability 已补齐 `allow-set-focus`/`allow-is-visible` 等跨窗口操作所需项。
+
+## P0 加固（2026-06-20）
+
+本次加固修复了全量代码审查发现的 8 个 P0 级问题。详细 spec/plan 见 `docs/superpowers/specs|plans/2026-06-20-p0-hardening-*.md`。
+
+### SQL 注入
+**风险点：** `commands/stats.rs::build_time_filter` 曾用 `format!()` 把前端传入的 `start`/`end` 日期字符串拼进 SQL
+**缓解：** 重构返回 `(String, Vec<SqlValue>)` 元组，绝对日期模式改用 `?` 占位符 + `SqlValue::Text` 参数化绑定。5 个 `stats_*` 命令全部改用 `params_from_iter`
+
+### 统计数据口径一致性
+**风险点：** `stats_listening_overview.play_count` 曾累计 `songs.play_count`（全库），不参与时间过滤；`stats_top_songs`/`stats_top_artists` 同问题
+**缓解：** 三处 `play_count` 字段统一改为 `COUNT(*) FROM play_history`，与同函数其他指标（duration/genre/artist）保持口径一致。前端报告 Tab 选「周/月/年」时显示的播放次数现在会随周期变化
+
+### 配置注入（set_setting 白名单）
+**风险点：** `set_setting(key, value)` 曾接受任意 key
+**缓解：** `ALLOWED_EXACT_KEYS`（9 项）+ `ALLOWED_KEY_PREFIXES`（4 项 `mini-player.` / `desktop-lyrics.` / `shortcut.` / `lyric.offset.`）白名单，前缀匹配要求非空子键（`shortcut.` 本身会被拒绝）。`get_setting`/`get_all_settings` 不加白名单（读取无副作用）
+
+### 路径遍历
+**风险点：** `export_playlist_m3u`/`export_playlist_pls`/`export_backup`/`export_settings`/`import_backup`/`import_settings` 共 6 个命令曾直接 `fs::write/read` 前端传入的任意路径
+**缓解：** 新增 `validate_user_path` 函数，要求绝对路径 + 拒绝 `..` 段。6 个命令开头统一调用。合法用户流程（dialog 返回的路径都是绝对且无 `..`）不受影响
+
+### Mutex 中毒连锁 panic
+**风险点：** 音频模块 14 处 `lock().unwrap()`，任一线程 panic 让 Mutex 中毒后所有 lock 都会连锁 panic
+**缓解：** 新增 `audio::lock_or_recover` 辅助函数，中毒时 `unwrap_or_else(|e| e.into_inner())` 取出内部数据继续服务。**使用策略（见函数 doc）：** 进度线程和批量操作（player_set_queue/next/previous）用本函数；单步 IPC 命令（player_pause/resume/seek 等）保留 `.lock().map_err(...)?`，让前端能感知错误。另：`commands/playlists.rs` 的 `UNIX_EPOCH.unwrap()` 同步改为 `unwrap_or_default()`
+
+### Sequential/Shuffle 行为
+**风险点：** `engine.rs::next_index` 中 `Sequential` 和 `RepeatAll` 行为完全相同（都循环），`Shuffle` 不是真随机（只是顺序往后走）
+**缓解：**
+- **Sequential**：到末尾返回 `None`（不再循环）；`player_next` 命令检测到 None 不切歌；歌曲自然播完时进度线程检测到 None 不触发下一首，播放自然停止 —— 这是 Sequential 的正确语义
+- **Shuffle**：用 `rand::seq::SliceRandom::choose` 从「非当前 index」中随机选，避免连续两次同一首；单曲队列（len==1）特判返回 `Some(0)`
+
+### 监听器累积泄漏
+**风险点：** `useMiniPlayer`/`useDesktopLyrics`/`useLyrics` 三处 composable 在主窗口被多次调用时每次都注册新的 Tauri 事件监听器，组件挂载/卸载累积导致监听器数量单调增长
+**缓解：**
+- **useMiniPlayer/useDesktopLyrics**：模块级状态 + 幂等 init guard（参考 `usePlayer.ts::listenersSetup` 模式）。删除 `onUnmounted` 中对模块级 unlistens 的清理（监听器随 webview 销毁自动回收）
+- **useLyrics**：因为接受 `currentSong` ref 参数不能完全单例化，改用 `_listenPromise` 追踪 listen 的 promise，`onUnmounted` 改为 async 先 await promise 再 unlisten —— 修复"组件在 listen 完成前卸载导致监听器泄漏"的竞态
+
+### useDesktopLyrics lyrics 实例缓存
+**风险点：** `useDesktopLyrics` 在 lyrics 窗口内调用 `useLyrics(currentSong)`，每次调用 useDesktopLyrics 都会新建 useLyrics 实例（叠加多个 audio:progress 监听）
+**缓解：** `lyricsInstance` 模块级缓存，仅在 lyrics 窗口首次调用时创建 useLyrics 实例。`currentSong` 是模块级 ref，lyrics 实例的 `watch(currentSong)` 只注册一次
 
 ## 大文件风险
 

@@ -197,15 +197,18 @@
 - **composables/useI18n.ts** - 国际化封装（语言初始化、切换、持久化）
 - **composables/usePlaybackMode.ts** - 播放模式切换（cycleMode 后调用 regenerateQueue 重新生成队列）
 - **composables/usePlayQueue.ts** - 播放队列生成（Fisher-Yates 洗牌、模式映射：sequential/repeat_all=原序、repeat_one=仅当前歌曲、shuffle=洗牌后当前歌曲排首位）
-- **composables/useLyrics.ts** - 歌词获取 + LRC 解析 + 同步跟踪
+- **composables/useLyrics.ts** - 歌词获取 + LRC 解析 + 同步跟踪（listen promise 加 await，防卸载竞态泄漏）
 - **composables/useDebounceSearch.ts** - 搜索防抖（300ms）
 - **composables/useOptimizedSort.ts** - 排序缓存（中文 locale 支持）
 - **composables/useImportExport.ts** - 导入导出功能（歌单导出 M3U/PLS、音乐库备份恢复、设置迁移）
 - **composables/useAutoUpdate.ts** - 自动更新逻辑（启动延迟检查、下载进度跟踪、重启安装）
 - **composables/useLibraryAnalysis.ts** - 曲库分析（loadStats IPC、格式化工具）
 - **composables/useListeningReport.ts** - 报告周期状态管理（见下文）
-- **composables/useMiniPlayer.ts** - 迷你播放器窗口生命周期管理（互斥切换、置顶、位置持久化，见下文）
+- **composables/useMiniPlayer.ts** - 迷你播放器窗口生命周期管理（互斥切换、置顶、位置持久化，见下文）。**模块级单例**：状态提升到模块级 + 幂等 init guard，多次调用只注册一次监听器
+- **composables/useDesktopLyrics.ts** - 桌面歌词窗口生命周期管理（可见性、锁定、配置、歌词窗口与锁按钮窗口的跨窗口同步）。**模块级单例**：同 useMiniPlayer 模式 + `lyricsInstance` 缓存确保 useLyrics 只创建一次
 - **composables/useGlobalShortcuts.ts** - 全局快捷键注册与路由（见下文）
+
+> **Composable 单例模式（2026-06-20 加固）：** `useMiniPlayer` / `useDesktopLyrics` / `usePlayer` 都采用模块级状态 + 幂等 init guard（`stateSyncDone` / `listenersSetup`），避免主窗口多个组件（App.vue / PlayerBar / SettingsView / useGlobalShortcuts 间接）重复注册 Tauri 事件监听器导致的累积泄漏。模块级监听器不通过 `onUnmounted` 清理，依赖 webview 销毁时 Tauri 运行时自动回收。`useLyrics` 因接受 `currentSong` ref 参数不能完全单例化，改用 `_listenPromise` 追踪 listen 的 promise，`onUnmounted` 改为 async 先 await promise 再 unlisten。详见 `.wiki/risks.md` 的「监听器累积泄漏」章节。
 
 ### useListeningReport.ts
 

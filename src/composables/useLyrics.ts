@@ -44,6 +44,7 @@ export function useLyrics(currentSong: Ref<Song | null>) {
   const source = ref('')
   const offsetSecs = ref(0)
   let _unlisten: UnlistenFn | null = null
+  let _listenPromise: Promise<void> | null = null
 
   async function fetchLyrics(song: Song) {
     isLoading.value = true
@@ -120,13 +121,20 @@ export function useLyrics(currentSong: Ref<Song | null>) {
     return lineTime - offsetSecs.value
   }
 
-  async function setupProgressListener() {
-    _unlisten = await listen<{ current: number; duration: number }>(
+  function setupProgressListener() {
+    if (_listenPromise) return // 已在注册中
+    _listenPromise = listen<{ current: number; duration: number }>(
       'audio:progress',
       (e) => {
         computeCurrentLine(e.payload.current)
       },
     )
+      .then((un) => {
+        _unlisten = un
+      })
+      .catch((e) => {
+        console.error('[useLyrics] listen audio:progress failed:', e)
+      })
   }
 
   watch(currentSong, async (song, oldSong) => {
@@ -142,8 +150,14 @@ export function useLyrics(currentSong: Ref<Song | null>) {
 
   setupProgressListener()
 
-  onUnmounted(() => {
+  onUnmounted(async () => {
+    // 等待 listen promise 完成后再 unlisten，避免 cleanup 早于 listen 完成导致泄漏
+    if (_listenPromise) {
+      await _listenPromise.catch(() => {})
+    }
     _unlisten?.()
+    _unlisten = null
+    _listenPromise = null
   })
 
   return {

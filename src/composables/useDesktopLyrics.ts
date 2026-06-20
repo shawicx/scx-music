@@ -1,4 +1,4 @@
-import { ref, reactive, onUnmounted, type Ref } from 'vue'
+import { ref, reactive, type Ref } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import {
   getCurrentWindow,
@@ -42,29 +42,35 @@ const STORAGE_KEYS = {
   posY: 'desktop-lyrics.position-y',
 } as const
 
+// 锁按钮独立小窗口（永远可点击）—— 仅在歌词窗口上下文管理
+const LOCK_WINDOW_LABEL = 'desktop-lyrics-lock'
+const LOCK_WINDOW_SIZE = 36
+const LOCK_OFFSET_X = 12
+const LOCK_OFFSET_Y = 8
+
+// 模块级状态：跨多次 useDesktopLyrics() 调用共享，避免重复注册监听器导致的累积泄漏。
+// 参考 usePlayer.ts 的 listenersSetup 模式 + Task 7 useMiniPlayer 改造。
+// 调用方：主窗口中 SettingsView + PlayerBar + useGlobalShortcuts（间接），lyrics 窗口、lock 窗口也各自调用。
+const visible = ref(false)
+const locked = ref(false)
+const config = reactive<DesktopLyricsConfig>({ ...DEFAULT_CONFIG })
+const currentSong = ref<Song | null>(null)
+const unlistens: UnlistenFn[] = []
+let stateSyncDone = false
+// lyrics 实例只在 lyrics 窗口首次调用时创建（不跨窗口共享，但同窗口内单例）。
+// 多个 useDesktopLyrics 实例共享同一个 currentSong ref，所以 lyrics 实例可安全复用。
+let lyricsInstance: ReturnType<typeof useLyrics> | null = null
+
 export function useDesktopLyrics() {
   const current = getCurrentWindow()
   const isLyricsWindow = current.label === 'desktop-lyrics'
 
-  const visible = ref(false)
-  const locked = ref(false)
-  const config = reactive<DesktopLyricsConfig>({ ...DEFAULT_CONFIG })
-  const currentSong = ref<Song | null>(null)
-  const unlistens: UnlistenFn[] = []
-
-  const lyrics = isLyricsWindow ? useLyrics(currentSong as Ref<Song | null>) : null
-  const lines = lyrics?.lines ?? ref<LrcLine[]>([])
-  const currentLineIndex = lyrics?.currentLineIndex ?? ref(-1)
-
-  // 锁定状态初始化 + 监听器：两个窗口都需要（主窗口用于 SettingsView 复选框状态同步）
-  setupStateSync()
-
-  // 配置初始化：两个窗口都需要（主窗口用于 SettingsView 颜色选择器显示存储值）
-  restoreConfig()
-
-  if (isLyricsWindow) {
-    setupLyricsWindow(current)
+  // lyrics 窗口首次调用时创建 lyrics 实例；后续调用复用模块级实例。
+  if (isLyricsWindow && !lyricsInstance) {
+    lyricsInstance = useLyrics(currentSong as Ref<Song | null>)
   }
+  const lines = lyricsInstance?.lines ?? ref<LrcLine[]>([])
+  const currentLineIndex = lyricsInstance?.currentLineIndex ?? ref(-1)
 
   // 锁状态初始化与同步 —— 与 setupLyricsWindow 解耦，确保主窗口也能收到锁状态变化
   async function setupStateSync() {
@@ -89,12 +95,6 @@ export function useDesktopLyrics() {
     })
     unlistens.push(un)
   }
-
-  // 锁按钮独立小窗口（永远可点击）—— 仅在歌词窗口上下文管理
-  const LOCK_WINDOW_LABEL = 'desktop-lyrics-lock'
-  const LOCK_WINDOW_SIZE = 36
-  const LOCK_OFFSET_X = 12
-  const LOCK_OFFSET_Y = 8
 
   async function syncLockWindowPosition() {
     if (!isLyricsWindow) return
@@ -285,9 +285,18 @@ export function useDesktopLyrics() {
     await current.setPosition(new LogicalPosition(x, y))
   }
 
-  onUnmounted(() => {
-    unlistens.forEach((un) => un())
-  })
+  // 幂等 init：仅首次调用时跑 setup，避免跨多次 useDesktopLyrics() 实例累积监听器。
+  if (!stateSyncDone) {
+    stateSyncDone = true
+    void setupStateSync()
+    void restoreConfig()
+    if (isLyricsWindow) {
+      void setupLyricsWindow(current)
+    }
+  }
+
+  // 模块级监听器随 webview 销毁自动清理，无需 onUnmounted。
+  // moveTimer 至多 500ms 后自然 expire，webview 销毁时也会被运行时回收。
 
   return {
     visible,

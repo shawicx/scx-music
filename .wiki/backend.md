@@ -30,7 +30,7 @@
 - `player_seek` - 跳转播放位置 (`commands.rs`)
 - `player_set_volume` - 设置音量 (`commands.rs`)
 - `player_next` / `player_previous` - 切换曲目 (`commands.rs`)
-- `player_set_mode` - 设置播放模式 (sequential/repeat_all/repeat_one/shuffle) — Shuffle 队列由前端洗牌，后端按队列顺序播放 (`commands.rs`)
+- `player_set_mode` - 设置播放模式 (sequential/repeat_all/repeat_one/shuffle) — 切歌逻辑见 `engine.rs::next_index`：Sequential 到末尾返回 `None`（自然停止）、RepeatAll 取模循环、RepeatOne 保持当前、Shuffle 用 `rand::seq::SliceRandom::choose` 从「非当前 index」随机选（避免连续两次同一首）(`commands.rs`)
 - `player_get_state` - 获取当前播放状态（恢复用）(`commands.rs`)
 - `player_get_output_devices` - 枚举音频输出设备 (`device.rs`)
 - `player_set_output_device` - 切换音频输出设备 (`device.rs`)
@@ -157,7 +157,7 @@
 **文件位置：** `src-tauri/src/audio/`
 
 **模块结构：**
-- `mod.rs` — 模块入口：Re-exports + `AudioState` 类型别名 + `start_progress_thread()`
+- `mod.rs` — 模块入口：Re-exports + `AudioState` 类型别名 + `start_progress_thread()` + `lock_or_recover()` 辅助函数（Mutex 中毒自愈，策略见函数 doc）
 - `types.rs` — Serde 类型：`PlaybackMode`、`PlaybackState`、`QueuedSong`、`PlayerStatePayload`、`AudioDeviceInfo`、`AudioDevicesResponse`
 - `engine.rs` — `AudioEngine`（Rodio OutputStream/Sink 封装）+ `AudioStateInner`（播放状态与逻辑）
 - `commands.rs` — 10 个播放控制命令（player_set_queue、player_pause 等）
