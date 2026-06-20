@@ -1,9 +1,12 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "desktop-lyrics-lock",
-  "description": "Capability for the desktop lyrics lock button window",
+  "description": "Capability for the desktop lyrics lock button window (36x36 fixed button)",
   "windows": ["desktop-lyrics-lock"],
   "permissions": [
-    "core:default"
+    "core:webview:default",
+    "core:app:default",
+    "core:event:allow-listen",
+    "core:event:allow-emit"
   ]
 }

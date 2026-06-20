@@ -4,7 +4,25 @@ use rusqlite::params;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
+use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
+
+/// 校验用户提供的文件路径，防止路径遍历攻击。
+/// - 必须是绝对路径
+/// - 拒绝任何 `..` 路径段
+fn validate_user_path(path: &str) -> Result<PathBuf, String> {
+    let p = PathBuf::from(path);
+    if !p.is_absolute() {
+        return Err(format!("Path must be absolute: {}", path));
+    }
+    if p
+        .components()
+        .any(|c| matches!(c, std::path::Component::ParentDir))
+    {
+        return Err(format!("Parent dir '..' not allowed in path: {}", path));
+    }
+    Ok(p)
+}
 
 // --- Backup data structures ---
 
@@ -87,6 +105,7 @@ pub fn export_playlist_m3u(
     playlist_id: String,
     save_path: String,
 ) -> Result<(), String> {
+    let save_path = validate_user_path(&save_path)?;
     let conn = db.0.lock().map_err(|e| e.to_string())?;
     let songs = get_playlist_songs_from_db(&conn, &playlist_id)?;
 
@@ -108,6 +127,7 @@ pub fn export_playlist_pls(
     playlist_id: String,
     save_path: String,
 ) -> Result<(), String> {
+    let save_path = validate_user_path(&save_path)?;
     let conn = db.0.lock().map_err(|e| e.to_string())?;
     let songs = get_playlist_songs_from_db(&conn, &playlist_id)?;
 
@@ -133,6 +153,7 @@ pub fn export_backup(
     db: tauri::State<'_, Db>,
     save_path: String,
 ) -> Result<(), String> {
+    let save_path = validate_user_path(&save_path)?;
     let conn = db.0.lock().map_err(|e| e.to_string())?;
 
     // Songs
@@ -247,6 +268,7 @@ pub fn import_backup(
     file_path: String,
     strategy: String,
 ) -> Result<ImportResult, String> {
+    let file_path = validate_user_path(&file_path)?;
     let content = fs::read_to_string(&file_path).map_err(|e| e.to_string())?;
     let backup: BackupFileInput = serde_json::from_str(&content).map_err(|e| e.to_string())?;
 
@@ -348,6 +370,7 @@ pub fn export_settings(
     db: tauri::State<'_, Db>,
     save_path: String,
 ) -> Result<(), String> {
+    let save_path = validate_user_path(&save_path)?;
     let conn = db.0.lock().map_err(|e| e.to_string())?;
     let mut stmt = conn
         .prepare("SELECT key, value FROM settings")
@@ -369,6 +392,7 @@ pub fn import_settings(
     db: tauri::State<'_, Db>,
     file_path: String,
 ) -> Result<usize, String> {
+    let file_path = validate_user_path(&file_path)?;
     let content = fs::read_to_string(&file_path).map_err(|e| e.to_string())?;
     let settings: HashMap<String, String> =
         serde_json::from_str(&content).map_err(|e| e.to_string())?;
@@ -388,4 +412,29 @@ pub fn import_settings(
 
     tx.commit().map_err(|e| e.to_string())?;
     Ok(count)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::validate_user_path;
+
+    #[test]
+    fn rejects_relative_path() {
+        assert!(validate_user_path("relative/path.txt").is_err());
+        assert!(validate_user_path("./relative.txt").is_err());
+    }
+
+    #[test]
+    fn rejects_parent_dir() {
+        assert!(validate_user_path("/etc/../passwd").is_err());
+        assert!(validate_user_path("/Users/x/../../etc/passwd").is_err());
+        assert!(validate_user_path("/tmp/foo/..").is_err());
+    }
+
+    #[test]
+    fn accepts_absolute_no_parent() {
+        assert!(validate_user_path("/Users/x/music/backup.json").is_ok());
+        assert!(validate_user_path("/tmp/export.m3u").is_ok());
+        assert!(validate_user_path("/").is_ok());
+    }
 }
