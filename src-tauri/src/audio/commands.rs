@@ -3,6 +3,7 @@ use std::time::{Duration, Instant};
 
 use tauri::{AppHandle, Emitter};
 
+use super::lock_or_recover;
 use super::types::*;
 use super::AudioState;
 
@@ -15,14 +16,14 @@ pub fn player_set_queue(
 ) -> Result<(), String> {
     let arc: AudioState = (*state).clone();
     {
-        let mut s = arc.lock().unwrap();
+        let mut s = lock_or_recover(&arc);
         s.progress_stop.store(true, Ordering::Relaxed);
         let old_handle = s.progress_thread_handle.take();
         drop(s);
         if let Some(handle) = old_handle {
             let _ = handle.join();
         }
-        let mut s = arc.lock().unwrap();
+        let mut s = lock_or_recover(&arc);
         s.progress_stop.store(false, Ordering::Relaxed);
         s.queue = songs;
         s.play_file_at_index(index, Some(&app))?;
@@ -32,7 +33,7 @@ pub fn player_set_queue(
         let _ = app.emit("audio:state_change", &payload);
     }
     let handle = super::start_progress_thread(arc.clone(), app);
-    arc.lock().unwrap().progress_thread_handle = Some(handle);
+    lock_or_recover(&arc).progress_thread_handle = Some(handle);
     Ok(())
 }
 
@@ -114,13 +115,13 @@ pub fn player_set_volume(
 pub fn player_next(app: AppHandle, state: tauri::State<'_, AudioState>) -> Result<(), String> {
     let arc: AudioState = (*state).clone();
     let next = {
-        let s = arc.lock().unwrap();
+        let s = lock_or_recover(&arc);
         s.next_index()
     };
     if let Some(idx) = next {
         let payload;
         {
-            let mut s = arc.lock().unwrap();
+            let mut s = lock_or_recover(&arc);
             s.play_file_at_index(idx, Some(&app))?;
             payload = s.get_state_payload();
         }
@@ -134,7 +135,7 @@ pub fn player_next(app: AppHandle, state: tauri::State<'_, AudioState>) -> Resul
 pub fn player_previous(app: AppHandle, state: tauri::State<'_, AudioState>) -> Result<(), String> {
     let arc: AudioState = (*state).clone();
     let prev = {
-        let s = arc.lock().unwrap();
+        let s = lock_or_recover(&arc);
         if s.queue_index > 0 {
             Some(s.queue_index - 1)
         } else if !s.queue.is_empty() {
@@ -146,7 +147,7 @@ pub fn player_previous(app: AppHandle, state: tauri::State<'_, AudioState>) -> R
     if let Some(idx) = prev {
         let payload;
         {
-            let mut s = arc.lock().unwrap();
+            let mut s = lock_or_recover(&arc);
             s.play_file_at_index(idx, Some(&app))?;
             payload = s.get_state_payload();
         }

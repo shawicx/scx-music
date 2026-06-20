@@ -19,10 +19,24 @@ use std::time::Duration;
 
 use tauri::{AppHandle, Emitter, Manager};
 
+/// 锁定 Mutex，若中毒（panic 后）取出内部数据继续服务，避免连锁 panic。
+/// 音频子系统状态不一致比"整个功能瘫痪"对用户更友好。
+///
+/// 使用策略：
+/// - **进度线程**（本文件 mod.rs）：必须用本函数，线程不能因单次 panic 退出
+/// - **后台/守护逻辑**（如 player_set_queue 等批量操作）：用本函数，保持功能可用
+/// - **单个 IPC 命令**（player_pause/resume/seek 等单步操作）：保留 `.lock().map_err(...)?`，
+///   让前端能感知错误（中毒后用户应看到 toast 而非静默失败）
+pub(crate) fn lock_or_recover<T>(
+    lock: &std::sync::Mutex<T>,
+) -> std::sync::MutexGuard<'_, T> {
+    lock.lock().unwrap_or_else(|e| e.into_inner())
+}
+
 pub type AudioState = Arc<Mutex<AudioStateInner>>;
 
 pub fn start_progress_thread(state: AudioState, app: AppHandle) -> JoinHandle<()> {
-    let stop_flag = state.lock().unwrap().progress_stop.clone();
+    let stop_flag = lock_or_recover(&state).progress_stop.clone();
 
     thread::spawn(move || {
         static FLUSH_COUNTER: AtomicU64 = AtomicU64::new(0);
@@ -39,7 +53,7 @@ pub fn start_progress_thread(state: AudioState, app: AppHandle) -> JoinHandle<()
                 let count = FLUSH_COUNTER.fetch_add(1, Ordering::Relaxed);
                 if count % 60 == 59 {
                     let session_data = {
-                        let s = state.lock().unwrap();
+                        let s = lock_or_recover(&state);
                         s.play_session
                             .as_ref()
                             .map(|sess| (sess.song_id.clone(), sess.song_duration_secs, sess.total_secs(), sess.total_listened_secs))
@@ -56,7 +70,7 @@ pub fn start_progress_thread(state: AudioState, app: AppHandle) -> JoinHandle<()
                                         total_listened_secs: 0.0,
                                     };
                                     if flush_session(&conn, &temp).unwrap_or(false) {
-                                        let mut s = state.lock().unwrap();
+                                        let mut s = lock_or_recover(&state);
                                         if let Some(ref mut sess) = s.play_session {
                                             sess.total_listened_secs = total_listened + total_secs;
                                             sess.accumulated_secs = 0.0;
@@ -71,7 +85,7 @@ pub fn start_progress_thread(state: AudioState, app: AppHandle) -> JoinHandle<()
             }
 
             let (progress, duration, song_ended) = {
-                let s = state.lock().unwrap();
+                let s = lock_or_recover(&state);
                 let playing = s.is_sink_playing();
                 let payload = s.get_state_payload();
                 (
@@ -88,14 +102,14 @@ pub fn start_progress_thread(state: AudioState, app: AppHandle) -> JoinHandle<()
 
             if song_ended {
                 let next = {
-                    let s = state.lock().unwrap();
+                    let s = lock_or_recover(&state);
                     s.next_index()
                 };
 
                 match next {
                     Some(idx) => {
                         let (play_result, new_payload) = {
-                            let mut s = state.lock().unwrap();
+                            let mut s = lock_or_recover(&state);
                             let result = s.play_file_at_index(idx, Some(&app));
                             let payload = s.get_state_payload();
                             (result, payload)
@@ -111,7 +125,7 @@ pub fn start_progress_thread(state: AudioState, app: AppHandle) -> JoinHandle<()
                         }
                     }
                     None => {
-                        let mut s = state.lock().unwrap();
+                        let mut s = lock_or_recover(&state);
                         s.stop_internal(Some(&app));
                         let payload = s.get_state_payload();
                         drop(s);

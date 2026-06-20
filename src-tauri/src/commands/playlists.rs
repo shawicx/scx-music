@@ -27,7 +27,7 @@ pub fn create_playlist(db: tauri::State<'_, Db>, name: String) -> Result<Playlis
     let conn = db.0.lock().map_err(|e| e.to_string())?;
     let id = format!("pl-{}", std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
+        .unwrap_or_default()
         .as_millis());
     let sort_order: i64 = conn
         .query_row("SELECT COALESCE(MAX(sort_order), -1) + 1 FROM playlists", [], |row| row.get(0))
