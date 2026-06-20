@@ -2,6 +2,7 @@ use serde::Serialize;
 use tauri::State;
 
 use crate::db::Db;
+use rusqlite::types::Value as SqlValue;
 
 // ── Library stats ──────────────────────────────────────────────────────────
 
@@ -232,25 +233,26 @@ pub struct DayDuration {
     pub duration_secs: f64,
 }
 
-/// 支持「滚动窗口」(range) 和「绝对日期」(start/end) 两种过滤模式。
+/// 时间过滤的 SQL 片段与对应绑定参数。
+/// 支持「滚动窗口」(range) 和「绝对日期」(start/end) 两种模式。
 /// 报告 Tab 传 start/end（自然周期），统计 Tab 传 range（滚动窗口）。
 fn build_time_filter(
     range: Option<&str>,
     start: Option<&str>,
     end: Option<&str>,
-) -> String {
-    // 优先使用绝对日期（报告模式）
+) -> (String, Vec<SqlValue>) {
+    // 优先使用绝对日期（报告模式）—— 参数化绑定防 SQL 注入
     if let (Some(s), Some(e)) = (start, end) {
-        return format!(
-            "AND ph.played_at >= '{}' AND ph.played_at < '{}'",
-            s, e
+        return (
+            "AND ph.played_at >= ? AND ph.played_at < ?".to_string(),
+            vec![SqlValue::Text(s.to_string()), SqlValue::Text(e.to_string())],
         );
     }
-    // 回退到滚动窗口（现有 StatsView 模式）
+    // 回退到滚动窗口（现有 StatsView 模式，无需参数）
     match range {
-        Some("7d") => "AND ph.played_at >= datetime('now', '-7 days')".to_string(),
-        Some("30d") => "AND ph.played_at >= datetime('now', '-30 days')".to_string(),
-        _ => String::new(),
+        Some("7d") => ("AND ph.played_at >= datetime('now', '-7 days')".to_string(), vec![]),
+        Some("30d") => ("AND ph.played_at >= datetime('now', '-30 days')".to_string(), vec![]),
+        _ => (String::new(), vec![]),
     }
 }
 
@@ -262,31 +264,37 @@ pub fn stats_listening_overview(
     db: State<'_, Db>,
 ) -> Result<ListeningOverview, String> {
     let conn = db.0.lock().map_err(|e| e.to_string())?;
-    let filter = build_time_filter(range.as_deref(), start.as_deref(), end.as_deref());
+    let (filter_sql, filter_params) = build_time_filter(range.as_deref(), start.as_deref(), end.as_deref());
 
+    // 修正：play_count 改为从 play_history 派生，与其他 4 个指标一致地参与时间过滤
     let play_count: i64 = conn.query_row(
-        "SELECT COALESCE(SUM(play_count), 0) FROM songs",
-        [], |r| r.get(0),
+        &format!("SELECT COUNT(*) FROM play_history ph WHERE 1=1 {}", filter_sql),
+        rusqlite::params_from_iter(filter_params.iter()),
+        |r| r.get(0),
     ).unwrap_or(0);
 
     let total_duration_secs: f64 = conn.query_row(
-        &format!("SELECT COALESCE(SUM(ph.duration_secs), 0) FROM play_history ph WHERE 1=1 {}", filter),
-        [], |r| r.get(0),
+        &format!("SELECT COALESCE(SUM(ph.duration_secs), 0) FROM play_history ph WHERE 1=1 {}", filter_sql),
+        rusqlite::params_from_iter(filter_params.iter()),
+        |r| r.get(0),
     ).unwrap_or(0.0);
 
     let genre_count: i64 = conn.query_row(
-        &format!("SELECT COUNT(DISTINCT s.genre) FROM play_history ph JOIN songs s ON s.id = ph.song_id WHERE s.genre != '' {}", filter),
-        [], |r| r.get(0),
+        &format!("SELECT COUNT(DISTINCT s.genre) FROM play_history ph JOIN songs s ON s.id = ph.song_id WHERE s.genre != '' {}", filter_sql),
+        rusqlite::params_from_iter(filter_params.iter()),
+        |r| r.get(0),
     ).unwrap_or(0);
 
     let artist_count: i64 = conn.query_row(
-        &format!("SELECT COUNT(DISTINCT s.artist) FROM play_history ph JOIN songs s ON s.id = ph.song_id WHERE s.artist NOT IN ('Unknown Artist', '') {}", filter),
-        [], |r| r.get(0),
+        &format!("SELECT COUNT(DISTINCT s.artist) FROM play_history ph JOIN songs s ON s.id = ph.song_id WHERE s.artist NOT IN ('Unknown Artist', '') {}", filter_sql),
+        rusqlite::params_from_iter(filter_params.iter()),
+        |r| r.get(0),
     ).unwrap_or(0);
 
     let unique_song_count: i64 = conn.query_row(
-        &format!("SELECT COUNT(DISTINCT ph.song_id) FROM play_history ph WHERE 1=1 {}", filter),
-        [], |r| r.get(0),
+        &format!("SELECT COUNT(DISTINCT ph.song_id) FROM play_history ph WHERE 1=1 {}", filter_sql),
+        rusqlite::params_from_iter(filter_params.iter()),
+        |r| r.get(0),
     ).unwrap_or(0);
 
     Ok(ListeningOverview { play_count, total_duration_secs, genre_count, artist_count, unique_song_count })
@@ -300,15 +308,16 @@ pub fn stats_top_songs(
 ) -> Result<Vec<TopSong>, String> {
     let conn = db.0.lock().map_err(|e| e.to_string())?;
     let limit = limit.unwrap_or(10);
-    let filter = build_time_filter(range.as_deref(), None, None);
+    let (filter_sql, mut filter_params) = build_time_filter(range.as_deref(), None, None);
 
     let mut stmt = conn.prepare(&format!(
-        "SELECT s.id, s.title, s.artist, s.play_count, COALESCE(SUM(ph.duration_secs), 0) as dur
+        "SELECT s.id, s.title, s.artist, COUNT(*) as play_count, COALESCE(SUM(ph.duration_secs), 0) as dur
          FROM play_history ph JOIN songs s ON s.id = ph.song_id WHERE 1=1 {}
-         GROUP BY s.id ORDER BY dur DESC LIMIT ?", filter
+         GROUP BY s.id ORDER BY dur DESC LIMIT ?", filter_sql
     )).map_err(|e| e.to_string())?;
 
-    let rows: Vec<TopSong> = stmt.query_map(rusqlite::params![limit], |row| {
+    filter_params.push(SqlValue::Integer(limit));
+    let rows: Vec<TopSong> = stmt.query_map(rusqlite::params_from_iter(filter_params.iter()), |row| {
         Ok(TopSong {
             song_id: row.get(0)?, title: row.get(1)?, artist: row.get(2)?,
             play_count: row.get(3)?, total_duration_secs: row.get(4)?,
@@ -325,15 +334,16 @@ pub fn stats_top_artists(
 ) -> Result<Vec<TopArtist>, String> {
     let conn = db.0.lock().map_err(|e| e.to_string())?;
     let limit = limit.unwrap_or(10);
-    let filter = build_time_filter(range.as_deref(), None, None);
+    let (filter_sql, mut filter_params) = build_time_filter(range.as_deref(), None, None);
 
     let mut stmt = conn.prepare(&format!(
-        "SELECT s.artist, SUM(s.play_count) as cnt, COALESCE(SUM(ph.duration_secs), 0) as dur, COUNT(DISTINCT s.id) as songs
+        "SELECT s.artist, COUNT(*) as cnt, COALESCE(SUM(ph.duration_secs), 0) as dur, COUNT(DISTINCT s.id) as songs
          FROM play_history ph JOIN songs s ON s.id = ph.song_id WHERE s.artist NOT IN ('Unknown Artist', '') {}
-         GROUP BY s.artist ORDER BY dur DESC LIMIT ?", filter
+         GROUP BY s.artist ORDER BY dur DESC LIMIT ?", filter_sql
     )).map_err(|e| e.to_string())?;
 
-    let rows: Vec<TopArtist> = stmt.query_map(rusqlite::params![limit], |row| {
+    filter_params.push(SqlValue::Integer(limit));
+    let rows: Vec<TopArtist> = stmt.query_map(rusqlite::params_from_iter(filter_params.iter()), |row| {
         Ok(TopArtist {
             artist: row.get(0)?, play_count: row.get(1)?,
             total_duration_secs: row.get(2)?, song_count: row.get(3)?,
@@ -348,15 +358,15 @@ pub fn stats_genre_distribution(
     db: State<'_, Db>,
 ) -> Result<Vec<GenreDuration>, String> {
     let conn = db.0.lock().map_err(|e| e.to_string())?;
-    let filter = build_time_filter(range.as_deref(), None, None);
+    let (filter_sql, filter_params) = build_time_filter(range.as_deref(), None, None);
 
     let mut stmt = conn.prepare(&format!(
         "SELECT COALESCE(NULLIF(s.genre, ''), 'Unknown') as genre, SUM(ph.duration_secs) as dur
          FROM play_history ph JOIN songs s ON s.id = ph.song_id WHERE 1=1 {}
-         GROUP BY genre ORDER BY dur DESC", filter
+         GROUP BY genre ORDER BY dur DESC", filter_sql
     )).map_err(|e| e.to_string())?;
 
-    let rows: Vec<GenreDuration> = stmt.query_map([], |row| {
+    let rows: Vec<GenreDuration> = stmt.query_map(rusqlite::params_from_iter(filter_params.iter()), |row| {
         Ok(GenreDuration { genre: row.get(0)?, duration_secs: row.get(1)? })
     }).map_err(|e| e.to_string())?.collect::<Result<Vec<_>, _>>().map_err(|e| e.to_string())?;
     Ok(rows)
@@ -368,14 +378,14 @@ pub fn stats_trend(
     db: State<'_, Db>,
 ) -> Result<Vec<DayDuration>, String> {
     let conn = db.0.lock().map_err(|e| e.to_string())?;
-    let filter = build_time_filter(range.as_deref(), None, None);
+    let (filter_sql, filter_params) = build_time_filter(range.as_deref(), None, None);
 
     let mut stmt = conn.prepare(&format!(
         "SELECT DATE(ph.played_at) as day, SUM(ph.duration_secs) as dur
-         FROM play_history ph WHERE 1=1 {} GROUP BY day ORDER BY day", filter
+         FROM play_history ph WHERE 1=1 {} GROUP BY day ORDER BY day", filter_sql
     )).map_err(|e| e.to_string())?;
 
-    let rows: Vec<DayDuration> = stmt.query_map([], |row| {
+    let rows: Vec<DayDuration> = stmt.query_map(rusqlite::params_from_iter(filter_params.iter()), |row| {
         Ok(DayDuration { date: row.get(0)?, duration_secs: row.get(1)? })
     }).map_err(|e| e.to_string())?.collect::<Result<Vec<_>, _>>().map_err(|e| e.to_string())?;
     Ok(rows)
