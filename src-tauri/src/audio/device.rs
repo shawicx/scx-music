@@ -4,6 +4,7 @@ use tauri::{AppHandle, Emitter};
 
 use super::types::*;
 use super::AudioState;
+use crate::error::AppResult;
 
 /// Try to create an OutputStream for the given device.
 /// Falls back to enumerating supported configs if default_output_config() fails
@@ -67,7 +68,7 @@ pub(super) fn try_build_hardcoded_stream(
     Err(rodio::StreamError::NoDevice)
 }
 
-pub(super) fn find_device_by_name(name: &str) -> Result<rodio::cpal::Device, String> {
+pub(super) fn find_device_by_name(name: &str) -> AppResult<rodio::cpal::Device> {
     use rodio::cpal::traits::{DeviceTrait, HostTrait};
     let host = rodio::cpal::default_host();
 
@@ -82,13 +83,13 @@ pub(super) fn find_device_by_name(name: &str) -> Result<rodio::cpal::Device, Str
         .map_err(|e| format!("Device enumeration error: {}", e))?;
     all_devices
         .find(|d| d.name().ok().as_deref() == Some(name))
-        .ok_or_else(|| format!("Device '{}' not found", name))
+        .ok_or_else(|| format!("Device '{}' not found", name).into())
 }
 
 // ---- Tauri Commands ----
 
 #[tauri::command]
-pub fn player_get_output_devices() -> Result<AudioDevicesResponse, String> {
+pub fn player_get_output_devices() -> AppResult<AudioDevicesResponse> {
     use rodio::cpal::traits::DeviceTrait;
     let host = rodio::cpal::default_host();
     let default_name = host.default_output_device().and_then(|d| d.name().ok());
@@ -121,7 +122,7 @@ pub fn player_set_output_device(
     state: tauri::State<'_, AudioState>,
     db: tauri::State<'_, crate::db::Db>,
     device_name: Option<String>,
-) -> Result<(), String> {
+) -> AppResult<()> {
     if let Some(ref name) = device_name {
         let device = find_device_by_name(name)?;
         match try_output_stream_for_device(&device) {
@@ -130,7 +131,7 @@ pub fn player_set_output_device(
                 drop(_handle);
             }
             Err(e) => {
-                return Err(format!("无法使用设备「{}」: {}", name, e));
+                return Err(format!("无法使用设备「{}」: {}", name, e).into());
             }
         }
     }
@@ -141,8 +142,7 @@ pub fn player_set_output_device(
         conn.execute(
             "INSERT OR REPLACE INTO settings (key, value) VALUES (?1, ?2)",
             rusqlite::params!["output_device", value],
-        )
-        .map_err(|e| e.to_string())?;
+        )?;
     }
 
     let arc: AudioState = (*state).clone();
@@ -159,7 +159,7 @@ pub fn player_set_output_device(
 #[tauri::command]
 pub fn player_get_current_device(
     state: tauri::State<'_, AudioState>,
-) -> Result<Option<String>, String> {
+) -> AppResult<Option<String>> {
     let s = state.lock().map_err(|e| e.to_string())?;
     Ok(s.output_device_name.clone())
 }

@@ -2,6 +2,9 @@ mod analyzer;
 mod audio;
 mod commands;
 mod db;
+mod error;
+
+pub use error::{AppError, AppResult};
 
 use sha2::{Sha256, Digest};
 use std::sync::{Arc, Mutex};
@@ -30,26 +33,59 @@ struct SongEntry {
     file_size: u64,
 }
 
+/// 递归深度上限：防止循环符号链接或异常深层目录导致栈溢出。
+/// 16 层覆盖正常音乐库（罕见深于 16 层）。
+const MAX_RECURSION_DEPTH: usize = 16;
+/// 扫描文件总数上限：防止超大目录卡死扫描。超出静默截断。
+const MAX_FILES_TOTAL: usize = 50_000;
+
 #[tauri::command]
-fn scan_music_folder(dir_path: String) -> Result<Vec<SongEntry>, String> {
+fn scan_music_folder(dir_path: String) -> AppResult<Vec<SongEntry>> {
     let path = Path::new(&dir_path);
     if !path.is_dir() {
-        return Err("路径不是文件夹".to_string());
+        return Err(AppError::InvalidArgument("路径不是文件夹".to_string()));
     }
 
     let audio_exts = ["mp3", "flac", "wav", "aac", "ogg", "m4a", "opus", "wma"];
     let mut files = Vec::new();
-    scan_dir(path, &audio_exts, &mut files)?;
+    let mut counter = 0usize;
+    scan_dir(path, &audio_exts, &mut files, 0, &mut counter)?;
     Ok(files)
 }
 
-fn scan_dir(dir: &Path, exts: &[&str], files: &mut Vec<SongEntry>) -> Result<(), String> {
-    for entry in fs::read_dir(dir).map_err(|e| e.to_string())? {
-        let entry = entry.map_err(|e| e.to_string())?;
+fn scan_dir(
+    dir: &Path,
+    exts: &[&str],
+    files: &mut Vec<SongEntry>,
+    depth: usize,
+    counter: &mut usize,
+) -> AppResult<()> {
+    // 深度上限：超过即停止递归（防止循环符号链接 / 异常深层目录）
+    if depth > MAX_RECURSION_DEPTH {
+        return Ok(());
+    }
+    // 总数上限：达到即停止扫描（防止超大目录卡死）
+    if *counter >= MAX_FILES_TOTAL {
+        return Ok(());
+    }
+
+    for entry in fs::read_dir(dir)? {
+        let entry = entry?;
         let path = entry.path();
 
-        if path.is_dir() {
-            scan_dir(&path, exts, files)?;
+        // 用 symlink_metadata（不跟随符号链接）判断类型，跳过符号链接，
+        // 避免循环符号链接导致的无限递归。
+        let meta = fs::symlink_metadata(&path)?;
+        if meta.file_type().is_symlink() {
+            continue;
+        }
+
+        if meta.is_dir() {
+            scan_dir(&path, exts, files, depth + 1, counter)?;
+            continue;
+        }
+
+        if !meta.is_file() {
             continue;
         }
 
@@ -63,6 +99,16 @@ fn scan_dir(dir: &Path, exts: &[&str], files: &mut Vec<SongEntry>) -> Result<(),
             continue;
         }
 
+        // 总数上限：超出截断并退出
+        if *counter >= MAX_FILES_TOTAL {
+            eprintln!(
+                "[scan] reached MAX_FILES_TOTAL={}, truncating",
+                MAX_FILES_TOTAL
+            );
+            break;
+        }
+        *counter += 1;
+
         let file_path = path.to_string_lossy().to_string();
         let file_stem = path
             .file_stem()
@@ -71,7 +117,7 @@ fn scan_dir(dir: &Path, exts: &[&str], files: &mut Vec<SongEntry>) -> Result<(),
             .to_string();
 
         let (title, artist, album, duration_secs, genre) = extract_metadata(&path);
-        let file_size = fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
+        let file_size = meta.len();
         let quality = match ext.as_str() {
             "flac" => "FLAC".to_string(),
             "mp3" => "MP3".to_string(),

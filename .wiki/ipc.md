@@ -49,7 +49,7 @@ const result = await invokeCommand('command_name', { param: value })
 | **文件扫描** | | | |
 | `scan_music_folder` | stores/library.ts | lib.rs | 扫描音乐文件夹 |
 | **启动加载** | | | |
-| `get_bootstrap_data` | stores/library.ts | commands/bootstrap.rs | 单次加载全部应用数据 |
+| `get_bootstrap_data` | stores/library.ts | commands/bootstrap.rs | 单次加载全部应用数据（2026-06-21：playlist_songs 改单条查询 + Rust 侧 HashMap 分组，消除 N+1 prepare） |
 | **歌词** | | | |
 | `get_lyrics` | composables/useLyrics.ts | commands/lyrics.rs | 获取歌词 (缓存→内嵌→LRCLIB) |
 | `refresh_lyrics` | - | commands/lyrics.rs | 强制刷新歌词 |
@@ -224,13 +224,29 @@ App.vue onMounted
 |------|------|---------|------|
 | `shortcut-triggered` | Rust → 前端 | `String`（action_id） | 全局快捷键被按下时由 OS 回调触发，前端按 action_id 路由到对应 handler |
 
+## 错误返回（2026-06-21 重构）
+
+所有命令的 `Err` 分支返回 `AppError` 结构体（序列化为 `{"type": "...", "message": "..."}`），
+不再返回字符串。前端 `utils/errorHandler.ts::AppInvokeError` 保留 type 字段供分类处理。
+
+AppError variants：
+- `FileOperation` - 文件 IO 错误
+- `Database` - SQLite 错误
+- `AudioParse` / `AudioPlayback` - 音频相关
+- `DeviceNotFound` - 音频设备不存在
+- `UnsupportedFormat` - 不支持的音频格式
+- `InvalidArgument` - 参数校验失败（如 settings key 白名单、路径校验）
+- `OperationFailed` - 其他操作失败（含网络错误、JSON 解析、String 桥接等）
+
+**注意**：`audio:error` 事件仍发送字符串（兼容既有监听），仅命令 reject 走结构化 AppError。
+
 ## 错误处理
 
 所有 IPC 调用都通过 `utils/errorHandler.ts` 统一处理：
 
-- **invokeCommand** - 带错误消息的调用
-- **safeInvoke** - 返回 Result 类型
-- **batchInvoke** - 批量调用
+- **invokeCommand** - 带错误消息的调用，失败时抛 `AppInvokeError`（保留原始 `{type, message}` payload，可用 `isAppInvokeError(e)` + `e.errorType` 分类处理）
+- **safeInvoke** - 返回 Result 类型（`{error: message}` 兼容旧调用方）
+- **batchInvoke** - 批量调用，错误收集为 `{command, error: message}`
 - **retry** - 重试机制
 
 ## 参数签名变化

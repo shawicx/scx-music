@@ -2,6 +2,7 @@ use serde::Serialize;
 use tauri::State;
 
 use crate::db::Db;
+use crate::error::AppResult;
 use rusqlite::types::Value as SqlValue;
 
 // ── Library stats ──────────────────────────────────────────────────────────
@@ -59,38 +60,38 @@ pub struct DurationBucket {
 }
 
 #[tauri::command]
-pub fn get_library_stats(db: tauri::State<'_, Db>) -> Result<LibraryStats, String> {
+pub fn get_library_stats(db: tauri::State<'_, Db>) -> AppResult<LibraryStats> {
     let conn = db.0.lock().map_err(|e| e.to_string())?;
 
     let total_songs: i64 = conn
         .query_row("SELECT COUNT(*) FROM songs", [], |r| r.get(0))
-        .map_err(|e| e.to_string())?;
+        ?;
     let total_artists: i64 = conn
         .query_row("SELECT COUNT(DISTINCT artist) FROM songs WHERE artist NOT IN ('Unknown Artist', '')", [], |r| r.get(0))
-        .map_err(|e| e.to_string())?;
+        ?;
     let total_albums: i64 = conn
         .query_row("SELECT COUNT(DISTINCT album) FROM songs WHERE album NOT IN ('Unknown Album', '')", [], |r| r.get(0))
-        .map_err(|e| e.to_string())?;
+        ?;
     let total_duration_secs: f64 = conn
         .query_row(
             "SELECT COALESCE(SUM(duration_secs), 0) FROM songs",
             [],
             |r| r.get(0),
         )
-        .map_err(|e| e.to_string())?;
+        ?;
     let total_file_size: i64 = conn
         .query_row(
             "SELECT COALESCE(SUM(file_size), 0) FROM songs",
             [],
             |r| r.get(0),
         )
-        .map_err(|e| e.to_string())?;
+        ?;
 
     let mut stmt = conn
         .prepare(
             "SELECT artist, COUNT(*) as cnt, SUM(duration_secs) as dur FROM songs WHERE artist NOT IN ('Unknown Artist', '') GROUP BY artist ORDER BY cnt DESC LIMIT 20",
         )
-        .map_err(|e| e.to_string())?;
+        ?;
     let artist_ranking = stmt
         .query_map([], |row| {
             Ok(ArtistCount {
@@ -99,15 +100,15 @@ pub fn get_library_stats(db: tauri::State<'_, Db>) -> Result<LibraryStats, Strin
                 total_duration_secs: row.get(2)?,
             })
         })
-        .map_err(|e| e.to_string())?
+        ?
         .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| e.to_string())?;
+        ?;
 
     let mut stmt = conn
         .prepare(
             "SELECT album, artist, COUNT(*) as cnt FROM songs WHERE album NOT IN ('Unknown Album', '') AND artist NOT IN ('Unknown Artist', '') GROUP BY album, artist ORDER BY cnt DESC LIMIT 20",
         )
-        .map_err(|e| e.to_string())?;
+        ?;
     let album_ranking = stmt
         .query_map([], |row| {
             Ok(AlbumCount {
@@ -116,15 +117,15 @@ pub fn get_library_stats(db: tauri::State<'_, Db>) -> Result<LibraryStats, Strin
                 song_count: row.get(2)?,
             })
         })
-        .map_err(|e| e.to_string())?
+        ?
         .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| e.to_string())?;
+        ?;
 
     let mut stmt = conn
         .prepare(
             "SELECT COALESCE(NULLIF(genre, ''), 'Unknown') as genre, COUNT(*) as cnt FROM songs GROUP BY genre ORDER BY cnt DESC",
         )
-        .map_err(|e| e.to_string())?;
+        ?;
     let genre_distribution = stmt
         .query_map([], |row| {
             Ok(GenreCount {
@@ -132,15 +133,15 @@ pub fn get_library_stats(db: tauri::State<'_, Db>) -> Result<LibraryStats, Strin
                 song_count: row.get(1)?,
             })
         })
-        .map_err(|e| e.to_string())?
+        ?
         .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| e.to_string())?;
+        ?;
 
     let mut stmt = conn
         .prepare(
             "SELECT quality, COUNT(*) as cnt FROM songs GROUP BY quality ORDER BY cnt DESC",
         )
-        .map_err(|e| e.to_string())?;
+        ?;
     let quality_distribution = stmt
         .query_map([], |row| {
             Ok(QualityCount {
@@ -148,9 +149,9 @@ pub fn get_library_stats(db: tauri::State<'_, Db>) -> Result<LibraryStats, Strin
                 song_count: row.get(1)?,
             })
         })
-        .map_err(|e| e.to_string())?
+        ?
         .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| e.to_string())?;
+        ?;
 
     let mut stmt = conn
         .prepare(
@@ -162,7 +163,7 @@ pub fn get_library_stats(db: tauri::State<'_, Db>) -> Result<LibraryStats, Strin
             END as bucket, COUNT(*) as cnt
             FROM songs GROUP BY bucket ORDER BY MIN(duration_secs)",
         )
-        .map_err(|e| e.to_string())?;
+        ?;
     let duration_distribution = stmt
         .query_map([], |row| {
             Ok(DurationBucket {
@@ -170,9 +171,9 @@ pub fn get_library_stats(db: tauri::State<'_, Db>) -> Result<LibraryStats, Strin
                 song_count: row.get(1)?,
             })
         })
-        .map_err(|e| e.to_string())?
+        ?
         .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| e.to_string())?;
+        ?;
 
     Ok(LibraryStats {
         total_songs,
@@ -262,7 +263,7 @@ pub fn stats_listening_overview(
     start: Option<String>,
     end: Option<String>,
     db: State<'_, Db>,
-) -> Result<ListeningOverview, String> {
+) -> AppResult<ListeningOverview> {
     let conn = db.0.lock().map_err(|e| e.to_string())?;
     let (filter_sql, filter_params) = build_time_filter(range.as_deref(), start.as_deref(), end.as_deref());
 
@@ -305,7 +306,7 @@ pub fn stats_top_songs(
     range: Option<String>,
     limit: Option<i64>,
     db: State<'_, Db>,
-) -> Result<Vec<TopSong>, String> {
+) -> AppResult<Vec<TopSong>> {
     let conn = db.0.lock().map_err(|e| e.to_string())?;
     let limit = limit.unwrap_or(10);
     let (filter_sql, mut filter_params) = build_time_filter(range.as_deref(), None, None);
@@ -314,7 +315,7 @@ pub fn stats_top_songs(
         "SELECT s.id, s.title, s.artist, COUNT(*) as play_count, COALESCE(SUM(ph.duration_secs), 0) as dur
          FROM play_history ph JOIN songs s ON s.id = ph.song_id WHERE 1=1 {}
          GROUP BY s.id ORDER BY dur DESC LIMIT ?", filter_sql
-    )).map_err(|e| e.to_string())?;
+    ))?;
 
     filter_params.push(SqlValue::Integer(limit));
     let rows: Vec<TopSong> = stmt.query_map(rusqlite::params_from_iter(filter_params.iter()), |row| {
@@ -322,7 +323,7 @@ pub fn stats_top_songs(
             song_id: row.get(0)?, title: row.get(1)?, artist: row.get(2)?,
             play_count: row.get(3)?, total_duration_secs: row.get(4)?,
         })
-    }).map_err(|e| e.to_string())?.collect::<Result<Vec<_>, _>>().map_err(|e| e.to_string())?;
+    })?.collect::<Result<Vec<_>, _>>()?;
     Ok(rows)
 }
 
@@ -331,7 +332,7 @@ pub fn stats_top_artists(
     range: Option<String>,
     limit: Option<i64>,
     db: State<'_, Db>,
-) -> Result<Vec<TopArtist>, String> {
+) -> AppResult<Vec<TopArtist>> {
     let conn = db.0.lock().map_err(|e| e.to_string())?;
     let limit = limit.unwrap_or(10);
     let (filter_sql, mut filter_params) = build_time_filter(range.as_deref(), None, None);
@@ -340,7 +341,7 @@ pub fn stats_top_artists(
         "SELECT s.artist, COUNT(*) as cnt, COALESCE(SUM(ph.duration_secs), 0) as dur, COUNT(DISTINCT s.id) as songs
          FROM play_history ph JOIN songs s ON s.id = ph.song_id WHERE s.artist NOT IN ('Unknown Artist', '') {}
          GROUP BY s.artist ORDER BY dur DESC LIMIT ?", filter_sql
-    )).map_err(|e| e.to_string())?;
+    ))?;
 
     filter_params.push(SqlValue::Integer(limit));
     let rows: Vec<TopArtist> = stmt.query_map(rusqlite::params_from_iter(filter_params.iter()), |row| {
@@ -348,7 +349,7 @@ pub fn stats_top_artists(
             artist: row.get(0)?, play_count: row.get(1)?,
             total_duration_secs: row.get(2)?, song_count: row.get(3)?,
         })
-    }).map_err(|e| e.to_string())?.collect::<Result<Vec<_>, _>>().map_err(|e| e.to_string())?;
+    })?.collect::<Result<Vec<_>, _>>()?;
     Ok(rows)
 }
 
@@ -356,7 +357,7 @@ pub fn stats_top_artists(
 pub fn stats_genre_distribution(
     range: Option<String>,
     db: State<'_, Db>,
-) -> Result<Vec<GenreDuration>, String> {
+) -> AppResult<Vec<GenreDuration>> {
     let conn = db.0.lock().map_err(|e| e.to_string())?;
     let (filter_sql, filter_params) = build_time_filter(range.as_deref(), None, None);
 
@@ -364,11 +365,11 @@ pub fn stats_genre_distribution(
         "SELECT COALESCE(NULLIF(s.genre, ''), 'Unknown') as genre, SUM(ph.duration_secs) as dur
          FROM play_history ph JOIN songs s ON s.id = ph.song_id WHERE 1=1 {}
          GROUP BY genre ORDER BY dur DESC", filter_sql
-    )).map_err(|e| e.to_string())?;
+    ))?;
 
     let rows: Vec<GenreDuration> = stmt.query_map(rusqlite::params_from_iter(filter_params.iter()), |row| {
         Ok(GenreDuration { genre: row.get(0)?, duration_secs: row.get(1)? })
-    }).map_err(|e| e.to_string())?.collect::<Result<Vec<_>, _>>().map_err(|e| e.to_string())?;
+    })?.collect::<Result<Vec<_>, _>>()?;
     Ok(rows)
 }
 
@@ -376,34 +377,34 @@ pub fn stats_genre_distribution(
 pub fn stats_trend(
     range: Option<String>,
     db: State<'_, Db>,
-) -> Result<Vec<DayDuration>, String> {
+) -> AppResult<Vec<DayDuration>> {
     let conn = db.0.lock().map_err(|e| e.to_string())?;
     let (filter_sql, filter_params) = build_time_filter(range.as_deref(), None, None);
 
     let mut stmt = conn.prepare(&format!(
         "SELECT DATE(ph.played_at) as day, SUM(ph.duration_secs) as dur
          FROM play_history ph WHERE 1=1 {} GROUP BY day ORDER BY day", filter_sql
-    )).map_err(|e| e.to_string())?;
+    ))?;
 
     let rows: Vec<DayDuration> = stmt.query_map(rusqlite::params_from_iter(filter_params.iter()), |row| {
         Ok(DayDuration { date: row.get(0)?, duration_secs: row.get(1)? })
-    }).map_err(|e| e.to_string())?.collect::<Result<Vec<_>, _>>().map_err(|e| e.to_string())?;
+    })?.collect::<Result<Vec<_>, _>>()?;
     Ok(rows)
 }
 
 #[tauri::command]
-pub fn stats_heatmap(db: State<'_, Db>) -> Result<Vec<DayDuration>, String> {
+pub fn stats_heatmap(db: State<'_, Db>) -> AppResult<Vec<DayDuration>> {
     let conn = db.0.lock().map_err(|e| e.to_string())?;
 
     let mut stmt = conn.prepare(
         "SELECT DATE(ph.played_at) as day, SUM(ph.duration_secs) as dur
          FROM play_history ph WHERE ph.played_at >= datetime('now', '-365 days')
          GROUP BY day ORDER BY day"
-    ).map_err(|e| e.to_string())?;
+    )?;
 
     let rows: Vec<DayDuration> = stmt.query_map([], |row| {
         Ok(DayDuration { date: row.get(0)?, duration_secs: row.get(1)? })
-    }).map_err(|e| e.to_string())?.collect::<Result<Vec<_>, _>>().map_err(|e| e.to_string())?;
+    })?.collect::<Result<Vec<_>, _>>()?;
     Ok(rows)
 }
 
@@ -419,7 +420,7 @@ pub fn stats_hourly_distribution(
     start: String,
     end: String,
     db: State<'_, Db>,
-) -> Result<Vec<HourDuration>, String> {
+) -> AppResult<Vec<HourDuration>> {
     let conn = db.0.lock().map_err(|e| e.to_string())?;
 
     let mut stmt = conn.prepare(
@@ -428,7 +429,7 @@ pub fn stats_hourly_distribution(
          FROM play_history ph
          WHERE ph.played_at >= ?1 AND ph.played_at < ?2
          GROUP BY hour ORDER BY hour"
-    ).map_err(|e| e.to_string())?;
+    )?;
 
     let rows: Vec<HourDuration> = stmt
         .query_map(rusqlite::params![start, end], |row| {
@@ -437,8 +438,8 @@ pub fn stats_hourly_distribution(
                 duration_secs: row.get(1)?,
             })
         })
-        .map_err(|e| e.to_string())?
+        ?
         .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| e.to_string())?;
+        ?;
     Ok(rows)
 }

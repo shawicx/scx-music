@@ -120,7 +120,7 @@ pub fn start_progress_thread(state: AudioState, app: AppHandle) -> JoinHandle<()
                                 let _ = app.emit("audio:state_change", &new_payload);
                             }
                             Err(e) => {
-                                let _ = app.emit("audio:error", e);
+                                let _ = app.emit("audio:error", e.to_string());
                             }
                         }
                     }

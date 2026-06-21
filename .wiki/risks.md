@@ -18,7 +18,7 @@
 ### 文件扫描
 **风险：** `scan_music_folder` 递归扫描大型文件夹可能阻塞
 **影响：** UI 冻结
-**缓解：** 目前在主线程，未来可改为异步
+**缓解：** 目前在主线程，未来可改为异步。**2026-06-21：** 加递归深度上限 16、文件总数上限 50000、跳过符号链接（`symlink_metadata`），防止循环符号链接栈溢出和超大目录卡死
 
 ### 数据库操作
 **风险：** 大批量 upsert 可能阻塞
@@ -82,6 +82,30 @@
 ### useDesktopLyrics lyrics 实例缓存
 **风险点：** `useDesktopLyrics` 在 lyrics 窗口内调用 `useLyrics(currentSong)`，每次调用 useDesktopLyrics 都会新建 useLyrics 实例（叠加多个 audio:progress 监听）
 **缓解：** `lyricsInstance` 模块级缓存，仅在 lyrics 窗口首次调用时创建 useLyrics 实例。`currentSong` 是模块级 ref，lyrics 实例的 `watch(currentSong)` 只注册一次
+
+## P1 后端健壮性（2026-06-21）
+
+本次修复了后端架构债务 + 5 项命令级健壮性问题。详细 spec/plan 见 `docs/superpowers/specs|plans/2026-06-21-p1-backend-robustness-*.md`。
+
+### AppError 全量迁移（架构债务）
+**风险点：** `error.rs` 的 `AppError`/`AppResult` 曾是死代码（未编译进 crate），50+ 命令返回 `Result<T, String>` 用 `.map_err(|e| e.to_string())?` 样板
+**缓解：** 启用 `mod error` + `serde::Serialize`，全量迁移 commands/*.rs 和 audio/*.rs 到 `AppResult`。`From<String>/From<io::Error>/From<rusqlite::Error>/From<serde_json::Error>` 自动转换让 `?` 直接工作。前端 `errorHandler.ts` 适配 `{type, message}` 结构（`AppInvokeError` 类保留 payload 供分类处理）
+
+### rename_song 原子性
+**风险点：** `rename_song` 6 步操作无事务，文件重命名成功后 DB 更新失败导致文件找不到；Lofty 写失败静默跳过
+**缓解：** DB UPDATE 包裹在 `conn.transaction()` 内；若 DB 失败且文件已重命名，best-effort 回滚文件名（`rename(new→old)`，失败打日志含两路径）；Lofty 读/写失败显式报错（不再静默跳过）
+
+### fetch_lrclib 错误区分
+**风险点：** `fetch_lrclib` 曾把所有错误 `.ok()?` 吞掉返回 `None`，前端把 `source='none'` 缓存 —— 一次网络抖动后这首歌歌词永久被判无
+**缓解：** 区分「无歌词」（HTTP 200 空结果 → `Ok(None)`，缓存 `source='none'`）和「网络错误」（请求失败/非 2xx/JSON 解析失败 → `Err(AppError)`，不缓存，向上传播让用户可重试）。模块级 `OnceLock<reqwest::Client>` 10s 超时
+
+### scan_music_folder 递归防护
+**风险点：** `scan_music_folder` 递归无深度上限，跟随符号链接，无文件数上限 —— 循环符号链接可致栈溢出，超大目录可卡死
+**缓解：** `MAX_RECURSION_DEPTH=16` + `MAX_FILES_TOTAL=50_000` + `symlink_metadata` 跳过符号链接。超限静默截断/跳过（用户可能不知道有循环符号链接）
+
+### bootstrap N+1 prepare
+**风险点：** `get_bootstrap_data` 循环内对每个 playlist 重复 prepare 同一 SQL（N+1 prepare）
+**缓解：** 改单条 `SELECT playlist_id, song_id FROM playlist_songs ORDER BY playlist_id, sort_order` + Rust 侧 `HashMap::entry().or_default()` 分组。行为无变化（每个 playlist 内歌曲顺序仍按 sort_order 保留）
 
 ## 大文件风险
 

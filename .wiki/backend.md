@@ -20,6 +20,27 @@
 - 统一的 `AppResult<T>` 类型别名
 - 自动转换为 String 以便通过 Tauri IPC 传递
 
+### 错误处理（2026-06-21 重构）
+
+所有 `#[tauri::command]` 现在返回 `AppResult<T>` 而非 `Result<T, String>`。
+`AppError` 定义在 `src-tauri/src/error.rs`，8 个 variant 通过
+`#[serde(tag = "type", content = "message")]` 序列化为
+`{"type": "...", "message": "..."}` 传到前端（字段统一为 `String`，
+因为 `std::io::Error`/`rusqlite::Error` 不实现 `Serialize`）。
+
+前端 `utils/errorHandler.ts` 通过 `AppInvokeError` 类保留原始 payload，调用方可按
+`errorType` 区分错误类别（`InvalidArgument` / `Database` / `FileOperation` 等）。
+
+**`From` 自动转换**（让 `?` 操作符直接工作）：
+- `From<std::io::Error>` → `FileOperation`
+- `From<rusqlite::Error>` → `Database`
+- `From<serde_json::Error>` → `OperationFailed`
+- `From<String>` → `OperationFailed`（用于迁移期间残留 `Result<T, String>` 桥接，
+  以及 `parse::<Shortcut>()` 等返回非标准错误的调用）
+
+**注意**：`audio/error` 事件仍发送字符串（`app.emit("audio:error", e.to_string())`），
+与前端既有监听兼容；命令的 `Err` 分支才走结构化 `AppError` 序列化。
+
 ## Commands (IPC 处理)
 
 ### 核心模块
@@ -108,27 +129,34 @@
 
 **返回：** 更新后的 `Song` 对象
 
-**处理流程：**
-1. 从数据库查询当前歌曲（获取 file_path、artist、album）
+**处理流程（原子性，2026-06-21 重构）：**
+1. 从数据库查询当前歌曲（获取 file_path、artist、album），锁内读取后立即释放
 2. 验证文件存在且可写
-3. 使用 Lofty 写入元数据标签（TrackTitle、TrackArtist、AlbumTitle）
+3. 使用 Lofty 写入元数据标签（TrackTitle、TrackArtist、AlbumTitle）—— **解析/写入失败显式报错**（不再静默跳过）
 4. 构建新文件名（基于 new_title，通过 `sanitize_filename` 清理非法字符）
-5. 文件名冲突解决：若目标文件已存在且非自身，添加 `(2)`, `(3)` ... 后缀
+5. 文件名冲突解决：若目标文件已存在且非自身，添加 `(2)`, `(3)` ... 后缀（TOCTOU，接受）
 6. 重命名磁盘文件（`std::fs::rename`）
-7. 更新数据库记录（title、artist、album、file_path）
-8. 返回更新后的完整 Song 对象
+7. **事务内更新数据库**（`conn.transaction()` 包裹 UPDATE），保证 DB 更新原子提交
+8. **若 DB 更新失败且文件已被重命名，尽力回滚文件名**（`rename(new → old)`，失败仅打日志含两路径）
+9. 重新取锁读取并返回更新后的完整 Song 对象
 
 **错误情况：**
 - 歌曲未找到（DB 查询失败）
 - 文件在磁盘上不存在
 - 文件只读（permissions.readonly）
-- 元数据写入失败（Lofty save 错误）
+- 元数据读取/写入失败（Lofty 错误，**不再静默跳过**）
 - 文件重命名失败（`std::fs::rename` 错误）
+- DB 更新失败（事务回滚 + 文件名回滚兜底）
 
 **辅助函数：** `sanitize_filename(name)` — 将 `/ \ : * ? " < > |` 替换为 `_`
 
 **lib.rs** - 文件扫描
 - `scan_music_folder` - 扫描音乐文件夹并提取元数据（含 genre、file_size）
+  - **递归防护（2026-06-21）：** `MAX_RECURSION_DEPTH=16`（防循环符号链接栈溢出）、
+    `MAX_FILES_TOTAL=50_000`（防超大目录卡死）、`symlink_metadata` 跳过符号链接。
+    超限静默截断/跳过，不报错（用户可能不知道有循环符号链接）。
+
+
 
 ## 自动更新
 
@@ -236,6 +264,14 @@ macOS CoreAudio 通过 CPAL 暴露设备时存在两个已知问题：
 - 参数：track_name, artist_name, duration
 - 优先选择有 synced_lyrics 的结果
 - 持久化 source 标记 (embedded / lrclib / none)
+
+**错误区分（2026-06-21 重构）：**
+- 模块级 `OnceLock<reqwest::Client>`（10s 超时，避免每次调用重建）
+- **`Ok(Some)`** — 命中歌词，缓存 source='lrclib'
+- **`Ok(None)`** — LRCLIB 确认无歌词（HTTP 200 空结果 / 全部结果无歌词字段），
+  调用方缓存 source='none'，避免重复请求
+- **`Err(AppError::OperationFailed)`** — 网络/服务器错误（请求失败、非 2xx、JSON 解析失败），
+  调用方**不缓存**，向上传播让用户可重试（修复了旧版 `.ok()?` 吞错导致一次抖动后永久判无歌词）
 
 ### commands/shortcuts.rs - 全局快捷键
 

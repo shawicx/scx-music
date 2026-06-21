@@ -3,6 +3,8 @@ use std::collections::HashMap;
 use std::sync::Mutex;
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
 
+use crate::error::AppResult;
+
 /// 单个动作的默认绑定 — 与前端共享的结构契约
 #[derive(Clone, Serialize)]
 pub struct ShortcutDefault {
@@ -102,7 +104,7 @@ pub fn shortcuts_register(
     registry: tauri::State<'_, ShortcutRegistry>,
     action_id: String,
     combo: String,
-) -> Result<(), String> {
+) -> AppResult<()> {
     // 如果该 action 已绑定其他 combo，先注销
     // 注意：`Shortcut: FromStr<Err = global_hotkey::HotKeyParseError>`（非插件 Error），
     // 使用 turbofish `parse::<Shortcut>()` 显式绑定类型，便于 map_err 类型推断。
@@ -123,7 +125,7 @@ pub fn shortcuts_unregister(
     app: tauri::AppHandle,
     registry: tauri::State<'_, ShortcutRegistry>,
     action_id: String,
-) -> Result<(), String> {
+) -> AppResult<()> {
     if let Some(combo) = find_combo_by_action(&registry, &action_id) {
         let shortcut = combo.parse::<Shortcut>().map_err(|e| e.to_string())?;
         let _ = app.global_shortcut().unregister(shortcut);
@@ -136,7 +138,7 @@ pub fn shortcuts_unregister(
 pub fn shortcuts_is_registered(
     app: tauri::AppHandle,
     combo: String,
-) -> Result<bool, String> {
+) -> AppResult<bool> {
     let shortcut = combo.parse::<Shortcut>().map_err(|e| e.to_string())?;
     Ok(app.global_shortcut().is_registered(shortcut))
 }
@@ -146,7 +148,7 @@ pub fn shortcuts_register_all(
     app: tauri::AppHandle,
     registry: tauri::State<'_, ShortcutRegistry>,
     bindings: Vec<(String, String)>,
-) -> Result<(), String> {
+) -> AppResult<()> {
     for (action_id, combo) in bindings {
         if combo.is_empty() { continue; }
         let shortcut = match combo.parse::<Shortcut>() {

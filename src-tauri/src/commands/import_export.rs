@@ -1,5 +1,6 @@
 use crate::db::models::{Lyric, Playlist, PlaylistSong, Song};
 use crate::db::Db;
+use crate::error::{AppError, AppResult};
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -10,16 +11,16 @@ use std::time::{SystemTime, UNIX_EPOCH};
 /// 校验用户提供的文件路径，防止路径遍历攻击。
 /// - 必须是绝对路径
 /// - 拒绝任何 `..` 路径段
-fn validate_user_path(path: &str) -> Result<PathBuf, String> {
+fn validate_user_path(path: &str) -> Result<PathBuf, AppError> {
     let p = PathBuf::from(path);
     if !p.is_absolute() {
-        return Err(format!("Path must be absolute: {}", path));
+        return Err(AppError::InvalidArgument(format!("Path must be absolute: {}", path)));
     }
     if p
         .components()
         .any(|c| matches!(c, std::path::Component::ParentDir))
     {
-        return Err(format!("Parent dir '..' not allowed in path: {}", path));
+        return Err(AppError::InvalidArgument(format!("Parent dir '..' not allowed in path: {}", path)));
     }
     Ok(p)
 }
@@ -65,7 +66,7 @@ pub struct ImportResult {
 fn get_playlist_songs_from_db(
     conn: &rusqlite::Connection,
     playlist_id: &str,
-) -> Result<Vec<Song>, String> {
+) -> AppResult<Vec<Song>> {
     let mut stmt = conn
         .prepare(
             "SELECT s.id, s.title, s.artist, s.album, s.duration, s.duration_secs, s.quality, s.file_path, s.art_gradient, s.genre, s.file_size
@@ -74,7 +75,7 @@ fn get_playlist_songs_from_db(
              WHERE ps.playlist_id = ?1
              ORDER BY ps.sort_order",
         )
-        .map_err(|e| e.to_string())?;
+        ?;
     let result: Vec<Song> = stmt
         .query_map(params![playlist_id], |row| {
             Ok(Song {
@@ -91,9 +92,9 @@ fn get_playlist_songs_from_db(
                 file_size: row.get(10)?,
             })
         })
-        .map_err(|e| e.to_string())?
+        ?
         .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| e.to_string())?;
+        ?;
     Ok(result)
 }
 
@@ -104,7 +105,7 @@ pub fn export_playlist_m3u(
     db: tauri::State<'_, Db>,
     playlist_id: String,
     save_path: String,
-) -> Result<(), String> {
+) -> AppResult<()> {
     let save_path = validate_user_path(&save_path)?;
     let conn = db.0.lock().map_err(|e| e.to_string())?;
     let songs = get_playlist_songs_from_db(&conn, &playlist_id)?;
@@ -118,7 +119,8 @@ pub fn export_playlist_m3u(
         ));
     }
 
-    fs::write(&save_path, content).map_err(|e| e.to_string())
+    fs::write(&save_path, content)?;
+    Ok(())
 }
 
 #[tauri::command]
@@ -126,7 +128,7 @@ pub fn export_playlist_pls(
     db: tauri::State<'_, Db>,
     playlist_id: String,
     save_path: String,
-) -> Result<(), String> {
+) -> AppResult<()> {
     let save_path = validate_user_path(&save_path)?;
     let conn = db.0.lock().map_err(|e| e.to_string())?;
     let songs = get_playlist_songs_from_db(&conn, &playlist_id)?;
@@ -145,21 +147,22 @@ pub fn export_playlist_pls(
         songs.len()
     ));
 
-    fs::write(&save_path, content).map_err(|e| e.to_string())
+    fs::write(&save_path, content)?;
+    Ok(())
 }
 
 #[tauri::command]
 pub fn export_backup(
     db: tauri::State<'_, Db>,
     save_path: String,
-) -> Result<(), String> {
+) -> AppResult<()> {
     let save_path = validate_user_path(&save_path)?;
     let conn = db.0.lock().map_err(|e| e.to_string())?;
 
     // Songs
     let mut stmt = conn
         .prepare("SELECT id, title, artist, album, duration, duration_secs, quality, file_path, art_gradient, genre, file_size FROM songs ORDER BY created_at")
-        .map_err(|e| e.to_string())?;
+        ?;
     let songs: Vec<Song> = stmt
         .query_map([], |row| {
             Ok(Song {
@@ -176,14 +179,14 @@ pub fn export_backup(
                 file_size: row.get(10)?,
             })
         })
-        .map_err(|e| e.to_string())?
+        ?
         .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| e.to_string())?;
+        ?;
 
     // Playlists
     let mut stmt = conn
         .prepare("SELECT id, name, sort_order FROM playlists ORDER BY sort_order")
-        .map_err(|e| e.to_string())?;
+        ?;
     let playlists: Vec<Playlist> = stmt
         .query_map([], |row| {
             Ok(Playlist {
@@ -192,14 +195,14 @@ pub fn export_backup(
                 sort_order: row.get(2)?,
             })
         })
-        .map_err(|e| e.to_string())?
+        ?
         .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| e.to_string())?;
+        ?;
 
     // Playlist songs
     let mut stmt = conn
         .prepare("SELECT playlist_id, song_id, sort_order FROM playlist_songs ORDER BY playlist_id, sort_order")
-        .map_err(|e| e.to_string())?;
+        ?;
     let playlist_songs: Vec<PlaylistSong> = stmt
         .query_map([], |row| {
             Ok(PlaylistSong {
@@ -208,26 +211,26 @@ pub fn export_backup(
                 sort_order: row.get(2)?,
             })
         })
-        .map_err(|e| e.to_string())?
+        ?
         .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| e.to_string())?;
+        ?;
 
     // Settings
     let mut stmt = conn
         .prepare("SELECT key, value FROM settings")
-        .map_err(|e| e.to_string())?;
+        ?;
     let settings: HashMap<String, String> = stmt
         .query_map([], |row| {
             Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
         })
-        .map_err(|e| e.to_string())?
+        ?
         .filter_map(|r| r.ok())
         .collect();
 
     // Lyrics
     let mut stmt = conn
         .prepare("SELECT song_id, raw_lrc, source FROM lyrics")
-        .map_err(|e| e.to_string())?;
+        ?;
     let lyrics: Vec<Lyric> = stmt
         .query_map([], |row| {
             Ok(Lyric {
@@ -236,9 +239,9 @@ pub fn export_backup(
                 source: row.get(2)?,
             })
         })
-        .map_err(|e| e.to_string())?
+        ?
         .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| e.to_string())?;
+        ?;
 
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -258,8 +261,9 @@ pub fn export_backup(
         },
     };
 
-    let json = serde_json::to_string_pretty(&backup).map_err(|e| e.to_string())?;
-    fs::write(&save_path, json).map_err(|e| e.to_string())
+    let json = serde_json::to_string_pretty(&backup)?;
+    fs::write(&save_path, json)?;
+    Ok(())
 }
 
 #[tauri::command]
@@ -267,30 +271,30 @@ pub fn import_backup(
     db: tauri::State<'_, Db>,
     file_path: String,
     strategy: String,
-) -> Result<ImportResult, String> {
+) -> AppResult<ImportResult> {
     let file_path = validate_user_path(&file_path)?;
-    let content = fs::read_to_string(&file_path).map_err(|e| e.to_string())?;
-    let backup: BackupFileInput = serde_json::from_str(&content).map_err(|e| e.to_string())?;
+    let content = fs::read_to_string(&file_path)?;
+    let backup: BackupFileInput = serde_json::from_str(&content)?;
 
     if backup.version != 1 {
-        return Err(format!("Unsupported backup version: {}", backup.version));
+        return Err(AppError::InvalidArgument(format!("Unsupported backup version: {}", backup.version)));
     }
 
     let data = backup.data;
     let conn = db.0.lock().map_err(|e| e.to_string())?;
-    let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+    let tx = conn.unchecked_transaction()?;
 
     if strategy == "replace" {
         tx.execute("DELETE FROM playlist_songs", [])
-            .map_err(|e| e.to_string())?;
+            ?;
         tx.execute("DELETE FROM lyrics", [])
-            .map_err(|e| e.to_string())?;
+            ?;
         tx.execute("DELETE FROM songs", [])
-            .map_err(|e| e.to_string())?;
+            ?;
         tx.execute("DELETE FROM playlists", [])
-            .map_err(|e| e.to_string())?;
+            ?;
         tx.execute("DELETE FROM settings", [])
-            .map_err(|e| e.to_string())?;
+            ?;
     }
 
     // Songs
@@ -306,7 +310,7 @@ pub fn import_backup(
                 query,
                 params![s.id, s.title, s.artist, s.album, s.duration, s.duration_secs, s.quality, s.file_path, s.art_gradient, s.genre, s.file_size],
             )
-            .map_err(|e| e.to_string())?;
+            ?;
         songs_imported += rows;
     }
 
@@ -320,7 +324,7 @@ pub fn import_backup(
         };
         let rows = tx
             .execute(query, params![p.id, p.name, p.sort_order])
-            .map_err(|e| e.to_string())?;
+            ?;
         playlists_imported += rows;
     }
 
@@ -332,7 +336,7 @@ pub fn import_backup(
             "INSERT OR IGNORE INTO playlist_songs (playlist_id, song_id, sort_order) VALUES (?1, ?2, ?3)"
         };
         tx.execute(query, params![ps.playlist_id, ps.song_id, ps.sort_order])
-            .map_err(|e| e.to_string())?;
+            ?;
     }
 
     // Lyrics
@@ -343,7 +347,7 @@ pub fn import_backup(
                 "INSERT OR REPLACE INTO lyrics (song_id, raw_lrc, source) VALUES (?1, ?2, ?3)",
                 params![l.song_id, l.raw_lrc, l.source],
             )
-            .map_err(|e| e.to_string())?;
+            ?;
         lyrics_imported += rows;
     }
 
@@ -353,10 +357,10 @@ pub fn import_backup(
             "INSERT OR REPLACE INTO settings (key, value) VALUES (?1, ?2)",
             params![key, value],
         )
-        .map_err(|e| e.to_string())?;
+        ?;
     }
 
-    tx.commit().map_err(|e| e.to_string())?;
+    tx.commit()?;
 
     Ok(ImportResult {
         songs_imported,
@@ -369,36 +373,37 @@ pub fn import_backup(
 pub fn export_settings(
     db: tauri::State<'_, Db>,
     save_path: String,
-) -> Result<(), String> {
+) -> AppResult<()> {
     let save_path = validate_user_path(&save_path)?;
     let conn = db.0.lock().map_err(|e| e.to_string())?;
     let mut stmt = conn
         .prepare("SELECT key, value FROM settings")
-        .map_err(|e| e.to_string())?;
+        ?;
     let settings: HashMap<String, String> = stmt
         .query_map([], |row| {
             Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
         })
-        .map_err(|e| e.to_string())?
+        ?
         .filter_map(|r| r.ok())
         .collect();
 
-    let json = serde_json::to_string_pretty(&settings).map_err(|e| e.to_string())?;
-    fs::write(&save_path, json).map_err(|e| e.to_string())
+    let json = serde_json::to_string_pretty(&settings)?;
+    fs::write(&save_path, json)?;
+    Ok(())
 }
 
 #[tauri::command]
 pub fn import_settings(
     db: tauri::State<'_, Db>,
     file_path: String,
-) -> Result<usize, String> {
+) -> AppResult<usize> {
     let file_path = validate_user_path(&file_path)?;
-    let content = fs::read_to_string(&file_path).map_err(|e| e.to_string())?;
+    let content = fs::read_to_string(&file_path)?;
     let settings: HashMap<String, String> =
-        serde_json::from_str(&content).map_err(|e| e.to_string())?;
+        serde_json::from_str(&content)?;
 
     let conn = db.0.lock().map_err(|e| e.to_string())?;
-    let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+    let tx = conn.unchecked_transaction()?;
 
     let mut count = 0usize;
     for (key, value) in &settings {
@@ -406,11 +411,11 @@ pub fn import_settings(
             "INSERT OR REPLACE INTO settings (key, value) VALUES (?1, ?2)",
             params![key, value],
         )
-        .map_err(|e| e.to_string())?;
+        ?;
         count += 1;
     }
 
-    tx.commit().map_err(|e| e.to_string())?;
+    tx.commit()?;
     Ok(count)
 }
 

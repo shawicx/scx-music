@@ -6,6 +6,7 @@ use tauri::{AppHandle, Emitter};
 use super::lock_or_recover;
 use super::types::*;
 use super::AudioState;
+use crate::error::AppResult;
 
 #[tauri::command]
 pub fn player_set_queue(
@@ -13,7 +14,7 @@ pub fn player_set_queue(
     state: tauri::State<'_, AudioState>,
     songs: Vec<QueuedSong>,
     index: usize,
-) -> Result<(), String> {
+) -> AppResult<()> {
     let arc: AudioState = (*state).clone();
     {
         let mut s = lock_or_recover(&arc);
@@ -41,7 +42,7 @@ pub fn player_set_queue(
 pub fn player_pause(
     app: AppHandle,
     state: tauri::State<'_, AudioState>,
-) -> Result<(), String> {
+) -> AppResult<()> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     s.pause_internal();
     let payload = s.get_state_payload();
@@ -54,7 +55,7 @@ pub fn player_pause(
 pub fn player_resume(
     app: AppHandle,
     state: tauri::State<'_, AudioState>,
-) -> Result<(), String> {
+) -> AppResult<()> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     s.resume_internal();
     let payload = s.get_state_payload();
@@ -64,7 +65,7 @@ pub fn player_resume(
 }
 
 #[tauri::command]
-pub fn player_stop(app: AppHandle, state: tauri::State<'_, AudioState>) -> Result<(), String> {
+pub fn player_stop(app: AppHandle, state: tauri::State<'_, AudioState>) -> AppResult<()> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     s.stop_internal(Some(&app));
     Ok(())
@@ -74,7 +75,7 @@ pub fn player_stop(app: AppHandle, state: tauri::State<'_, AudioState>) -> Resul
 pub fn player_seek(
     state: tauri::State<'_, AudioState>,
     position_secs: f64,
-) -> Result<(), String> {
+) -> AppResult<()> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
 
     let seeked = if let Some(engine) = &s.engine {
@@ -100,7 +101,7 @@ pub fn player_seek(
 pub fn player_set_volume(
     state: tauri::State<'_, AudioState>,
     volume: f64,
-) -> Result<(), String> {
+) -> AppResult<()> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     s.volume = volume as f32;
     if let Some(engine) = &s.engine {
@@ -112,7 +113,7 @@ pub fn player_set_volume(
 }
 
 #[tauri::command]
-pub fn player_next(app: AppHandle, state: tauri::State<'_, AudioState>) -> Result<(), String> {
+pub fn player_next(app: AppHandle, state: tauri::State<'_, AudioState>) -> AppResult<()> {
     let arc: AudioState = (*state).clone();
     let next = {
         let s = lock_or_recover(&arc);
@@ -132,7 +133,7 @@ pub fn player_next(app: AppHandle, state: tauri::State<'_, AudioState>) -> Resul
 }
 
 #[tauri::command]
-pub fn player_previous(app: AppHandle, state: tauri::State<'_, AudioState>) -> Result<(), String> {
+pub fn player_previous(app: AppHandle, state: tauri::State<'_, AudioState>) -> AppResult<()> {
     let arc: AudioState = (*state).clone();
     let prev = {
         let s = lock_or_recover(&arc);
@@ -162,7 +163,7 @@ pub fn player_set_mode(
     app: AppHandle,
     state: tauri::State<'_, AudioState>,
     mode: PlaybackMode,
-) -> Result<(), String> {
+) -> AppResult<()> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     s.mode = mode;
     let payload = s.get_state_payload();
@@ -172,7 +173,7 @@ pub fn player_set_mode(
 }
 
 #[tauri::command]
-pub fn player_get_state(state: tauri::State<'_, AudioState>) -> Result<PlayerStatePayload, String> {
+pub fn player_get_state(state: tauri::State<'_, AudioState>) -> AppResult<PlayerStatePayload> {
     let s = state.lock().map_err(|e| e.to_string())?;
     Ok(s.get_state_payload())
 }

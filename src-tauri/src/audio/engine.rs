@@ -12,6 +12,7 @@ use crate::analyzer::{AnalyzerHandle, TeeSource};
 use super::device::{find_device_by_name, try_output_stream_for_device};
 use super::tracker::{finalize_session, PlaySession};
 use super::types::*;
+use crate::error::{AppError, AppResult};
 
 pub(super) struct AudioEngine {
     pub(super) _stream: OutputStream,
@@ -66,7 +67,7 @@ impl AudioStateInner {
         self.output_device_name = name;
     }
 
-    pub(super) fn ensure_engine(&mut self) -> Result<(), String> {
+    pub(super) fn ensure_engine(&mut self) -> AppResult<()> {
         if self.engine.is_some() {
             return Ok(());
         }
@@ -98,7 +99,7 @@ impl AudioStateInner {
         Ok(())
     }
 
-    pub(super) fn rebuild_engine_with_device(&mut self, device_name: Option<String>) -> Result<(), String> {
+    pub(super) fn rebuild_engine_with_device(&mut self, device_name: Option<String>) -> AppResult<()> {
         let was_paused = matches!(self.state, PlaybackState::Paused);
         let current_index = if self.current_song.is_some() {
             Some(self.queue_index)
@@ -141,7 +142,7 @@ impl AudioStateInner {
         &mut self,
         index: usize,
         app: Option<&tauri::AppHandle>,
-    ) -> Result<(), String> {
+    ) -> AppResult<()> {
         if index >= self.queue.len() {
             self.stop_internal(app);
             return Ok(());
@@ -165,7 +166,7 @@ impl AudioStateInner {
         self.ensure_engine()?;
 
         {
-            let engine = self.engine.as_mut().ok_or("No audio engine")?;
+            let engine = self.engine.as_mut().ok_or(AppError::AudioPlayback("No audio engine".to_string()))?;
             if let Some(old) = engine.sink.take() {
                 old.stop();
                 old.detach();
@@ -173,14 +174,14 @@ impl AudioStateInner {
         }
 
         let sink = {
-            let engine = self.engine.as_mut().ok_or("No audio engine")?;
+            let engine = self.engine.as_mut().ok_or(AppError::AudioPlayback("No audio engine".to_string()))?;
             match Sink::try_new(&engine.handle) {
                 Ok(s) => s,
                 Err(_) => {
                     let _ = engine;
                     self.engine = None;
                     self.ensure_engine()?;
-                    let engine = self.engine.as_mut().ok_or("No audio engine")?;
+                    let engine = self.engine.as_mut().ok_or(AppError::AudioPlayback("No audio engine".to_string()))?;
                     Sink::try_new(&engine.handle).map_err(|e| format!("Sink error: {}", e))?
                 }
             }
@@ -193,7 +194,7 @@ impl AudioStateInner {
         sink.set_volume(self.volume);
         let teed = TeeSource::new(source.convert_samples::<f32>(), self.analyzer.clone());
         sink.append(teed);
-        self.engine.as_mut().ok_or("No audio engine")?.sink = Some(sink);
+        self.engine.as_mut().ok_or(AppError::AudioPlayback("No audio engine".to_string()))?.sink = Some(sink);
 
         self.current_song = Some(song);
         self.state = PlaybackState::Playing;
@@ -255,11 +256,11 @@ impl AudioStateInner {
         }
     }
 
-    pub(super) fn seek_by_restart(&mut self, position_secs: f64) -> Result<(), String> {
-        let song = self.current_song.clone().ok_or("No song playing")?;
+    pub(super) fn seek_by_restart(&mut self, position_secs: f64) -> AppResult<()> {
+        let song = self.current_song.clone().ok_or(AppError::AudioPlayback("No song playing".to_string()))?;
         let was_paused = matches!(self.state, PlaybackState::Paused);
         self.ensure_engine()?;
-        let engine = self.engine.as_mut().ok_or("No audio engine")?;
+        let engine = self.engine.as_mut().ok_or(AppError::AudioPlayback("No audio engine".to_string()))?;
 
         if let Some(old) = engine.sink.take() {
             old.stop();

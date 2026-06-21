@@ -1,4 +1,5 @@
 use crate::db::Db;
+use crate::error::{AppError, AppResult};
 use rusqlite::params;
 use std::collections::HashMap;
 
@@ -24,7 +25,7 @@ const ALLOWED_EXACT_KEYS: &[&str] = &[
     "currentSongId",
 ];
 
-fn validate_setting_key(key: &str) -> Result<(), String> {
+fn validate_setting_key(key: &str) -> AppResult<()> {
     if ALLOWED_EXACT_KEYS.contains(&key) {
         return Ok(());
     }
@@ -35,10 +36,10 @@ fn validate_setting_key(key: &str) -> Result<(), String> {
             return Ok(());
         }
     }
-    Err(format!(
+    Err(AppError::InvalidArgument(format!(
         "Unknown setting key (not in whitelist): {}",
         key
-    ))
+    )))
 }
 
 #[tauri::command]
@@ -47,23 +48,20 @@ pub fn get_system_locale() -> String {
 }
 
 #[tauri::command]
-pub fn get_all_settings(db: tauri::State<'_, Db>) -> Result<HashMap<String, String>, String> {
+pub fn get_all_settings(db: tauri::State<'_, Db>) -> AppResult<HashMap<String, String>> {
     let conn = db.0.lock().map_err(|e| e.to_string())?;
-    let mut stmt = conn
-        .prepare("SELECT key, value FROM settings")
-        .map_err(|e| e.to_string())?;
+    let mut stmt = conn.prepare("SELECT key, value FROM settings")?;
     let map: HashMap<String, String> = stmt
         .query_map([], |row| {
             Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
-        })
-        .map_err(|e| e.to_string())?
+        })?
         .filter_map(|r| r.ok())
         .collect();
     Ok(map)
 }
 
 #[tauri::command]
-pub fn get_setting(db: tauri::State<'_, Db>, key: String) -> Result<Option<String>, String> {
+pub fn get_setting(db: tauri::State<'_, Db>, key: String) -> AppResult<Option<String>> {
     let conn = db.0.lock().map_err(|e| e.to_string())?;
     let result = conn
         .query_row(
@@ -76,14 +74,13 @@ pub fn get_setting(db: tauri::State<'_, Db>, key: String) -> Result<Option<Strin
 }
 
 #[tauri::command]
-pub fn set_setting(db: tauri::State<'_, Db>, key: String, value: String) -> Result<(), String> {
+pub fn set_setting(db: tauri::State<'_, Db>, key: String, value: String) -> AppResult<()> {
     validate_setting_key(&key)?;
     let conn = db.0.lock().map_err(|e| e.to_string())?;
     conn.execute(
         "INSERT OR REPLACE INTO settings (key, value) VALUES (?1, ?2)",
         params![key, value],
-    )
-    .map_err(|e| e.to_string())?;
+    )?;
     Ok(())
 }
 
