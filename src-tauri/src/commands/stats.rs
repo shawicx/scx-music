@@ -61,7 +61,7 @@ pub struct DurationBucket {
 
 #[tauri::command]
 pub fn get_library_stats(db: tauri::State<'_, Db>) -> AppResult<LibraryStats> {
-    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    let conn = crate::audio::lock_or_recover(&db.0);
 
     let total_songs: i64 = conn
         .query_row("SELECT COUNT(*) FROM songs", [], |r| r.get(0))
@@ -264,7 +264,7 @@ pub fn stats_listening_overview(
     end: Option<String>,
     db: State<'_, Db>,
 ) -> AppResult<ListeningOverview> {
-    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    let conn = crate::audio::lock_or_recover(&db.0);
     let (filter_sql, filter_params) = build_time_filter(range.as_deref(), start.as_deref(), end.as_deref());
 
     // 修正：play_count 改为从 play_history 派生，与其他 4 个指标一致地参与时间过滤
@@ -307,7 +307,7 @@ pub fn stats_top_songs(
     limit: Option<i64>,
     db: State<'_, Db>,
 ) -> AppResult<Vec<TopSong>> {
-    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    let conn = crate::audio::lock_or_recover(&db.0);
     let limit = limit.unwrap_or(10);
     let (filter_sql, mut filter_params) = build_time_filter(range.as_deref(), None, None);
 
@@ -333,7 +333,7 @@ pub fn stats_top_artists(
     limit: Option<i64>,
     db: State<'_, Db>,
 ) -> AppResult<Vec<TopArtist>> {
-    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    let conn = crate::audio::lock_or_recover(&db.0);
     let limit = limit.unwrap_or(10);
     let (filter_sql, mut filter_params) = build_time_filter(range.as_deref(), None, None);
 
@@ -358,7 +358,7 @@ pub fn stats_genre_distribution(
     range: Option<String>,
     db: State<'_, Db>,
 ) -> AppResult<Vec<GenreDuration>> {
-    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    let conn = crate::audio::lock_or_recover(&db.0);
     let (filter_sql, filter_params) = build_time_filter(range.as_deref(), None, None);
 
     let mut stmt = conn.prepare(&format!(
@@ -378,7 +378,7 @@ pub fn stats_trend(
     range: Option<String>,
     db: State<'_, Db>,
 ) -> AppResult<Vec<DayDuration>> {
-    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    let conn = crate::audio::lock_or_recover(&db.0);
     let (filter_sql, filter_params) = build_time_filter(range.as_deref(), None, None);
 
     let mut stmt = conn.prepare(&format!(
@@ -394,7 +394,7 @@ pub fn stats_trend(
 
 #[tauri::command]
 pub fn stats_heatmap(db: State<'_, Db>) -> AppResult<Vec<DayDuration>> {
-    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    let conn = crate::audio::lock_or_recover(&db.0);
 
     let mut stmt = conn.prepare(
         "SELECT DATE(ph.played_at) as day, SUM(ph.duration_secs) as dur
@@ -421,7 +421,7 @@ pub fn stats_hourly_distribution(
     end: String,
     db: State<'_, Db>,
 ) -> AppResult<Vec<HourDuration>> {
-    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    let conn = crate::audio::lock_or_recover(&db.0);
 
     let mut stmt = conn.prepare(
         "SELECT CAST(strftime('%H', ph.played_at, 'localtime') AS INTEGER) as hour,

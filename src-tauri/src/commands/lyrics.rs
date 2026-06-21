@@ -37,7 +37,7 @@ pub async fn get_lyrics(
 ) -> AppResult<Option<LyricsResult>> {
     // 1. Check SQLite cache + 2. Try embedded lyrics (sync, no .await)
     let early_result = {
-        let conn = db.0.lock().map_err(|e| e.to_string())?;
+        let conn = crate::audio::lock_or_recover(&db.0);
 
         let cached: Option<(Option<String>, String, f64)> = conn
             .query_row(
@@ -73,7 +73,7 @@ pub async fn get_lyrics(
     // 3. Try LRCLIB online (conn is dropped, safe to .await)
     match fetch_lrclib(&title, &artist, duration_secs).await {
         Ok(Some(result)) => {
-            let conn = db.0.lock().map_err(|e| e.to_string())?;
+            let conn = crate::audio::lock_or_recover(&db.0);
             conn.execute(
                 "INSERT INTO lyrics (song_id, raw_lrc, source, offset_secs) VALUES (?1, ?2, ?3, ?4)",
                 params![song_id, &result.raw_lrc, &result.source, result.offset_secs],
@@ -91,7 +91,7 @@ pub async fn get_lyrics(
     }
 
     // 4. No lyrics found — cache the miss
-    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    let conn = crate::audio::lock_or_recover(&db.0);
     conn.execute(
         "INSERT INTO lyrics (song_id, raw_lrc, source, offset_secs) VALUES (?1, NULL, 'none', 0.0)",
         params![song_id],
@@ -110,7 +110,7 @@ pub async fn refresh_lyrics(
 ) -> AppResult<Option<LyricsResult>> {
     // Preserve existing offset before overwrite
     let existing_offset: f64 = {
-        let conn = db.0.lock().map_err(|e| e.to_string())?;
+        let conn = crate::audio::lock_or_recover(&db.0);
         conn.query_row(
             "SELECT offset_secs FROM lyrics WHERE song_id = ?1",
             params![song_id],
@@ -121,7 +121,7 @@ pub async fn refresh_lyrics(
 
     match fetch_lrclib(&title, &artist, duration_secs).await {
         Ok(Some(result)) => {
-            let conn = db.0.lock().map_err(|e| e.to_string())?;
+            let conn = crate::audio::lock_or_recover(&db.0);
             conn.execute(
                 "INSERT OR REPLACE INTO lyrics (song_id, raw_lrc, source, offset_secs) VALUES (?1, ?2, ?3, ?4)",
                 params![song_id, &result.raw_lrc, &result.source, existing_offset],
@@ -142,7 +142,7 @@ pub async fn refresh_lyrics(
         }
     }
 
-    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    let conn = crate::audio::lock_or_recover(&db.0);
     conn.execute(
         "INSERT OR REPLACE INTO lyrics (song_id, raw_lrc, source, offset_secs) VALUES (?1, NULL, 'none', ?2)",
         params![song_id, existing_offset],
@@ -157,7 +157,7 @@ pub async fn set_lyric_offset(
     song_id: String,
     offset_secs: f64,
 ) -> AppResult<()> {
-    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    let conn = crate::audio::lock_or_recover(&db.0);
     conn.execute(
         "UPDATE lyrics SET offset_secs = ?1 WHERE song_id = ?2",
         params![offset_secs, song_id],

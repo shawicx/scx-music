@@ -106,16 +106,17 @@ pub fn shortcuts_register(
     combo: String,
 ) -> AppResult<()> {
     // 如果该 action 已绑定其他 combo，先注销
-    // 注意：`Shortcut: FromStr<Err = global_hotkey::HotKeyParseError>`（非插件 Error），
-    // 使用 turbofish `parse::<Shortcut>()` 显式绑定类型，便于 map_err 类型推断。
+    // `parse::<Shortcut>()` 的错误类型 HotKeyParseError 来自非直接依赖 crate，
+    // 无法在 error.rs 写 `From`，仍用 `.map_err(|e| e.to_string())?` 经 `From<String>` 桥接；
+    // `register/unregister` 的 `tauri_plugin_global_shortcut::Error` 有 `From`，直接 `?`
     if let Some(old_combo) = find_combo_by_action(&registry, &action_id) {
         let shortcut = old_combo.parse::<Shortcut>().map_err(|e| e.to_string())?;
-        app.global_shortcut().unregister(shortcut).map_err(|e| e.to_string())?;
+        app.global_shortcut().unregister(shortcut)?;
         registry.remove(&old_combo);
     }
 
     let shortcut = combo.parse::<Shortcut>().map_err(|e| e.to_string())?;
-    app.global_shortcut().register(shortcut).map_err(|e| e.to_string())?;
+    app.global_shortcut().register(shortcut)?;
     registry.set(combo, action_id);
     Ok(())
 }

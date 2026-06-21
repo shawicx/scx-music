@@ -5,7 +5,7 @@ use rusqlite::params;
 
 #[tauri::command]
 pub fn get_playlists(db: tauri::State<'_, Db>) -> AppResult<Vec<Playlist>> {
-    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    let conn = crate::audio::lock_or_recover(&db.0);
     let mut stmt = conn
         .prepare("SELECT id, name, sort_order FROM playlists ORDER BY sort_order")?;
     let playlists = stmt
@@ -22,7 +22,7 @@ pub fn get_playlists(db: tauri::State<'_, Db>) -> AppResult<Vec<Playlist>> {
 
 #[tauri::command]
 pub fn create_playlist(db: tauri::State<'_, Db>, name: String) -> AppResult<Playlist> {
-    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    let conn = crate::audio::lock_or_recover(&db.0);
     let id = format!("pl-{}", std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
@@ -38,14 +38,14 @@ pub fn create_playlist(db: tauri::State<'_, Db>, name: String) -> AppResult<Play
 
 #[tauri::command]
 pub fn rename_playlist(db: tauri::State<'_, Db>, id: String, name: String) -> AppResult<()> {
-    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    let conn = crate::audio::lock_or_recover(&db.0);
     conn.execute("UPDATE playlists SET name = ?1 WHERE id = ?2", params![name, id])?;
     Ok(())
 }
 
 #[tauri::command]
 pub fn delete_playlist(db: tauri::State<'_, Db>, id: String) -> AppResult<()> {
-    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    let conn = crate::audio::lock_or_recover(&db.0);
     conn.execute("DELETE FROM playlist_songs WHERE playlist_id = ?1", params![id])?;
     conn.execute("DELETE FROM playlists WHERE id = ?1", params![id])?;
     Ok(())
@@ -53,7 +53,7 @@ pub fn delete_playlist(db: tauri::State<'_, Db>, id: String) -> AppResult<()> {
 
 #[tauri::command]
 pub fn get_playlist_songs(db: tauri::State<'_, Db>, playlist_id: String) -> AppResult<Vec<Song>> {
-    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    let conn = crate::audio::lock_or_recover(&db.0);
     let mut stmt = conn
         .prepare(
             "SELECT s.id, s.title, s.artist, s.album, s.duration, s.duration_secs, s.quality, s.file_path, s.art_gradient, s.genre, s.file_size
@@ -88,7 +88,7 @@ pub fn add_songs_to_playlist(
     playlist_id: String,
     song_ids: Vec<String>,
 ) -> AppResult<()> {
-    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    let conn = crate::audio::lock_or_recover(&db.0);
     let tx = conn.unchecked_transaction()?;
     for sid in &song_ids {
         let sort_order: i64 = tx
@@ -108,7 +108,7 @@ pub fn add_songs_to_playlist(
 
 #[tauri::command]
 pub fn clear_playlist(db: tauri::State<'_, Db>, playlist_id: String) -> AppResult<()> {
-    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    let conn = crate::audio::lock_or_recover(&db.0);
     conn.execute("DELETE FROM playlist_songs WHERE playlist_id = ?1", params![playlist_id])?;
     Ok(())
 }
@@ -119,7 +119,7 @@ pub fn remove_song_from_playlist(
     playlist_id: String,
     song_id: String,
 ) -> AppResult<()> {
-    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    let conn = crate::audio::lock_or_recover(&db.0);
     conn.execute(
         "DELETE FROM playlist_songs WHERE playlist_id = ?1 AND song_id = ?2",
         params![playlist_id, song_id],

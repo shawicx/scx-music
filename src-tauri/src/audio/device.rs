@@ -137,7 +137,7 @@ pub fn player_set_output_device(
     }
 
     {
-        let conn = db.0.lock().map_err(|e| e.to_string())?;
+        let conn = crate::audio::lock_or_recover(&db.0);
         let value = device_name.as_deref().unwrap_or("");
         conn.execute(
             "INSERT OR REPLACE INTO settings (key, value) VALUES (?1, ?2)",

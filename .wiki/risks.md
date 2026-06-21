@@ -107,6 +107,26 @@
 **风险点：** `get_bootstrap_data` 循环内对每个 playlist 重复 prepare 同一 SQL（N+1 prepare）
 **缓解：** 改单条 `SELECT playlist_id, song_id FROM playlist_songs ORDER BY playlist_id, sort_order` + Rust 侧 `HashMap::entry().or_default()` 分组。行为无变化（每个 playlist 内歌曲顺序仍按 sort_order 保留）
 
+## P2 D4 AppError 残留清理（2026-06-21）
+
+P1 启用 AppError 时保留了 60 处 `.map_err(|e| e.to_string())?` 残留（依赖 `From<String>` 自动转 `OperationFailed`，前端拿不到细分 variant）。本次清理替换了 **45 处**：
+
+- 所有 `db.0.lock().map_err(|e| e.to_string())?` → `crate::audio::lock_or_recover(&db.0)`（P0 中毒自愈模式，bootstrap/settings/playlists/stats/songs/lyrics/import_export/device 共 41 处）
+- `commands/window.rs`（2 处）：`win.hide()`/`win.show()` → 裸 `?`，依赖新增的 `From<tauri::Error>`
+- `commands/shortcuts.rs` 的 `register/unregister`（2 处）：→ 裸 `?`，依赖新增的 `From<tauri_plugin_global_shortcut::Error>`
+- rusqlite/fs/serde_json 调用在 P1 迁移时已改为直接 `?`（走 `From<rusqlite::Error>`→Database、`From<io::Error>`→FileOperation、`From<serde_json::Error>`→OperationFailed），本计划无需再改
+
+**新增 2 个 `From` 实现**（`error.rs`）：`From<tauri::Error>` 和 `From<tauri_plugin_global_shortcut::Error>`，均转 `OperationFailed`。
+
+**保留 11 处**（设计性决策）：
+- `audio/commands.rs`（7）+ `audio/device.rs`（2）+ `audio/analyzer_cmds.rs`（2）共 11 处 **AudioState 锁**：单步 IPC 命令保留 `.map_err(|e| e.to_string())?`，让前端能感知 lock 中毒错误（与 P0 doc 中 `lock_or_recover` 的使用策略一致 —— 进度线程/批量操作用自愈，单步命令保留错误传播）
+
+**另保留 9 处**（技术限制 + 自定义上下文）：
+- `commands/shortcuts.rs`（4）：`parse::<Shortcut>()` 的 `HotKeyParseError` 来自非直接依赖 crate（`global_hotkey`），无法在 `error.rs` 写 `From`，仍经 `From<String>` 桥接
+- `commands/songs.rs::rename_song`（5）：`format!("Song not found: {}", e)?` 等自定义上下文 —— 有上下文价值，依赖 `From<String>` 转 OperationFailed
+
+**前端影响**：`AppInvokeError.errorType` 现在能拿到 `FileOperation` / `Database` 等细分 variant，便于按错误类别分类显示 toast（实际改造留待 P3）。
+
 ## 大文件风险
 
 ### 音频文件

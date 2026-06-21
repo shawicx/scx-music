@@ -49,7 +49,7 @@ pub fn get_system_locale() -> String {
 
 #[tauri::command]
 pub fn get_all_settings(db: tauri::State<'_, Db>) -> AppResult<HashMap<String, String>> {
-    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    let conn = crate::audio::lock_or_recover(&db.0);
     let mut stmt = conn.prepare("SELECT key, value FROM settings")?;
     let map: HashMap<String, String> = stmt
         .query_map([], |row| {
@@ -62,7 +62,7 @@ pub fn get_all_settings(db: tauri::State<'_, Db>) -> AppResult<HashMap<String, S
 
 #[tauri::command]
 pub fn get_setting(db: tauri::State<'_, Db>, key: String) -> AppResult<Option<String>> {
-    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    let conn = crate::audio::lock_or_recover(&db.0);
     let result = conn
         .query_row(
             "SELECT value FROM settings WHERE key = ?1",
@@ -76,7 +76,7 @@ pub fn get_setting(db: tauri::State<'_, Db>, key: String) -> AppResult<Option<St
 #[tauri::command]
 pub fn set_setting(db: tauri::State<'_, Db>, key: String, value: String) -> AppResult<()> {
     validate_setting_key(&key)?;
-    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    let conn = crate::audio::lock_or_recover(&db.0);
     conn.execute(
         "INSERT OR REPLACE INTO settings (key, value) VALUES (?1, ?2)",
         params![key, value],

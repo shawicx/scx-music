@@ -297,7 +297,7 @@ pub fn run() {
 /// 应用启动时从 settings 表读取快捷键绑定，批量注册 enabled 的项
 fn setup_shortcuts_at_start(app: tauri::AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     let db_state: tauri::State<db::Db> = app.state();
-    let conn = db_state.0.lock().map_err(|e| e.to_string())?;
+    let conn = crate::audio::lock_or_recover(&db_state.0);
 
     let mut stmt = conn.prepare("SELECT key, value FROM settings")?;
     let stored: std::collections::HashMap<String, String> = stmt

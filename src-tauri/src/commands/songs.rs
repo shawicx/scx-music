@@ -7,7 +7,7 @@ use rusqlite::params;
 
 #[tauri::command]
 pub fn get_all_songs(db: tauri::State<'_, Db>) -> AppResult<Vec<Song>> {
-    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    let conn = crate::audio::lock_or_recover(&db.0);
     let mut stmt = conn
         .prepare("SELECT id, title, artist, album, duration, duration_secs, quality, file_path, art_gradient, genre, file_size FROM songs ORDER BY created_at")?;
     let songs = stmt
@@ -32,7 +32,7 @@ pub fn get_all_songs(db: tauri::State<'_, Db>) -> AppResult<Vec<Song>> {
 
 #[tauri::command]
 pub fn upsert_songs(db: tauri::State<'_, Db>, songs: Vec<Song>) -> AppResult<Vec<String>> {
-    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    let conn = crate::audio::lock_or_recover(&db.0);
     let tx = conn.unchecked_transaction()?;
     for s in &songs {
         tx.execute(
@@ -63,7 +63,7 @@ pub fn upsert_songs(db: tauri::State<'_, Db>, songs: Vec<Song>) -> AppResult<Vec
 
 #[tauri::command]
 pub fn delete_songs(db: tauri::State<'_, Db>, ids: Vec<String>) -> AppResult<()> {
-    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    let conn = crate::audio::lock_or_recover(&db.0);
     let tx = conn.unchecked_transaction()?;
     for id in &ids {
         tx.execute("DELETE FROM songs WHERE id = ?1", params![id])?;
@@ -82,7 +82,7 @@ pub fn rename_song(
 ) -> AppResult<Song> {
     // 1. Query current song (release lock immediately)
     let (old_file_path, old_artist, old_album): (String, String, String) = {
-        let conn = db.0.lock().map_err(|e| e.to_string())?;
+        let conn = crate::audio::lock_or_recover(&db.0);
         conn.query_row(
             "SELECT file_path, artist, album FROM songs WHERE id = ?1",
             params![song_id],
@@ -156,7 +156,7 @@ pub fn rename_song(
     // 6. Update database inside a transaction (re-acquire lock).
     //    若事务失败且文件已被重命名，尽力回滚文件名，避免文件与 DB 不一致。
     let db_result: AppResult<()> = {
-        let mut conn = db.0.lock().map_err(|e| e.to_string())?;
+        let mut conn = crate::audio::lock_or_recover(&db.0);
         let tx = conn.transaction()?;
         tx.execute(
             "UPDATE songs SET title = ?1, artist = ?2, album = ?3, file_path = ?4 WHERE id = ?5",
@@ -181,7 +181,7 @@ pub fn rename_song(
     }
 
     // 7. Return updated song
-    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    let conn = crate::audio::lock_or_recover(&db.0);
     let song = conn
         .query_row(
             "SELECT id, title, artist, album, duration, duration_secs, quality, file_path, art_gradient, genre, file_size FROM songs WHERE id = ?1",

@@ -65,6 +65,23 @@ impl From<String> for AppError {
     }
 }
 
+/// Tauri 核心 API 错误（窗口操作、事件等）→ OperationFailed。
+impl From<tauri::Error> for AppError {
+    fn from(e: tauri::Error) -> Self {
+        AppError::OperationFailed(e.to_string())
+    }
+}
+
+/// 全局快捷键插件错误（注册/注销失败）→ OperationFailed。
+/// 注意：快捷键组合**字符串解析**错误（`global_hotkey::HotKeyParseError`）
+/// 所在 crate 非本项目直接依赖，无法在此写 `From`；调用方仍需 `.map_err(|e| e.to_string())?`
+/// 经 `From<String>` 桥接。
+impl From<tauri_plugin_global_shortcut::Error> for AppError {
+    fn from(e: tauri_plugin_global_shortcut::Error) -> Self {
+        AppError::OperationFailed(e.to_string())
+    }
+}
+
 /// 将 AppError 转换为 String 以便向后兼容（旧前端代码读字符串）。
 /// 注意：启用 serde::Serialize 后，Tauri IPC 会优先走 Serialize 路径
 /// 把 AppError 作为结构化对象传给前端，此 impl 仅为内部兜底。

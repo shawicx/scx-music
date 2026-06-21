@@ -107,7 +107,7 @@ pub fn export_playlist_m3u(
     save_path: String,
 ) -> AppResult<()> {
     let save_path = validate_user_path(&save_path)?;
-    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    let conn = crate::audio::lock_or_recover(&db.0);
     let songs = get_playlist_songs_from_db(&conn, &playlist_id)?;
 
     let mut content = String::from("#EXTM3U\n");
@@ -130,7 +130,7 @@ pub fn export_playlist_pls(
     save_path: String,
 ) -> AppResult<()> {
     let save_path = validate_user_path(&save_path)?;
-    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    let conn = crate::audio::lock_or_recover(&db.0);
     let songs = get_playlist_songs_from_db(&conn, &playlist_id)?;
 
     let mut content = String::from("[playlist]\n");
@@ -157,7 +157,7 @@ pub fn export_backup(
     save_path: String,
 ) -> AppResult<()> {
     let save_path = validate_user_path(&save_path)?;
-    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    let conn = crate::audio::lock_or_recover(&db.0);
 
     // Songs
     let mut stmt = conn
@@ -281,7 +281,7 @@ pub fn import_backup(
     }
 
     let data = backup.data;
-    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    let conn = crate::audio::lock_or_recover(&db.0);
     let tx = conn.unchecked_transaction()?;
 
     if strategy == "replace" {
@@ -375,7 +375,7 @@ pub fn export_settings(
     save_path: String,
 ) -> AppResult<()> {
     let save_path = validate_user_path(&save_path)?;
-    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    let conn = crate::audio::lock_or_recover(&db.0);
     let mut stmt = conn
         .prepare("SELECT key, value FROM settings")
         ?;
@@ -402,7 +402,7 @@ pub fn import_settings(
     let settings: HashMap<String, String> =
         serde_json::from_str(&content)?;
 
-    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    let conn = crate::audio::lock_or_recover(&db.0);
     let tx = conn.unchecked_transaction()?;
 
     let mut count = 0usize;

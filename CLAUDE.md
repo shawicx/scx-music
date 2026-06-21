@@ -60,7 +60,7 @@ Rust 命令 → IPC emit → Pinia Store → UI 更新
 - `analyzer.rs` — FFT 频谱（256 点 → 64 bins，30fps，通过 `audio:spectrum` 事件推送）
 - `commands/` — IPC 处理器：bootstrap、songs、playlists、settings、lyrics、import_export
 - `db/` — SQLite 数据库，含迁移（V1-V3）和数据模型（Song、Playlist、PlaylistSong、Lyric）
-- 错误处理：统一 `AppError` 枚举在 `error.rs`，所有命令返回 `AppResult<T>`
+- 错误处理：统一 `AppError` 枚举在 `error.rs`，所有命令返回 `AppResult<T>`；AppError 通过 `#[serde(tag = "type", content = "message")]` 序列化为 `{"type": "...", "message": "..."}` 传到前端。`From<io::Error>` 自动转 FileOperation、`From<rusqlite::Error>` 自动转 Database、`From<serde_json::Error>`/`From<tauri::Error>`/`From<tauri_plugin_global_shortcut::Error>`/`From<String>` 转 OperationFailed。**`?` 操作符直接工作，无需 `.map_err(|e| e.to_string())?` 样板**（例外：① audio/commands.rs / device.rs / analyzer_cmds.rs 的 AudioState 锁保留 `.map_err(|e| e.to_string())?`，让前端感知 lock 中毒；② shortcuts.rs 的 `parse::<Shortcut>()` 因 `HotKeyParseError` 来自非直接依赖 crate 无法写 `From`，保留桥接；③ songs.rs::rename_song 的 `format!("上下文: {}", e)` 保留）。
 
 ### 关键数据流
 

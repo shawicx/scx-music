@@ -224,7 +224,7 @@ App.vue onMounted
 |------|------|---------|------|
 | `shortcut-triggered` | Rust → 前端 | `String`（action_id） | 全局快捷键被按下时由 OS 回调触发，前端按 action_id 路由到对应 handler |
 
-## 错误返回（2026-06-21 重构）
+## 错误返回（2026-06-21 重构，P2 D4 清理后）
 
 所有命令的 `Err` 分支返回 `AppError` 结构体（序列化为 `{"type": "...", "message": "..."}`），
 不再返回字符串。前端 `utils/errorHandler.ts::AppInvokeError` 保留 type 字段供分类处理。
@@ -237,6 +237,21 @@ AppError variants：
 - `UnsupportedFormat` - 不支持的音频格式
 - `InvalidArgument` - 参数校验失败（如 settings key 白名单、路径校验）
 - `OperationFailed` - 其他操作失败（含网络错误、JSON 解析、String 桥接等）
+
+`From` 自动转换已让 `?` 操作符直接工作，无需 `.map_err(|e| e.to_string())?` 样板：
+- `io::Error` → `FileOperation`
+- `rusqlite::Error` → `Database`
+- `serde_json::Error` → `OperationFailed`
+- `tauri::Error` → `OperationFailed`（P2 D4 新增）
+- `tauri_plugin_global_shortcut::Error` → `OperationFailed`（P2 D4 新增）
+- `String` → `OperationFailed`（兜底，用于自定义上下文和无 `From` 的第三方错误）
+
+**例外（保留 `.map_err(|e| e.to_string())?`）**：
+- `audio/commands.rs` / `audio/device.rs` / `audio/analyzer_cmds.rs` 的 **AudioState 锁**：单步 IPC 命令保留错误传播，让前端能感知 lock 中毒（与 P0 doc 中 `lock_or_recover` 的使用策略一致）
+- `commands/shortcuts.rs` 的 `parse::<Shortcut>()`：`HotKeyParseError` 来自非直接依赖 crate（`global_hotkey`），无法在 `error.rs` 写 `From`，仍用 `.map_err(|e| e.to_string())?` 经 `From<String>` 桥接。同文件的 `register/unregister`（`tauri_plugin_global_shortcut::Error`）已有 `From`，已改裸 `?`
+- `commands/songs.rs::rename_song`：`format!("Song not found: {}", e)?` 等自定义上下文（有诊断价值，依赖 `From<String>`）
+
+**新增 `From` 实现（P2 D4 补充）**：`tauri::Error` 和 `tauri_plugin_global_shortcut::Error` 各加了一个 `From<E> for AppError` → `OperationFailed`，让 `window.rs` 全部、`shortcuts.rs` 的 register/unregister 部分改裸 `?`。
 
 **注意**：`audio:error` 事件仍发送字符串（兼容既有监听），仅命令 reject 走结构化 AppError。
 

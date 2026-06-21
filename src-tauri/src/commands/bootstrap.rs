@@ -15,7 +15,7 @@ pub struct BootstrapData {
 
 #[tauri::command]
 pub fn get_bootstrap_data(db: tauri::State<'_, Db>) -> AppResult<BootstrapData> {
-    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    let conn = crate::audio::lock_or_recover(&db.0);
 
     // Songs
     let mut stmt = conn
