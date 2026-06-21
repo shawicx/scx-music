@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { onKeyStroke } from '@vueuse/core'
 import { usePlayerStore } from '../stores/player'
 import { useMiniPlayer } from '../composables/useMiniPlayer'
 import { useI18n } from '../composables/useI18n'
+import { useDraggableProgress } from '../composables/useDraggableProgress'
 
 const playerStore = usePlayerStore()
 const { t } = useI18n()
@@ -23,36 +24,7 @@ const { togglePlayPause, next, previous, seek, formatTime } = playerStore
 
 const hover = ref(false)
 
-// 拖动进度条状态（复用 PlayerBar 模式）
-const isDragging = ref(false)
-const localProgress = ref(0)
-
-const progressModel = computed({
-  get: () => {
-    if (isDragging.value) {
-      return isNaN(localProgress.value) ? 0 : localProgress.value
-    }
-    if (duration.value > 0) {
-      const result = (progress.value / duration.value) * 100
-      return isNaN(result) ? 0 : result
-    }
-    return 0
-  },
-  set: (val: number) => {
-    localProgress.value = val
-    if (duration.value > 0 && !isNaN(val)) {
-      seek((val / 100) * duration.value)
-    }
-  },
-})
-
-const displayProgress = computed(() => {
-  if (isDragging.value && duration.value > 0) {
-    const result = (localProgress.value / 100) * duration.value
-    return isNaN(result) ? progress.value : result
-  }
-  return progress.value
-})
+const { progressModel, displayProgress, isDragging } = useDraggableProgress(progress, duration, seek)
 
 onMounted(async () => {
   await restoreFromSettings()

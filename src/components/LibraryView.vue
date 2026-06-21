@@ -6,7 +6,6 @@ import { usePlayerStore } from '../stores/player'
 import type { Song } from '../types'
 import LibraryHeader from './library/LibraryHeader.vue'
 import SongTable from './library/SongTable.vue'
-import VirtualSongTable from './library/VirtualSongTable.vue'
 import SongGrid from './library/SongGrid.vue'
 import BrowseCards from './library/BrowseCards.vue'
 import EmptyStates from './library/EmptyStates.vue'
@@ -203,21 +202,12 @@ const emptyStateType = computed(() => {
           @card-click="onCardClick"
         />
 
-        <!-- List view -->
+        <!-- List view (SongTable 内部按 songs.length > 100 自动切换虚拟滚动) -->
         <SongTable
-          v-if="viewMode === 'list' && displayedSongs.length < 100"
+          v-if="viewMode === 'list'"
           :songs="displayedSongs"
           :current-song-id="currentSong?.id"
           :is-playing="isPlaying"
-          @song-click="onSongClick"
-          @song-menu="openSongMenu"
-        />
-        <VirtualSongTable
-          v-else-if="viewMode === 'list'"
-          :songs="displayedSongs"
-          :current-song-id="currentSong?.id"
-          :is-playing="isPlaying"
-          :container-height="600"
           @song-click="onSongClick"
           @song-menu="openSongMenu"
         />

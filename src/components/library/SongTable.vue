@@ -1,11 +1,15 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import type { Song } from '../../types'
 import { useI18n } from '../../composables/useI18n'
+import VirtualSongTable from './VirtualSongTable.vue'
 
-defineProps<{
+const props = defineProps<{
   songs: Song[]
   currentSongId?: string | null
   isPlaying: boolean
+  /** 是否强制启用虚拟滚动；不传则按 songs.length > 100 自动切换 */
+  virtualEnabled?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -14,10 +18,21 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+
+const useVirtual = computed(() => props.virtualEnabled ?? props.songs.length > 100)
 </script>
 
 <template>
-  <div class="table-scroll">
+  <VirtualSongTable
+    v-if="useVirtual"
+    :songs="songs"
+    :current-song-id="currentSongId"
+    :is-playing="isPlaying"
+    :container-height="600"
+    @song-click="emit('songClick', $event)"
+    @song-menu="(event, songId) => emit('songMenu', event, songId)"
+  />
+  <div v-else class="table-scroll">
     <div class="table-header">
       <div class="col col-num">#</div>
       <div class="col col-title">{{ t('library.title') }}</div>

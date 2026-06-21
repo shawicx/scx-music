@@ -1,5 +1,6 @@
 import { ref, computed, watch } from 'vue'
 import { invokeCommand } from '../utils/errorHandler'
+import { formatHoursMinutes as formatDuration } from '../utils/format'
 import type {
   ListeningOverview,
   HourDuration,
@@ -14,13 +15,6 @@ const loading = ref(false)
 
 function formatDateTimeUTC(d: Date): string {
   return d.toISOString().slice(0, 19).replace('T', ' ')
-}
-
-function formatDuration(secs: number): string {
-  const hours = Math.floor(secs / 3600)
-  const minutes = Math.floor((secs % 3600) / 60)
-  if (hours > 0) return `${hours}h ${minutes}m`
-  return `${minutes}m`
 }
 
 function fillMissingHours(data: HourDuration[]): HourDuration[] {

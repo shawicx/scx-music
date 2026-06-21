@@ -1,5 +1,6 @@
 import { ref, computed } from 'vue'
 import { invokeCommand } from '../utils/errorHandler'
+import { formatHoursMinutes as formatDuration } from '../utils/format'
 import type {
   ListeningOverview,
   TopSong,
@@ -17,13 +18,6 @@ const trend = ref<DayDuration[]>([])
 const heatmap = ref<DayDuration[]>([])
 const loading = ref(false)
 const currentRange = ref<ListeningRange>('7d')
-
-function formatDuration(secs: number): string {
-  const hours = Math.floor(secs / 3600)
-  const minutes = Math.floor((secs % 3600) / 60)
-  if (hours > 0) return `${hours}h ${minutes}m`
-  return `${minutes}m`
-}
 
 export function useListeningStats() {
   async function loadData(range?: ListeningRange) {

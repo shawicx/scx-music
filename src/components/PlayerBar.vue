@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { usePlayerStore } from '../stores/player'
 import { useLibraryStore } from '../stores/library'
 import IconButtonWithTooltip from './IconButtonWithTooltip.vue'
 import { usePlaybackMode } from '../composables/usePlaybackMode'
 import { useDesktopLyrics } from '../composables/useDesktopLyrics'
+import { useDraggableProgress } from '../composables/useDraggableProgress'
 import { useMiniPlayer } from '../composables/useMiniPlayer'
 import { useI18n } from '../composables/useI18n'
 
@@ -53,42 +54,12 @@ async function toggleLike() {
   }
 }
 
-// Local state for dragging
-const isDragging = ref(false)
-const localProgress = ref(0)
-
-const progressModel = computed({
-  get: () => {
-    if (isDragging.value) {
-      return isNaN(localProgress.value) ? 0 : localProgress.value
-    }
-    if (duration.value > 0) {
-      const result = (progress.value / duration.value) * 100
-      return isNaN(result) ? 0 : result
-    }
-    return 0
-  },
-  set: (val: number) => {
-    localProgress.value = val
-    if (duration.value > 0 && !isNaN(val)) {
-      seek((val / 100) * duration.value)
-    }
-  },
-})
-
 const volumeModel = computed({
   get: () => Math.round(volume.value * 100),
   set: (val: number) => setVolume(val / 100),
 })
 
-// Display current time during drag
-const displayProgress = computed(() => {
-  if (isDragging.value && duration.value > 0) {
-    const result = (localProgress.value / 100) * duration.value
-    return isNaN(result) ? progress.value : result
-  }
-  return progress.value
-})
+const { progressModel, displayProgress, isDragging } = useDraggableProgress(progress, duration, seek)
 </script>
 
 <template>

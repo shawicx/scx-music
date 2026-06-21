@@ -2,6 +2,7 @@ import { ref, computed } from 'vue'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import type { Song, PlaybackMode, PlaybackState } from '../types'
 import { invokeCommand } from '../utils/errorHandler'
+import { formatTimecode as formatTime } from '../utils/format'
 import { useToast } from './useToast'
 import i18n from '../i18n'
 import { generateQueue } from './usePlayQueue'
@@ -74,12 +75,6 @@ async function setupListeners() {
       console.error('Audio error:', e.payload)
     }),
   )
-}
-
-function formatTime(secs: number): string {
-  if (isNaN(secs) || !isFinite(secs)) return '0:00'
-  const s = Math.max(0, Math.floor(secs))
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
 }
 
 const progressFormatted = computed(() => formatTime(progress.value))

@@ -63,21 +63,7 @@ pub fn get_playlist_songs(db: tauri::State<'_, Db>, playlist_id: String) -> AppR
              ORDER BY ps.sort_order",
         )?;
     let songs = stmt
-        .query_map(params![playlist_id], |row| {
-            Ok(Song {
-                id: row.get(0)?,
-                title: row.get(1)?,
-                artist: row.get(2)?,
-                album: row.get(3)?,
-                duration: row.get(4)?,
-                duration_secs: row.get(5)?,
-                quality: row.get(6)?,
-                file_path: row.get(7)?,
-                art_gradient: row.get(8)?,
-                genre: row.get(9)?,
-                file_size: row.get(10)?,
-            })
-        })?
+        .query_map(params![playlist_id], Song::from_row)?
         .collect::<Result<Vec<_>, _>>()?;
     Ok(songs)
 }

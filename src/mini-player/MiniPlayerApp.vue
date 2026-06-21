@@ -8,14 +8,9 @@ import MiniPlayer from './MiniPlayer.vue'
   </v-app>
 </template>
 
+<style src="../styles/window-reset.css"></style>
 <style>
 html, body, #app {
-  margin: 0;
-  padding: 0;
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
   background: rgb(var(--v-theme-surface));
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 </style>

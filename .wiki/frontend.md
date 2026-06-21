@@ -54,7 +54,7 @@
 - `audio:error` - 音频错误
 
 **工具方法：**
-- `formatTime()` - 时间格式化
+- `formatTime()` - 时间格式化（2026-06-21 D1 重构后，实现在 `utils/format.ts::formatTimecode`，此处为别名 re-export）
 - `progressFormatted` / `durationFormatted` - 格式化计算属性
 - `updateSongInQueue(updatedSong)` - 更新队列数组中对应歌曲，同步更新 `currentSong` ref（用于歌曲重命名后保持播放状态一致）
 
@@ -110,7 +110,7 @@
 
 **工具方法：**
 - `formattedTotalSize` / `formattedTotalDuration` - 格式化计算属性
-- `formatFileSize()` / `formatDuration()` - 格式化工具
+- `formatFileSize()` / `formatDuration()` - 格式化工具（2026-06-21 D1 重构后，实现在 `utils/format.ts::formatFileSize` / `formatHoursMinutes`，此处为别名 re-export）
 
 **主题系统：**
 - 使用 Vuetify 3.x 主题系统
@@ -155,9 +155,9 @@
 - **RenameDialog.vue** - 歌曲重命名对话框（标题必填、艺术家、专辑可选，loading/error 状态，Enter 提交）
 - **UpdateDialog.vue** - 自动更新提示弹窗（available/downloading/ready/error 四状态，进度条，重启按钮）
 - **SongGrid.vue** - 歌曲网格视图（小数据量）
-- **SongTable.vue** - 歌曲表格视图（小数据量）
+- **SongTable.vue** - 歌曲表格视图（门面组件，内部按 `songs.length > 100` 自动委托 VirtualSongTable；2026-06-21 D1 合并后由 LibraryView 单一引用）
 - **SortMenu.vue** - 排序菜单（标题/艺术家/专辑/时长排序）
-- **VirtualSongTable.vue** - 虚拟滚动表格（大数据优化，>100首歌）
+- **VirtualSongTable.vue** - 虚拟滚动表格（大数据优化，>100首歌；现为 SongTable 内部委托组件，不再被 LibraryView 直接引用）
 
 ### Settings 子组件 (components/settings/)
 
@@ -170,8 +170,8 @@
 - 捕获流程：点击「重新绑定」→ 显示「请按下组合键…」→ 捕获到完整组合 → 显示预览 + 「保存」按钮
 
 ### 组件使用策略
-- **小数据量** (< 100首歌): 使用 SongTable.vue 或 SongGrid.vue
-- **大数据量** (> 100首歌): 自动切换到 VirtualSongTable.vue 提升性能
+- **小数据量** (< 100首歌): 使用 SongTable.vue（内部非虚拟模式）或 SongGrid.vue
+- **大数据量** (> 100首歌): SongTable.vue 内部自动切换到 VirtualSongTable.vue 提升性能（2026-06-21 D1 合并后，LibraryView 只引 SongTable）
 
 ## 工具函数
 

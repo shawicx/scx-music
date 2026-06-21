@@ -21,21 +21,7 @@ pub fn get_bootstrap_data(db: tauri::State<'_, Db>) -> AppResult<BootstrapData> 
     let mut stmt = conn
         .prepare("SELECT id, title, artist, album, duration, duration_secs, quality, file_path, art_gradient, genre, file_size FROM songs ORDER BY created_at")?;
     let songs = stmt
-        .query_map([], |row| {
-            Ok(Song {
-                id: row.get(0)?,
-                title: row.get(1)?,
-                artist: row.get(2)?,
-                album: row.get(3)?,
-                duration: row.get(4)?,
-                duration_secs: row.get(5)?,
-                quality: row.get(6)?,
-                file_path: row.get(7)?,
-                art_gradient: row.get(8)?,
-                genre: row.get(9)?,
-                file_size: row.get(10)?,
-            })
-        })?
+        .query_map([], Song::from_row)?
         .collect::<Result<Vec<_>, _>>()?;
 
     // Playlists
