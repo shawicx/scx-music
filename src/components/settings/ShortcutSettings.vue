@@ -146,30 +146,9 @@ onMounted(loadAll)
   </v-card>
 </template>
 
+<style src="../../styles/settings-card.css"></style>
 <style scoped>
-/* 与 SettingsView 中其他 settings-card 保持视觉一致 */
-.settings-card {
-  padding: 20px;
-  margin-bottom: 16px;
-  border-radius: 12px;
-}
-
-.card-header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 16px;
-}
-
-.card-icon {
-  color: rgb(var(--v-theme-primary));
-}
-
-.card-title {
-  font-size: var(--text-md);
-  font-weight: 600;
-}
-
+/* ShortcutSettings 专有样式 */
 .shortcuts-list {
   padding: 0;
 }
@@ -181,9 +160,8 @@ onMounted(loadAll)
   line-height: 1.5;
 }
 
+/* action-row 在本组件需要额外上间距（覆盖共享 .action-row） */
 .action-row {
-  display: flex;
-  gap: 12px;
   margin-top: 12px;
 }
 </style>

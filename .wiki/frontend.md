@@ -131,7 +131,7 @@
 - **LibraryView.vue** - 音乐库主容器
 - **PlayerBar.vue** - 底部播放控制（toggleQueue 事件触发 PlayQueueDrawer）
 - **PlayQueueDrawer.vue** - 播放队列抽屉（GSAP Flip 列表重排动画、点击歌曲播放、模式切换按钮）
-- **SettingsView.vue** - 设置页面
+- **SettingsView.vue** - 设置页面（容器，tab 切换：外观/音频/桌面歌词/快捷键/数据管理；2026-06-21 D2 拆分后 621→118 行）
 - **AnalysisView.vue** - 曲库分析（5 概览卡片 + 4 ECharts 图表 + 专辑排行列表）
 - **NowPlayingOverlay.vue** - 正在播放覆盖层
 - **LyricsDisplay.vue** - 歌词显示（同步滚动、点击跳转、骨架屏加载态）
@@ -160,6 +160,15 @@
 - **VirtualSongTable.vue** - 虚拟滚动表格（大数据优化，>100首歌；现为 SongTable 内部委托组件，不再被 LibraryView 直接引用）
 
 ### Settings 子组件 (components/settings/)
+
+SettingsView.vue 是容器（tab 切换），5 个 tab 各委托一个子组件（2026-06-21 D2 拆分）：
+- `AppearanceSettings.vue` — 外观（语言/主题模式/主题颜色）
+- `AudioDeviceSettings.vue` — 音频输出设备（依赖 `useAudioDevice` composable）
+- `DesktopLyricsSettings.vue` — 桌面歌词配置（bgOpacity/fontSize/colorCurrent/colorNext/glowStrength/锁定）
+- `ShortcutSettings.vue` — 快捷键（见下）
+- `DataManagementSettings.vue` — 数据管理（备份/恢复/设置导入导出）
+- `KeyCaptureField.vue` — ShortcutSettings 的子组件
+共享 CSS 在 `src/styles/settings-card.css`（`.settings-card`/`.card-*`/`.mode-toggle`/`.mode-button`/`.action-row`），各子组件用 `<style src>` 引用。
 
 ### `ShortcutSettings` / `KeyCaptureField`
 
@@ -201,6 +210,7 @@
 - **composables/useDebounceSearch.ts** - 搜索防抖（300ms）
 - **composables/useOptimizedSort.ts** - 排序缓存（中文 locale 支持）
 - **composables/useImportExport.ts** - 导入导出功能（歌单导出 M3U/PLS、音乐库备份恢复、设置迁移）
+- **composables/useAudioDevice.ts** - 音频输出设备管理（封装 player_get_output_devices/current/set 三个 IPC，2026-06-21 D2 抽出，原 SettingsView 内联）
 - **composables/useAutoUpdate.ts** - 自动更新逻辑（启动延迟检查、下载进度跟踪、重启安装）
 - **composables/useLibraryAnalysis.ts** - 曲库分析（loadStats IPC、格式化工具）
 - **composables/useListeningReport.ts** - 报告周期状态管理（见下文）

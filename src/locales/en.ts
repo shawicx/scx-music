@@ -84,6 +84,13 @@ export default {
   },
   settings: {
     title: 'Settings',
+    tabs: {
+      appearance: 'Appearance',
+      audio: 'Audio',
+      lyrics: 'Desktop Lyrics',
+      shortcuts: 'Shortcuts',
+      data: 'Data',
+    },
     themeMode: 'Theme Mode',
     themeColor: 'Theme Color',
     outputDevice: 'Output Device',

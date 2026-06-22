@@ -1,0 +1,71 @@
+/* 设置卡片共享样式（AppearanceSettings/AudioDeviceSettings/DesktopLyricsSettings/
+ * ShortcutSettings/DataManagementSettings 共用）。各子组件用
+ * <style src="../../styles/settings-card.css"></style> 引入，再各自加 scoped 业务样式。
+ * 从 SettingsView.vue 原 <style scoped> 提取（行 418-475, 567-570）。
+ */
+
+.settings-card {
+  padding: 20px;
+  margin-bottom: 16px;
+  border-radius: 12px;
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.card-icon {
+  color: rgb(var(--v-theme-primary));
+}
+
+.card-title {
+  font-size: var(--text-md);
+  font-weight: 600;
+}
+
+/* mode-toggle：用于语言/主题模式/桌面歌词 glow/恢复策略选择 */
+.mode-toggle {
+  display: flex;
+  gap: 8px;
+  padding: 4px;
+  background: rgb(var(--v-theme-surface-variant));
+  border-radius: 10px;
+  border: 1px solid rgb(var(--v-theme-border));
+}
+
+.mode-button {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.2s;
+  color: rgb(var(--v-theme-on-background));
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+.mode-button:hover {
+  background: rgba(var(--v-theme-primary), 0.1);
+}
+
+.mode-button.active {
+  background: rgb(var(--v-theme-primary));
+  color: rgb(var(--v-theme-on-primary));
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* action-row：按钮横排 */
+.action-row {
+  display: flex;
+  gap: 12px;
+}

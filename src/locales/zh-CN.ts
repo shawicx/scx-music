@@ -84,6 +84,13 @@ export default {
   },
   settings: {
     title: '设置',
+    tabs: {
+      appearance: '外观',
+      audio: '音频',
+      lyrics: '桌面歌词',
+      shortcuts: '快捷键',
+      data: '数据管理',
+    },
     themeMode: '主题模式',
     themeColor: '主题颜色',
     outputDevice: '输出设备',
