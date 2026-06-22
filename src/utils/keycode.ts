@@ -1,5 +1,5 @@
 /**
- * Tauri global-hotkey 的媒体/音频键代码 → 友好展示
+ * @description Tauri global-hotkey 的媒体/音频键代码 → 友好展示
  * 故意不与 action label 重合，让用户能区分「动作描述」和「物理键位」
  */
 const KEY_DISPLAY: Record<string, string> = {
@@ -13,13 +13,13 @@ const KEY_DISPLAY: Record<string, string> = {
 }
 
 /**
- * 把 Tauri globalShortcut 的组合字符串转成平台友好的展示形式
- * 输入示例：'CommandOrControl+Shift+M'
+ * @description 把 Tauri globalShortcut 的组合字符串转成平台友好的展示形式
+ * @example 输入示例：'CommandOrControl+Shift+M'
  *   macOS 输出：'⌘+Shift+M'
  *   Windows 输出：'Ctrl+Shift+M'
- * 输入示例：'MediaPlayPause'
+ * @example 输入示例：'MediaPlayPause'
  *   输出：'Media Play/Pause'
- * 输入示例：'CommandOrControl+Shift+KeyM'
+ * @example 输入示例：'CommandOrControl+Shift+KeyM'
  *   输出：'⌘+Shift+M'（Key 前缀被剥离）
  */
 export function formatCombo(

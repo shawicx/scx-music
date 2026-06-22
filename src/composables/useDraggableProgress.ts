@@ -1,9 +1,8 @@
 import { computed, ref, type Ref } from 'vue'
 
 /**
- * 进度条拖拽逻辑（PlayerBar 和 MiniPlayer 共用）。
+ * @description 进度条拖拽逻辑（PlayerBar 和 MiniPlayer 共用）。
  *
- * 行为说明（与原内联实现一致）：
  * - `progressModel` 的 setter 在每次值变时**实时 seek**（非仅拖拽结束 seek）
  * - `isDragging` 控制显示：拖拽中显示 localProgress 对应的时间，否则显示真实 progress
  * - `@start="isDragging = true"` / `@end="isDragging = false"` 由模板直接赋值

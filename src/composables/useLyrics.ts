@@ -2,11 +2,9 @@ import { ref, watch, onUnmounted, type Ref } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import type { Song } from '../types'
+import { parseLrc, type LrcLine } from '../utils/lyrics'
 
-export interface LrcLine {
-  time: number
-  text: string
-}
+export type { LrcLine }
 
 interface LyricsResult {
   rawLrc: string | null
@@ -14,27 +12,8 @@ interface LyricsResult {
   offsetSecs: number
 }
 
-const LRC_REGEX = /\[(\d{2}):(\d{2})\.(\d{2,3})](.*)/
 const OFFSET_MIN = -10.0
 const OFFSET_MAX = 10.0
-
-function parseLrc(raw: string): LrcLine[] {
-  const lines: LrcLine[] = []
-  for (const line of raw.split('\n')) {
-    const match = line.trim().match(LRC_REGEX)
-    if (match) {
-      const min = parseInt(match[1])
-      const sec = parseInt(match[2])
-      const ms = match[3].length === 2 ? parseInt(match[3]) * 10 : parseInt(match[3])
-      lines.push({
-        time: min * 60 + sec + ms / 1000,
-        text: match[4].trim(),
-      })
-    }
-  }
-  lines.sort((a, b) => a.time - b.time)
-  return lines
-}
 
 export function useLyrics(currentSong: Ref<Song | null>) {
   const lines = ref<LrcLine[]>([])

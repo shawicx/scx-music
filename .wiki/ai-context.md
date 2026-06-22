@@ -151,6 +151,17 @@ pnpm app:dev
 # 构建
 pnpm app:build
 
+# 前端测试（vitest）
+pnpm test              # 单次运行
+pnpm test:watch        # watch 模式
+pnpm test:coverage     # 生成 coverage 报告（coverage/）
+
 # Rust 后端测试
 cd src-tauri && cargo test
 ```
+
+## 测试约定
+
+- **前端**：测试文件与源码同目录，命名 `*.test.ts`（如 `src/utils/format.test.ts`）。配置在 `vitest.config.ts`（与 `vite.config.ts` 分离，避免影响 dev server）。首批覆盖 `src/utils/**` 与 `src/composables/usePlayQueue.ts`。
+- **Rust**：测试内联在源文件的 `#[cfg(test)] mod tests`（如 `audio/engine.rs`、`commands/stats.rs`）。
+- **CI**：`build.yml` 在 `pnpm install` 后、打包前自动跑 `pnpm test` 与 `cargo test`。

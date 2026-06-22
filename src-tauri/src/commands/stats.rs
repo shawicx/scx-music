@@ -443,3 +443,30 @@ pub fn stats_hourly_distribution(
         ?;
     Ok(rows)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn absolute_dates_bind_as_parameters() {
+        let (sql, params) =
+            build_time_filter(None, Some("2026-01-01"), Some("2026-02-01"));
+        assert!(sql.contains("AND ph.played_at >= ? AND ph.played_at < ?"), "sql={sql}");
+        assert_eq!(params.len(), 2);
+    }
+
+    #[test]
+    fn range_7d_uses_sqlite_datetime_with_no_params() {
+        let (sql, params) = build_time_filter(Some("7d"), None, None);
+        assert!(sql.contains("datetime('now', '-7 days')"), "sql={sql}");
+        assert!(params.is_empty());
+    }
+
+    #[test]
+    fn no_filter_returns_empty() {
+        let (sql, params) = build_time_filter(None, None, None);
+        assert!(sql.is_empty(), "sql={sql}");
+        assert!(params.is_empty());
+    }
+}

@@ -350,3 +350,91 @@ impl AudioStateInner {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::audio::types::{PlaybackMode, QueuedSong};
+
+    fn make_queue(len: usize) -> Vec<QueuedSong> {
+        (0..len)
+            .map(|i| QueuedSong {
+                id: format!("song-{i}"),
+                title: format!("T{i}"),
+                artist: "A".into(),
+                album: "Al".into(),
+                duration_secs: 0.0,
+                quality: "lossy".into(),
+                file_path: format!("/p/{i}"),
+            })
+            .collect()
+    }
+
+    #[test]
+    fn sequential_returns_next_until_end() {
+        let mut state = AudioStateInner::new();
+        state.queue = make_queue(3);
+        state.mode = PlaybackMode::Sequential;
+
+        state.queue_index = 0;
+        assert_eq!(state.next_index(), Some(1));
+
+        state.queue_index = 1;
+        assert_eq!(state.next_index(), Some(2));
+
+        // 末尾返回 None（停止）
+        state.queue_index = 2;
+        assert_eq!(state.next_index(), None);
+    }
+
+    #[test]
+    fn sequential_empty_queue_returns_none() {
+        let mut state = AudioStateInner::new();
+        state.mode = PlaybackMode::Sequential;
+        assert_eq!(state.next_index(), None);
+    }
+
+    #[test]
+    fn repeat_all_wraps_around() {
+        let mut state = AudioStateInner::new();
+        state.queue = make_queue(3);
+        state.mode = PlaybackMode::RepeatAll;
+
+        state.queue_index = 1;
+        assert_eq!(state.next_index(), Some(2));
+
+        // 末尾回到 0
+        state.queue_index = 2;
+        assert_eq!(state.next_index(), Some(0));
+    }
+
+    #[test]
+    fn repeat_one_stays_at_current() {
+        let mut state = AudioStateInner::new();
+        state.queue = make_queue(3);
+        state.mode = PlaybackMode::RepeatOne;
+
+        state.queue_index = 1;
+        assert_eq!(state.next_index(), Some(1));
+    }
+
+    #[test]
+    fn shuffle_never_returns_current_and_single_track_returns_zero() {
+        let mut state = AudioStateInner::new();
+        state.queue = make_queue(5);
+        state.mode = PlaybackMode::Shuffle;
+
+        // 多元素：任一起点都不返回自身，且落在合法范围
+        for start in 0..5 {
+            state.queue_index = start;
+            let next = state.next_index().expect("shuffle should return Some");
+            assert_ne!(next, start, "shuffle 不应返回当前索引");
+            assert!(next < 5, "shuffle 索引越界");
+        }
+
+        // 单元素：退化为返回 0
+        state.queue = make_queue(1);
+        state.queue_index = 0;
+        assert_eq!(state.next_index(), Some(0));
+    }
+}

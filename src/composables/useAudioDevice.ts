@@ -6,12 +6,8 @@ import { useToast } from './useToast'
 type AudioDeviceInfo = AudioDevicesResponse['devices'][number]
 
 /**
- * 音频输出设备管理（原 SettingsView.vue 行 54-74 内联逻辑）。
+ * 音频输出设备管理
  *
- * 把原本直接 invoke 的 3 个 IPC 调用封装为 composable，
- * 组件不再绕过 store 层直接 invoke。
- *
- * 行为（与原 SettingsView 一致）：
  * - `loadDevices()`：拉取设备列表 + 当前选中设备（onMounted 自动调用）
  * - `selectDevice(name|null)`：乐观更新 selectedDevice → invoke → 始终 loadDevices 重同步；
  *   失败时 showToast + loadDevices 回滚
