@@ -39,6 +39,15 @@ const MAX_RECURSION_DEPTH: usize = 16;
 /// 扫描文件总数上限：防止超大目录卡死扫描。超出静默截断。
 const MAX_FILES_TOTAL: usize = 50_000;
 
+/// 递归扫描音乐文件夹，返回元数据列表（IPC 命令 `scan_music_folder`）。
+///
+/// 支持的扩展名：mp3 / flac / wav / aac / ogg / m4a / opus / wma。
+/// 防护（防止异常输入卡死或栈溢出）：
+/// - **深度上限** `MAX_RECURSION_DEPTH = 16`：超过即停止递归（防循环符号链接）
+/// - **总数上限** `MAX_FILES_TOTAL = 50_000`：达到即静默截断（防超大目录）
+/// - **跳过符号链接**：用 `symlink_metadata`（不跟随）检测并跳过，避免循环链接无限递归
+///
+/// 非文件夹路径返回 `InvalidArgument` 错误。
 #[tauri::command]
 fn scan_music_folder(dir_path: String) -> AppResult<Vec<SongEntry>> {
     let path = Path::new(&dir_path);

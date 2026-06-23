@@ -17,6 +17,21 @@
 - **DesktopLyricsApp.vue** - 桌面歌词窗口根（极简，无 AppShell）
 - **MiniPlayerApp.vue** - 迷你播放器窗口根（挂载 `MiniPlayer.vue`）
 
+## 多窗口架构（2026-06-15 起）
+
+应用包含 4 个 Tauri 窗口，各自独立 JS 上下文，composable 模块级状态在窗口内单例。详见各窗口小节（桌面歌词窗口 / 迷你播放器窗口）和 `.wiki/architecture.md` 窗口系统表。
+
+| 窗口 Label | 根组件 | 用途 |
+|------------|--------|------|
+| `main` | App.vue | 主窗口：侧边栏 + 主区域 + PlayerBar |
+| `mini-player` | MiniPlayerApp.vue | 迷你播放器（与主窗口互斥切换） |
+| `desktop-lyrics` | DesktopLyricsApp.vue | 桌面歌词悬浮窗（透明、置顶、双行） |
+| `desktop-lyrics-lock` | （辅助窗口） | 锁定态 36×36 锁按钮窗口（光标穿透占位） |
+
+**跨窗口通信**：`listen('event', ...)` + `app.emit('event', payload)` 全局广播。`audio:*` 事件已在 Rust 侧广播到所有 webview；业务事件（`desktop-lyrics:config-changed` / `mini-player:active-changed` 等）走同样路径。
+
+**入口分发**：`src/main.ts` 检测 `window.location.hash`（`#mini-player` / `#desktop-lyrics`）条件挂载对应根组件，否则挂载 `App.vue`。
+
 ## Router
 
 无复杂路由，使用 `activeView` 状态切换视图：library / settings / analysis / stats。

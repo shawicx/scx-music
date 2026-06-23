@@ -25,6 +25,6 @@ coverage
 *.sw?
 .superpowers/
 .remember/
-docs/superpowers/
+superpowers/
 .superpowers/
 .playwright-mcp

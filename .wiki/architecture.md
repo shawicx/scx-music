@@ -59,8 +59,10 @@ Rust Handler -> IPC Event -> Pinia Store -> UI Update
 |-------|------|--------|------|
 | `main` | (默认) | `App.vue` | 主窗口，侧边栏 + 主区域 + PlayerBar |
 | `desktop-lyrics` | `#desktop-lyrics` | `DesktopLyricsApp.vue` | 桌面歌词悬浮窗口（透明、置顶、双行） |
-| `desktop-lyrics-lock` | — | — | 锁定态辅助窗口（光标穿透占位） |
+| `desktop-lyrics-lock` | — | — | 锁定态辅助窗口（36×36 锁按钮，光标穿透占位） |
 | `mini-player` | `#mini-player` | `MiniPlayerApp.vue` | 迷你播放器悬浮窗口，与主窗口互斥切换 |
+
+> 各窗口的根组件结构见 [frontend.md#多窗口架构](frontend.md#多窗口架构)；跨窗口状态来源与同步见 [state.md#多窗口状态来源](state.md#多窗口状态来源)。四个窗口各自独立 JS 上下文，composable 模块级状态在窗口内单例；跨窗口通过 `app.emit()` 广播 + 各窗口 `listen()` 接收同步。
 
 ### mini-player 窗口
 

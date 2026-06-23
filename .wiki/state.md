@@ -6,6 +6,21 @@
 **后端：** Rust structs + SQLite
 **IPC：** Tauri Events (后端 -> 前端)
 
+## 多窗口状态来源（2026-06-15 起新增）
+
+应用包含 4 个独立 Tauri 窗口（各自独立 JS 上下文），状态来源按窗口划分：
+
+| 窗口 | 主要状态来源 |
+|------|------------|
+| **主窗口** (`main`) | 全部 Pinia store + 主窗口专用的 `useMiniPlayer` / `useDesktopLyrics` / `useGlobalShortcuts` / `useAutoUpdate` |
+| **迷你播放器** (`mini-player`) | `useMiniPlayer`（模块级单例）+ `usePlayer` 监听 `audio:*` 广播事件 |
+| **桌面歌词** (`desktop-lyrics`) | `useDesktopLyrics`（模块级单例 + `lyricsInstance` 缓存）+ `useLyrics` |
+| **锁按钮** (`desktop-lyrics-lock`) | `useDesktopLyrics`（共享锁定/配置状态） |
+
+**跨窗口同步**：通过 Tauri `app.emit()`（全局广播）+ 各窗口 `listen()` 实现。`audio:progress` / `audio:track_change` / `audio:state_change` 已在 Rust 侧广播到所有 webview；自定义业务事件（如 `desktop-lyrics:config-changed`、`mini-player:active-changed`）走同样路径。
+
+**单例化**：`useMiniPlayer` / `useDesktopLyrics` / `usePlayer` 均采用模块级状态 + 幂等 init guard，避免主窗口多个组件重复注册监听器导致累积泄漏（详见 `.wiki/risks.md`）。
+
 ## 状态更新方式
 
 ### 前端状态 (Vue + Pinia)
@@ -43,13 +58,14 @@ listen('audio:state_change', (e) => {
 - playlists 表
 - playlist_songs 表
 - settings 表
-- lyrics 表 (V3 新增)
+- lyrics 表（INIT_SCHEMA 内）
+- play_history 表（V6_PLAY_HISTORY 新增）
 
 ## 关键状态
 
 ### 播放器状态 (stores/player.ts - usePlayerStore)
 
-**来源：** Rust audio.rs + Events
+**来源：** Rust audio/ 模块（engine.rs + Events）
 **更新方式：**
 - 用户操作 -> IPC Command -> Rust 状态变更 -> Event -> Store 状态
 - 进度线程直接推送 progress 事件

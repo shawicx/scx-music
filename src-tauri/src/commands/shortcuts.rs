@@ -13,7 +13,13 @@ pub struct ShortcutDefault {
     pub enabled: bool,
 }
 
-/// 内置动作清单 + 默认绑定
+/// 内置快捷键默认清单（11 项）。
+///
+/// 顺序固定：3 个媒体键（默认开）+ 4 个媒体扩展（默认关）+ 4 个应用动作（默认关）。
+/// 启动时由 `setup_shortcuts_at_start` 从 settings 表读取 `shortcut.<id>` 覆盖值后批量注册。
+///
+/// 返回的 `ShortcutDefault` 是 Rust ↔ 前端共享的结构契约：前端 `useGlobalShortcuts`
+/// 拉取本清单初始化 UI，rebind/reset 后写回 settings 表，下次启动由 Rust 侧读取覆盖。
 ///
 /// 注意：combo 字符串格式遵循 Tauri globalShortcut 文档约定：
 /// - 修饰符：CommandOrControl / Shift / Alt / Super

@@ -13,24 +13,25 @@
 
 ## 数据表结构
 
-### songs (V1)
+### songs (INIT_SCHEMA + V6 缓存列)
 **作用：** 存储歌曲元数据
-**关键字段：** id (TEXT PK), title, artist, album, duration (TEXT), duration_secs (REAL), quality, file_path (TEXT UNIQUE), art_gradient, created_at
-**索引：** id (PK), file_path (UNIQUE), artist, album, title, created_at
+**关键字段：** id (TEXT PK), title, artist, album, duration (TEXT), duration_secs (REAL), quality, file_path (TEXT UNIQUE), art_gradient, genre, file_size, created_at
+**缓存列（V6 新增）：** play_count (INTEGER, 默认 0), total_play_duration (REAL, 默认 0.0)
+**索引：** id (PK), file_path (UNIQUE), artist, album, title, created_at, genre
 
-### playlists (V1)
+### playlists (INIT_SCHEMA)
 **作用：** 存储播放列表
 **关键字段：** id (TEXT PK), name, sort_order, created_at
 **索引：** id (PK)
 **初始数据：** 'fav' (我喜欢的)
 
-### playlist_songs (V1)
-**作用：** 播放列表和歌曲的多对多关系
+### playlist_songs (INIT_SCHEMA)
+**作用：** 存储播放列表和歌曲的多对多关系
 **关键字段：** playlist_id, song_id, sort_order
 **约束：** PRIMARY KEY (playlist_id, song_id), FOREIGN KEYS (ON DELETE CASCADE)
 **索引：** (playlist_id), (playlist_id, sort_order)
 
-### settings (V1)
+### settings (INIT_SCHEMA)
 **作用：** 存储应用设置键值对
 **关键字段：** key (TEXT PK), value
 **常用设置：**
@@ -43,11 +44,21 @@
 - `activePlaylistId` - 当前播放列表
 - `language` - 界面语言
 - `visualization_style` - 可视化风格
+- `desktop-lyrics.*` - 桌面歌词配置（前缀）
+- `mini-player.*` - 迷你播放器配置（前缀）
+- `shortcut.*` - 全局快捷键绑定（前缀）
 
-### lyrics (V3)
+### lyrics (INIT_SCHEMA)
 **作用：** 歌词缓存
 **关键字段：** song_id (TEXT PK), raw_lrc (TEXT), source (TEXT)
 **source 值：** embedded / lrclib / none
+
+### play_history (V6_PLAY_HISTORY)
+**作用：** 播放历史明细，驱动听歌统计（周/月/年报告、时段分布）
+**关键字段：** id (INTEGER PK AUTOINCREMENT), song_id (TEXT, FK), played_at (TEXT, 默认 now), duration_secs (REAL)
+**约束：** FOREIGN KEY song_id → songs(id) ON DELETE CASCADE
+**索引：** song_id, played_at
+**写入触发：** 进度线程每 ~30s 自动 flush（仅时长，不增 play_count）；切歌/退出时 finalize（时长 + 满足 50% 阈值才 play_count +1）
 
 ## Cache
 
@@ -69,7 +80,7 @@
 
 ### 数据库迁移
 应用升级时 schema 变更可能导致数据丢失
-**缓解：** 使用 migrations.rs 版本化管理 (V1-V3)
+**缓解：** 使用 migrations.rs 版本化管理 (INIT_SCHEMA + V6_PLAY_HISTORY)
 
 ### 大文件处理
 音频文件不存储在数据库中，只存储路径

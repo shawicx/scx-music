@@ -36,15 +36,16 @@ src/utils/errorHandler.ts        # 统一错误处理
 ### 后端
 ```
 src-tauri/src/lib.rs              # Tauri 主入口 (命令注册)
-src-tauri/src/audio.rs            # 音频引擎 (核心)
+src-tauri/src/audio/             # 音频引擎模块 (engine.rs 核心、commands.rs 播放、device.rs 设备、tracker.rs 统计)
 src-tauri/src/analyzer.rs         # FFT 频谱分析器
+src-tauri/src/error.rs            # 统一 AppError 枚举
 src-tauri/src/commands/bootstrap.rs  # 启动批量加载
 src-tauri/src/commands/lyrics.rs  # 歌词获取 (缓存→内嵌→LRCLIB)
 src-tauri/src/commands/songs.rs   # 歌曲数据操作
 src-tauri/src/commands/playlists.rs  # 播放列表操作
 src-tauri/src/commands/settings.rs   # 设置管理
 src-tauri/src/db/mod.rs           # 数据库管理
-src-tauri/src/db/migrations.rs    # 数据库迁移 (V1-V3)
+src-tauri/src/db/migrations.rs    # 数据库迁移 (INIT_SCHEMA + V6_PLAY_HISTORY)
 src-tauri/src/db/models.rs        # 数据模型 (Song, Playlist)
 ```
 
@@ -63,8 +64,8 @@ App.vue onMounted
 ```
 UI -> usePlayerStore.playFromQueue()
 -> invokeCommand('player_set_queue')
--> audio.rs::player_set_queue()
--> audio.rs::play_file_at_index()
+-> audio/commands.rs::player_set_queue()
+-> audio/engine.rs::play_file_at_index()
 -> emit('audio:state_change')
 -> usePlayerStore 监听器
 -> UI 更新
@@ -96,11 +97,11 @@ UI -> useLibraryStore.importToPlaylist()
 | useLibraryStore | 音乐库 | Bootstrap 加载、搜索/筛选/排序、播放列表 CRUD |
 | useSettingsStore | 设置主题 | Vuetify 主题、系统检测、数据库持久化 |
 | useLyrics | 歌词 | LRC 解析、多源获取、实时同步 |
-| audio.rs | 音频引擎 | Rodio 封装、线程安全、设备切换 |
+| audio/ | 音频引擎 | Rodio 封装、线程安全、设备切换 |
 | analyzer.rs | 频谱分析 | FFT 256点→64bins、30fps 推送 |
 | bootstrap.rs | 启动加载 | 单次 IPC 全量数据 |
 | lyrics.rs | 歌词后端 | 缓存→内嵌→LRCLIB 三级获取 |
-| db/ | 数据库 | SQLite WAL、迁移管理 (V1-V3) |
+| db/ | 数据库 | SQLite WAL、迁移管理 (INIT_SCHEMA + V6) |
 
 ## 注意事项
 

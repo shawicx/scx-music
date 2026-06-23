@@ -288,6 +288,17 @@ impl AudioStateInner {
         Ok(())
     }
 
+    /// 计算下一次播放的队列索引。
+    ///
+    /// 行为随 `mode` 变化：
+    /// - `Sequential`: 顺序往后，到末尾返回 `None`（自然播完后停止，不切歌）
+    /// - `RepeatAll`: 顺序往后，到末尾回到索引 0
+    /// - `RepeatOne`: 返回当前索引（不切歌，由 sink 的循环实现重播）
+    /// - `Shuffle`: 从「非当前索引」中随机选，避免连续两次同一首
+    ///   （队列长度为 1 时退化为单曲循环）
+    ///
+    /// 调用方：`player_next` 命令、进度线程（自然播完时检测 None 不触发下一首）。
+    /// 返回 `None` 时 player_next 保持当前歌曲、进度线程不切歌。
     pub(super) fn next_index(&self) -> Option<usize> {
         if self.queue.is_empty() {
             return None;

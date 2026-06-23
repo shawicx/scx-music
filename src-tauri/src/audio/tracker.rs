@@ -40,10 +40,21 @@ impl PlaySession {
     }
 }
 
+/// 单次会话写入 play_history 的最短累计时长（秒）。
+/// 低于此值视为「试听不足」，不计入播放历史。
 const MIN_RECORD_SECS: f64 = 5.0;
 
-/// Write play duration to database (history + total_play_duration).
-/// Does NOT touch play_count — use finalize_session for that.
+/// 将当前播放会话的累计时长写入 play_history 表 + 更新 songs.total_play_duration。
+///
+/// 仅当累计时长 `secs >= MIN_RECORD_SECS`（5.0）才计入，否则视为
+/// "试听不足"，直接跳过返回 `Ok(false)`。
+///
+/// **注意**：本函数只写时长，**不**修改 `play_count` —— 计数逻辑由
+/// `finalize_session` 负责（切歌/退出时调用，满足 50% 时长阈值才 +1）。
+/// 因此进度线程每 ~30s 自动 flush 是安全的，不会重复计数。
+///
+/// 写入在一个事务内完成（INSERT play_history + UPDATE songs），返回
+/// `Ok(true)` 表示写入了记录，`Ok(false)` 表示因时长不足跳过。
 pub fn flush_session(
     conn: &rusqlite::Connection,
     session: &PlaySession,
