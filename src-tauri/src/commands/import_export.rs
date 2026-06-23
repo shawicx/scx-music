@@ -395,6 +395,16 @@ pub fn import_settings(
 mod tests {
     use super::validate_user_path;
 
+    /// 返回当前平台的绝对路径根（Unix 为 `/`，Windows 为 `C:\`），
+    /// 以便测试用例在所有平台上都能构造出合法的绝对路径。
+    fn abs_root() -> &'static str {
+        if cfg!(windows) {
+            "C:\\"
+        } else {
+            "/"
+        }
+    }
+
     #[test]
     fn rejects_relative_path() {
         assert!(validate_user_path("relative/path.txt").is_err());
@@ -403,15 +413,17 @@ mod tests {
 
     #[test]
     fn rejects_parent_dir() {
-        assert!(validate_user_path("/etc/../passwd").is_err());
-        assert!(validate_user_path("/Users/x/../../etc/passwd").is_err());
-        assert!(validate_user_path("/tmp/foo/..").is_err());
+        let root = abs_root();
+        assert!(validate_user_path(&format!("{}etc/../passwd", root)).is_err());
+        assert!(validate_user_path(&format!("{}Users/x/../../etc/passwd", root)).is_err());
+        assert!(validate_user_path(&format!("{}tmp/foo/..", root)).is_err());
     }
 
     #[test]
     fn accepts_absolute_no_parent() {
-        assert!(validate_user_path("/Users/x/music/backup.json").is_ok());
-        assert!(validate_user_path("/tmp/export.m3u").is_ok());
-        assert!(validate_user_path("/").is_ok());
+        let root = abs_root();
+        assert!(validate_user_path(&format!("{}Users/x/music/backup.json", root)).is_ok());
+        assert!(validate_user_path(&format!("{}tmp/export.m3u", root)).is_ok());
+        assert!(validate_user_path(root).is_ok());
     }
 }
