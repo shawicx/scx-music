@@ -10,7 +10,7 @@ export function usePlayerExpand() {
     const topSection = overlay.querySelector('.top-section')
     const progressSection = overlay.querySelector('.progress-section')
     const controls = overlay.querySelector('.controls')
-    const glow = overlay.querySelector('.glow-primary')
+    const vignette = overlay.querySelector('.vignette')
     const status = overlay.querySelector('.mode-status-bar')
 
     const tl = createTimeline({
@@ -26,9 +26,9 @@ export function usePlayerExpand() {
       ease: easings.gentle,
     })
 
-    // Glow
-    if (glow) {
-      tl.fromTo(glow, {
+    // Vignette（主题色晕染层）
+    if (vignette) {
+      tl.fromTo(vignette, {
         opacity: 0,
         scale: 0.8,
       }, {

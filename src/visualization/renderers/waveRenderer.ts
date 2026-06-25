@@ -1,6 +1,6 @@
-import type { Renderer } from './types'
+import type { Renderer, RendererContext } from './types'
 
-export const waveRenderer: Renderer = ({ ctx, width, height, frequencyData, timeData, themeColor }) => {
+export const waveRenderer: Renderer = ({ ctx, width, height, frequencyData, timeData, themeColor, mode }: RendererContext) => {
   ctx.clearRect(0, 0, width, height)
 
   const { r, g, b } = themeColor
@@ -39,9 +39,21 @@ export const waveRenderer: Renderer = ({ ctx, width, height, frequencyData, time
       }
     }
 
-    ctx.strokeStyle = `rgba(${lr}, ${lg}, ${lb}, ${layer.alpha})`
+    if (mode === 'glow') {
+      // 暗色：主题色 + 发光
+      ctx.strokeStyle = `rgba(${lr}, ${lg}, ${lb}, ${layer.alpha})`
+      ctx.shadowBlur = 6
+      ctx.shadowColor = `rgba(${lr}, ${lg}, ${lb}, 0.5)`
+    } else {
+      // 浅色：黑色主线 + 主题色辅线（第一层黑、其余主题色细线），无发光
+      ctx.strokeStyle = layer === layers[0]
+        ? `rgba(0, 0, 0, ${layer.alpha * 1.5})`
+        : `rgba(${r}, ${g}, ${b}, ${layer.alpha})`
+      ctx.shadowBlur = 0
+    }
     ctx.lineWidth = 2
     ctx.stroke()
+    ctx.shadowBlur = 0
 
     ctx.lineTo(width, height)
     ctx.lineTo(0, height)

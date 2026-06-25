@@ -54,13 +54,13 @@ const emit = defineEmits<{
 }
 
 .grid-card.playing .grid-art {
-  box-shadow: 0 8px 24px var(--v-accent-shadow);
+  box-shadow: var(--shadow-accent-lg);
 }
 
 .grid-art {
   width: 100%;
   aspect-ratio: 1;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   display: flex;
   align-items: center;
   justify-content: center;

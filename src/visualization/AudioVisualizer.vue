@@ -8,9 +8,11 @@ import { useVisualizationRenderer } from './useVisualizationRenderer'
 
 const STYLE_OPTIONS: { key: VisualizationStyle; icon: string }[] = [
   { key: 'bar', icon: 'mdi-equalizer' },
+  { key: 'mirror', icon: 'mdi-flip-vertical' },
   { key: 'circular', icon: 'mdi-circle-outline' },
+  { key: 'radial', icon: 'mdi-ray-vertex' },
   { key: 'wave', icon: 'mdi-waves' },
-  { key: 'particle', icon: 'mdi-blur' },
+  { key: 'wave-fill', icon: 'mdi-chart-line-variant' },
 ]
 
 const { t } = useI18n()
@@ -21,10 +23,16 @@ const canvasRef = ref<HTMLCanvasElement | null>(null)
 const { frequencyData, start: startAnalyzer, stop: stopAnalyzer } = useAudioAnalyzer()
 const { start: startRenderer, stop: stopRenderer } = useVisualizationRenderer(canvasRef, currentStyle, frequencyData)
 
+const VALID_STYLES: VisualizationStyle[] = ['bar', 'circular', 'wave', 'mirror', 'radial', 'wave-fill']
+
 async function loadStyle() {
   try {
     const saved = await invoke<string | null>('get_setting', { key: 'visualization_style' })
-    if (saved && ['bar', 'circular', 'wave', 'particle'].includes(saved)) {
+    if (saved === 'particle') {
+      // particle 已移除，迁移到 bar
+      currentStyle.value = 'bar'
+      invoke('set_setting', { key: 'visualization_style', value: 'bar' }).catch(() => {})
+    } else if (saved && VALID_STYLES.includes(saved as VisualizationStyle)) {
       currentStyle.value = saved as VisualizationStyle
     }
   } catch { /* use default */ }

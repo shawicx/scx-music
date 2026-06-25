@@ -21,7 +21,7 @@ export interface Playlist {
 // 播放器相关类型
 export type PlaybackMode = 'sequential' | 'repeat_all' | 'repeat_one' | 'shuffle'
 export type PlaybackState = 'playing' | 'paused' | 'stopped'
-export type VisualizationStyle = 'bar' | 'circular' | 'wave' | 'particle'
+export type VisualizationStyle = 'wave' | 'bar' | 'circular' | 'mirror' | 'radial' | 'wave-fill'
 
 // 主题相关类型 — ThemeColor 和 ThemeMode 统一从 plugins/vuetify.ts 导出
 

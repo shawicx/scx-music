@@ -4,6 +4,7 @@ import { storeToRefs } from 'pinia'
 import { usePlayerStore } from '../stores/player'
 import { useLibraryStore } from '../stores/library'
 import IconButtonWithTooltip from './IconButtonWithTooltip.vue'
+import PulseDots from './common/PulseDots.vue'
 import { usePlaybackMode } from '../composables/usePlaybackMode'
 import { useDesktopLyrics } from '../composables/useDesktopLyrics'
 import { useDraggableProgress } from '../composables/useDraggableProgress'
@@ -70,7 +71,10 @@ const { progressModel, displayProgress, isDragging } = useDraggableProgress(prog
       </div>
       <div class="song-meta">
         <div class="song-name">{{ currentSong?.title ?? t('player.notPlaying') }}</div>
-        <div class="song-artist">{{ currentSong?.artist ?? '--' }}</div>
+        <div class="song-artist">
+          {{ currentSong?.artist ?? '--' }}
+          <PulseDots v-if="isPlaying && currentSong" :size="4" :gap="3" class="pulse-inline" />
+        </div>
       </div>
       <IconButtonWithTooltip
         :icon="isLiked ? 'mdi-heart' : 'mdi-heart-outline'"
@@ -172,9 +176,9 @@ const { progressModel, displayProgress, isDragging } = useDraggableProgress(prog
 <style scoped>
 .player-bar {
   height: 72px;
-  background: linear-gradient(transparent, rgb(var(--v-theme-background)));
-  backdrop-filter: blur(20px);
-  border-top: 1px solid var(--v-border-color);
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  border-top: 1px solid var(--glass-border);
   display: flex;
   align-items: center;
   padding: 0 16px;
@@ -192,7 +196,7 @@ const { progressModel, displayProgress, isDragging } = useDraggableProgress(prog
 .cover-art {
   width: 48px; height: 48px;
   background: var(--v-gradient-brand);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   box-shadow: 0 4px 12px var(--v-accent-shadow);
   flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
@@ -206,12 +210,14 @@ const { progressModel, displayProgress, isDragging } = useDraggableProgress(prog
 .song-artist {
   font-size: var(--text-sm); color: var(--v-text-secondary);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  display: flex; align-items: center; gap: 6px;
 }
+.pulse-inline { flex-shrink: 0; }
 .like-btn { margin-left: 4px; }
 
 .player-center { display: flex; flex-direction: column; align-items: center; flex: 1; gap: 0; padding: 0 24px; }
 .controls { display: flex; align-items: center; gap: 0.5rem; }
-.play-btn { box-shadow: 0 4px 12px var(--v-accent-shadow); transition: transform 0.2s; }
+.play-btn { box-shadow: var(--shadow-accent); transition: transform 0.2s; }
 .play-btn:hover { transform: scale(1.1); }
 
 .progress-row { display: flex; align-items: center; gap: 8px; width: 100%; max-width: 600px; }

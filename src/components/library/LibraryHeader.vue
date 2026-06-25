@@ -123,6 +123,12 @@ const sortLabel = computed(() => {
   color: rgb(var(--v-theme-on-background));
   margin: 0;
 }
+/* 浅色极简：大标题 800 字重 */
+:global(.v-theme--light) .page-title {
+  font-size: var(--text-display);
+  font-weight: 800;
+  letter-spacing: -1px;
+}
 
 .page-subtitle {
   font-size: var(--text-sm);
