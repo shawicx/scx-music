@@ -175,7 +175,7 @@ html, body, #app {
 }
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgb(var(--v-theme-surface-variant)); border-radius: 3px; }
+::-webkit-scrollbar-thumb { background: rgb(var(--v-theme-surface-variant)); border-radius: var(--radius-sm); }
 </style>
 
 <style scoped>

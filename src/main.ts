@@ -1,3 +1,5 @@
+import './styles/tailwind.css'
+import './styles/tokens.css'
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import vuetify from './plugins/vuetify'

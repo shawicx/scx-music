@@ -298,8 +298,9 @@ function handleExportPlaylist() {
 
 <style scoped>
 .sidebar {
-  background: rgb(var(--v-theme-surface-bright));
-  border-right: 1px solid var(--v-border-color);
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  border-right: 1px solid var(--glass-border);
   display: flex;
   flex-direction: column;
   padding: 16px 0;

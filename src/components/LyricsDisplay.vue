@@ -102,6 +102,10 @@ const offsetLabel = computed(() => {
   flex-direction: column;
   width: 100%;
   min-height: 0;
+  position: relative;
+  z-index: 1;
+  /* 歌词区背景遮罩：压暗中间区域的音频可视化，使可视化退居背景，歌词成为视觉主体 */
+  background: radial-gradient(ellipse 95% 80% at center, rgb(var(--v-theme-background) / 0.82) 30%, transparent 90%);
 }
 
 .lyrics-display {
@@ -121,6 +125,8 @@ const offsetLabel = computed(() => {
   color: rgba(var(--v-theme-on-background), 0.25);
   cursor: pointer;
   text-align: center;
+  /* 文字描边阴影：保证歌词在任何可视化背景上都清晰可读 */
+  text-shadow: 0 1px 4px rgb(var(--v-theme-background) / 0.8), 0 0 12px rgb(var(--v-theme-background) / 0.6);
 }
 .lyric-line:hover {
   color: rgba(var(--v-theme-on-background), 0.5);
@@ -129,6 +135,7 @@ const offsetLabel = computed(() => {
   color: rgb(var(--v-theme-on-background));
   font-size: 19px;
   font-weight: 600;
+  text-shadow: 0 1px 6px rgb(var(--v-theme-background) / 0.9), 0 0 16px rgb(var(--v-theme-background) / 0.7);
 }
 .lyric-spacer {
   height: 40%;

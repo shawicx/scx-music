@@ -50,9 +50,11 @@ export default {
     unlike: '取消喜欢',
     addToFavorite: '添加到喜欢',
     visualizationBar: '频谱柱状图',
+    visualizationMirror: '镜像对称',
     visualizationCircular: '环形放射',
+    visualizationRadial: '径向放射',
     visualizationWave: '流动波形',
-    visualizationParticle: '粒子系统',
+    visualizationWaveFill: '波形山峦',
     visualizationStyle: '可视化风格',
   },
   lyrics: {

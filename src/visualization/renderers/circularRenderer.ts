@@ -1,6 +1,6 @@
-import type { Renderer } from './types'
+import type { Renderer, RendererContext } from './types'
 
-export const circularRenderer: Renderer = ({ ctx, width, height, frequencyData, themeColor }) => {
+export const circularRenderer: Renderer = ({ ctx, width, height, frequencyData, themeColor, mode }: RendererContext) => {
   ctx.clearRect(0, 0, width, height)
 
   const { r, g, b } = themeColor
@@ -11,12 +11,15 @@ export const circularRenderer: Renderer = ({ ctx, width, height, frequencyData, 
   const barCount = frequencyData.length
   const rotation = -Math.PI / 2
 
-  const avgLow = frequencyData.slice(0, 8).reduce((a, b) => a + b, 0) / 8 / 255
-  const glowGradient = ctx.createRadialGradient(cx, cy, innerRadius, cx, cy, innerRadius + maxBarLength * 0.5)
-  glowGradient.addColorStop(0, `rgba(${r}, ${g}, ${b}, ${avgLow * 0.3})`)
-  glowGradient.addColorStop(1, 'transparent')
-  ctx.fillStyle = glowGradient
-  ctx.fillRect(0, 0, width, height)
+  // 背景辉光：仅暗色模式
+  if (mode === 'glow') {
+    const avgLow = frequencyData.slice(0, 8).reduce((a, b) => a + b, 0) / 8 / 255
+    const glowGradient = ctx.createRadialGradient(cx, cy, innerRadius, cx, cy, innerRadius + maxBarLength * 0.5)
+    glowGradient.addColorStop(0, `rgba(${r}, ${g}, ${b}, ${avgLow * 0.3})`)
+    glowGradient.addColorStop(1, 'transparent')
+    ctx.fillStyle = glowGradient
+    ctx.fillRect(0, 0, width, height)
+  }
 
   for (let i = 0; i < barCount; i++) {
     const angle = rotation + (i / barCount) * Math.PI * 2
@@ -31,18 +34,26 @@ export const circularRenderer: Renderer = ({ ctx, width, height, frequencyData, 
     ctx.beginPath()
     ctx.moveTo(x1, y1)
     ctx.lineTo(x2, y2)
-    ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${0.3 + value * 0.7})`
+    if (mode === 'glow') {
+      ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${0.3 + value * 0.7})`
+    } else {
+      // 浅色：描边 + 透明度递减
+      ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${0.4 + value * 0.4})`
+    }
     ctx.lineWidth = Math.max(1.5, (Math.PI * 2 * innerRadius) / barCount * 0.6)
     ctx.lineCap = 'round'
     ctx.stroke()
   }
 
+  // 中心圆
   ctx.save()
-  ctx.shadowColor = `rgba(${r}, ${g}, ${b}, 0.4)`
-  ctx.shadowBlur = 20
+  if (mode === 'glow') {
+    ctx.shadowColor = `rgba(${r}, ${g}, ${b}, 0.4)`
+    ctx.shadowBlur = 20
+  }
   ctx.beginPath()
   ctx.arc(cx, cy, innerRadius, 0, Math.PI * 2)
-  ctx.fillStyle = 'rgba(20, 20, 30, 0.6)'
+  ctx.fillStyle = mode === 'glow' ? 'rgba(20, 20, 30, 0.6)' : 'rgba(255, 255, 255, 0.9)'
   ctx.fill()
   ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, 0.3)`
   ctx.lineWidth = 1.5

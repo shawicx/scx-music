@@ -147,10 +147,11 @@ onMounted(async () => {
 .mini-player {
   width: 100%;
   height: 100%;
-  background: rgb(var(--v-theme-surface));
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
   display: flex;
   flex-direction: column;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   overflow: hidden;
   user-select: none;
 }

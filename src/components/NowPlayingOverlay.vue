@@ -8,6 +8,7 @@ import { useI18n } from '../composables/useI18n'
 import { useLyrics } from '../composables/useLyrics'
 import { AudioVisualizer } from '../visualization'
 import LyricsDisplay from './LyricsDisplay.vue'
+import PulseDots from './common/PulseDots.vue'
 
 defineEmits<{ close: [] }>()
 
@@ -63,8 +64,7 @@ function onLyricSeek(time: number) {
 
 <template>
   <div class="overlay">
-    <div class="glow glow-primary" />
-    <div class="glow glow-secondary" />
+    <div class="vignette" />
     <AudioVisualizer />
     <div class="mode-status-bar" v-if="isModeActive">
       <div class="status-item">
@@ -78,7 +78,10 @@ function onLyricSeek(time: number) {
     </v-btn>
     <div class="top-section">
         <div class="song-title">{{ currentSong?.title ?? t('player.notPlaying') }}</div>
-        <div class="song-artist">{{ currentSong ? `${currentSong.artist} · ${currentSong.album}` : '--' }}</div>
+        <div class="song-artist-row">
+          <span class="song-artist">{{ currentSong ? `${currentSong.artist} · ${currentSong.album}` : '--' }}</span>
+          <PulseDots v-if="isPlaying && currentSong" :size="7" :gap="5" />
+        </div>
     </div>
     <LyricsDisplay
       :lines="lines"
@@ -129,27 +132,21 @@ function onLyricSeek(time: number) {
 <style scoped>
 .overlay {
   position: absolute; inset: 0;
-  background: rgb(var(--v-theme-background) / 0.82);
-  backdrop-filter: blur(40px);
-  -webkit-backdrop-filter: blur(40px);
+  /* 全屏遮罩用实色背景，彻底盖住底层，避免歌曲列表透出。
+     沉浸感由 vignette 叠加层提供，而非依赖背景透明度。 */
+  background: rgb(var(--v-theme-background));
   display: flex; flex-direction: column; align-items: center;
   z-index: 20; overflow: hidden;
   padding: 48px 24px 36px;
 }
 
-.glow { position: absolute; border-radius: 50%; pointer-events: none; }
-.glow-primary {
-  top: -80px; left: 50%; transform: translateX(-50%);
-  width: 500px; height: 400px;
-  background: radial-gradient(ellipse at center, var(--v-accent-glow), transparent 70%);
-  filter: blur(40px);
+/* 主题色 vignette：仅暗色模式，浅色极简无装饰背景 */
+.vignette {
+  position: absolute; inset: 0;
+  background: radial-gradient(ellipse at center top, rgb(var(--v-theme-primary) / 0.12), transparent 60%);
+  pointer-events: none;
 }
-.glow-secondary {
-  bottom: -60px; right: -40px;
-  width: 350px; height: 300px;
-  background: radial-gradient(ellipse at center, var(--v-accent-glow), transparent 70%);
-  filter: blur(40px);
-}
+:global(.v-theme--light) .vignette { display: none; }
 
 .close-btn { position: absolute; top: 16px; left: 20px; z-index: 1; color: var(--v-text-secondary); }
 
@@ -181,6 +178,7 @@ function onLyricSeek(time: number) {
   color: rgb(var(--v-theme-on-background)); margin-bottom: 4px;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
+.song-artist-row { display: flex; align-items: center; gap: 10px; }
 .song-artist {
   font-size: var(--text-md); color: var(--v-text-secondary);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -190,7 +188,7 @@ function onLyricSeek(time: number) {
 .time-row { display: flex; justify-content: space-between; margin-top: 6px; font-size: var(--text-xs); color: var(--v-text-muted); }
 
 .controls { display: flex; align-items: center; gap: 12px; z-index: 1; flex-shrink: 0; }
-.play-btn-lg { box-shadow: 0 4px 20px var(--v-accent-shadow); transition: transform 0.15s, box-shadow 0.15s; }
+.play-btn-lg { box-shadow: var(--shadow-accent-lg); transition: transform 0.15s, box-shadow 0.15s; }
 .play-btn-lg:hover { transform: scale(1.06); }
 .muted { opacity: 0.5; }
 </style>

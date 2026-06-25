@@ -1,17 +1,21 @@
 import { onMounted, onUnmounted, type Ref } from 'vue'
 import { useTheme } from 'vuetify'
 import type { VisualizationStyle } from '../types'
-import type { Renderer } from './renderers/types'
+import type { Renderer, RenderMode } from './renderers/types'
 import { barRenderer } from './renderers/barRenderer'
 import { circularRenderer } from './renderers/circularRenderer'
 import { waveRenderer } from './renderers/waveRenderer'
-import { particleRenderer } from './renderers/particleRenderer'
+import { mirrorRenderer } from './renderers/mirrorRenderer'
+import { radialRenderer } from './renderers/radialRenderer'
+import { waveFillRenderer } from './renderers/waveFillRenderer'
 
 const RENDERERS: Record<VisualizationStyle, Renderer> = {
   bar: barRenderer,
   circular: circularRenderer,
   wave: waveRenderer,
-  particle: particleRenderer,
+  mirror: mirrorRenderer,
+  radial: radialRenderer,
+  'wave-fill': waveFillRenderer,
 }
 
 function parseHexColor(hex: string): { r: number; g: number; b: number } {
@@ -48,6 +52,7 @@ export function useVisualizationRenderer(
 
     const colors = vuetifyTheme.current.value.colors
     const themeColor = parseHexColor(colors.secondary as string)
+    const mode: RenderMode = vuetifyTheme.current.value.dark ? 'glow' : 'flat'
 
     const renderer = RENDERERS[style.value]
     renderer({
@@ -57,6 +62,7 @@ export function useVisualizationRenderer(
       frequencyData: frequencyData.value,
       timeData: performance.now(),
       themeColor,
+      mode,
     })
 
     animFrameId = requestAnimationFrame(render)
