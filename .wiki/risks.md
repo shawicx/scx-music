@@ -33,15 +33,25 @@
 ## Capability 风险（最小权限设计，2026-06-20 收紧）
 
 **当前权限分布（按窗口）：**
-- **主窗口 `default.json`**：`core:default` + `opener:default` + `dialog:default` + `updater:default` + `process:default` + 7 个具体 window 权限
+- **主窗口 `default.json`**：`core:default` + `opener:default` + `dialog:default` + `updater:default` + `process:default` + 7 个具体 window 权限（含 `allow-get-all-windows`，`core:default` 隐含）
 - **`shortcuts.json`**：3 个具体 global-shortcut 权限（注册/注销/查询）
-- **`desktop-lyrics.json`**：15 项（webview/app/event + 11 个 window allow-*）
-- **`mini-player.json`**：16 项（同上 + set-always-on-top / is-visible / set-focus）
+- **`desktop-lyrics.json`**：16 项（webview/app/event + 12 个 window allow-*，含 `allow-get-all-windows`）
+- **`mini-player.json`**：17 项（同上 + set-always-on-top / is-visible / set-focus，含 `allow-get-all-windows`）
 - **`desktop-lyrics-lock.json`**：4 项（webview/app/event listen/emit，36×36 锁按钮窗口最小集）
 
 **风险：** 3 个子窗口已移除 `core:default` 聚合权限，改用具体 allow-* 列表。命令级权限（自定义 permission 文件）尚未引入，所有 `#[tauri::command]` 默认对拥有 `core:webview:default` 的窗口可达 —— 这是已知 P1 收紧方向。
 
-**风险：** Tauri v2 权限模型按**发起调用的窗口**检查 capability。跨窗口调用（如 `mini-player` 窗口调 `main.setFocus()`）需要发起方持有相应权限，不是目标窗口。所有子窗口的 capability 已补齐 `allow-set-focus`/`allow-is-visible` 等跨窗口操作所需项。
+**风险：** Tauri v2 权限模型按**发起调用的窗口**检查 capability。跨窗口调用（如 `mini-player` 窗口调 `main.setFocus()`）需要发起方持有相应权限，不是目标窗口。
+
+> **⚠️ 踩坑记录（2026-06-26 修复）：** `ebf31ff`（2026-06-20 收紧）把子窗口的 `core:default` 拆解成精确 allow-* 列表时，**漏掉了 `allow-get-all-windows`**（它原本隐含在 `core:default` 中）。而 `WebviewWindow.getByLabel()` 内部调用 `get_all_windows` IPC 命令，任何子窗口用 `getByLabel()` 操作其他窗口都会权限拒绝、异常被 catch 静默吞掉。
+>
+> **两个由此引发的 bug：**
+> 1. **mini-player 无法回到主窗口** —— `exit()` 里 `getByLabel('main')` 抛 `get_all_windows not allowed on window "mini-player"`，exit 失败
+> 2. **桌面歌词锁定后无锁图标** —— `updateLockWindowVisibility()` 里 `getByLabel('desktop-lyrics-lock')` 抛同样异常进 catch，锁窗口 show 永不执行
+>
+> **修复：** 给 `mini-player.json` 和 `desktop-lyrics.json` 补 `core:window:allow-get-all-windows`。**教训：** 拆解聚合权限（`core:default`）时，必须逐项核对每个跨窗口 API 调用链的权限覆盖，尤其注意 `getByLabel` 这类隐式依赖多命令的 API。
+
+**防回归：** 未来给子窗口加 `WebviewWindow.getByLabel(label)` / `getAll()` / `getCurrentWindow()` 之外的跨窗口操作时，确认该窗口的 capability 含 `allow-get-all-windows`（或改用 Rust 侧 `app.emit_to` + 事件驱动，避免前端跨窗口句柄操作）。
 
 ## P0 加固（2026-06-20）
 

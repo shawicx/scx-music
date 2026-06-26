@@ -183,8 +183,13 @@ export function useMiniPlayer() {
           const sf = m?.scaleFactor ?? 1
           const logicalX = Math.round(pos.x / sf)
           const logicalY = Math.round(pos.y / sf)
-          await invoke('set_setting', { key: STORAGE_KEYS.posX, value: String(logicalX) })
-          await invoke('set_setting', { key: STORAGE_KEYS.posY, value: String(logicalY) })
+          // 合并 posX/posY 为单次 IPC,避免拖动后的串行往返
+          await invoke('set_window_position', {
+            keyX: STORAGE_KEYS.posX,
+            keyY: STORAGE_KEYS.posY,
+            valueX: String(logicalX),
+            valueY: String(logicalY),
+          })
         } catch {
           // 静默失败
         }

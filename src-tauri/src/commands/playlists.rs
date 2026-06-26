@@ -92,6 +92,31 @@ pub fn add_songs_to_playlist(
     Ok(())
 }
 
+/// 原子替换歌单的全部歌曲：单事务内先 DELETE 再批量 INSERT。
+/// 替代前端 clear_playlist + add_songs_to_playlist 两次 IPC，
+/// 保证半途崩溃不会留下空歌单（事务原子性）。
+#[tauri::command]
+pub fn replace_playlist_songs(
+    db: tauri::State<'_, Db>,
+    playlist_id: String,
+    song_ids: Vec<String>,
+) -> AppResult<()> {
+    let conn = crate::audio::lock_or_recover(&db.0);
+    let tx = conn.unchecked_transaction()?;
+    tx.execute(
+        "DELETE FROM playlist_songs WHERE playlist_id = ?1",
+        params![playlist_id],
+    )?;
+    for (i, sid) in song_ids.iter().enumerate() {
+        tx.execute(
+            "INSERT OR IGNORE INTO playlist_songs (playlist_id, song_id, sort_order) VALUES (?1, ?2, ?3)",
+            params![playlist_id, sid, i as i64],
+        )?;
+    }
+    tx.commit()?;
+    Ok(())
+}
+
 #[tauri::command]
 pub fn clear_playlist(db: tauri::State<'_, Db>, playlist_id: String) -> AppResult<()> {
     let conn = crate::audio::lock_or_recover(&db.0);

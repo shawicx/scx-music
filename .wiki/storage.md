@@ -50,8 +50,10 @@
 
 ### lyrics (INIT_SCHEMA)
 **作用：** 歌词缓存
-**关键字段：** song_id (TEXT PK), raw_lrc (TEXT), source (TEXT)
+**关键字段：** song_id (TEXT PK), raw_lrc (TEXT), source (TEXT), offset_secs (REAL)
 **source 值：** embedded / lrclib / none
+
+> **2026-06-26 修复：** `Lyric` model（`db/models.rs`）补全 `offset_secs` 字段（原遗漏，与表列不对应，导致备份/恢复丢失歌词偏移）。`import_export.rs` 的导出查询和导入 INSERT 同步补上该列。model 用 `#[serde(default)]` 确保旧备份文件（无此字段）反序列化兼容。
 
 ### play_history (V6_PLAY_HISTORY)
 **作用：** 播放历史明细，驱动听歌统计（周/月/年报告、时段分布）

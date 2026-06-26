@@ -1,5 +1,22 @@
 # IPC 通信
 
+## 通信原语选型
+
+项目使用三种 Tauri v2 IPC 原语,按场景选择:
+
+| 原语 | 适用场景 | 项目内用法 |
+|------|---------|-----------|
+| **`invoke`** | 请求-响应(一次性) | 绝大多数 CRUD 命令(songs/playlists/settings/lyrics…) |
+| **`emit`/`listen`** | 事件广播(多消费者) | `audio:state_change`/`track_change`(多窗口消费)、跨窗口业务事件(`mini-player:*`/`desktop-lyrics:*`) |
+| **`Channel<T>`** | 流式点对点(单消费者+高频) | `audio:spectrum`(频谱分析器,30Hz,仅可视化渲染器消费) |
+
+**选型决策矩阵:**
+- 消费者数 ≥2 个窗口 → `emit` 广播
+- 恰好 1 个消费者 + 高频(>10Hz) → `Channel<T>`
+- 一次性请求-响应 → `invoke`
+
+> **2026-06-26 优化:** 频谱分析器从 `emit` 广播改为 `Channel<T>` 点对点。原实现 30Hz 广播给全部 4 个 webview,但仅可视化渲染器消费,其余窗口白白反序列化。Channel 提供生命周期自洽(channel 销毁即停推,无需手动 `analyzer_stop` 配对)。
+
 ## invoke 封装
 
 前端使用 `@tauri-apps/api/core` 的 `invoke` 函数，并通过 `utils/errorHandler.ts` 统一错误处理：
@@ -41,10 +58,12 @@ const result = await invokeCommand('command_name', { param: value })
 | `add_songs_to_playlist` | stores/library.ts | commands/playlists.rs | 添加歌曲到播放列表 |
 | `remove_song_from_playlist` | stores/library.ts | commands/playlists.rs | 从播放列表移除歌曲 |
 | `clear_playlist` | stores/library.ts | commands/playlists.rs | 清空播放列表 |
+| `replace_playlist_songs` | stores/library.ts | commands/playlists.rs | 原子替换歌单全部歌曲（单事务 DELETE+INSERT，2026-06-26 新增，替代 clear+add 两次 IPC） |
 | **设置** | | | |
 | `get_all_settings` | - | commands/settings.rs | 获取所有设置 |
 | `get_setting` | stores/settings.ts | commands/settings.rs | 获取单个设置 |
 | `set_setting` | stores/settings.ts, stores/library.ts | commands/settings.rs | 设置单个键值对（**key 白名单校验**：精确 9 项 + 前缀 4 项；前缀必须带非空子键） |
+| `set_window_position` | composables/useMiniPlayer.ts, composables/useDesktopLyrics.ts | commands/settings.rs | 批量写入窗口位置（单事务双 key，2026-06-26 新增，替代拖动后的两次 set_setting） |
 | `get_system_locale` | composables/useI18n.ts | commands/settings.rs | 获取系统语言 |
 | **文件扫描** | | | |
 | `scan_music_folder` | stores/library.ts | lib.rs | 扫描音乐文件夹 |
@@ -63,16 +82,17 @@ const result = await invokeCommand('command_name', { param: value })
 | **曲库分析** | | | |
 | `get_library_stats` | stores/analysis.ts | commands/stats.rs | 获取曲库聚合统计数据 |
 | **听歌统计/报告** | | | |
-| `stats_listening_overview` | stores/stats.ts, composables/useListeningReport.ts | commands/stats.rs | 概览卡（统计 Tab 传 range，报告 Tab 传 start/end）。`play_count` 从 `play_history` 派生（`COUNT(*)`），与 `total_duration_secs` 等其他指标一致地参与时间过滤 |
-| `stats_top_songs` | stores/stats.ts | commands/stats.rs | 最爱歌曲 Top N（统计 Tab）。`play_count` 字段是窗口内 `COUNT(*) FROM play_history`，不是 `songs.play_count` 全库累计 |
-| `stats_top_artists` | stores/stats.ts | commands/stats.rs | 最爱歌手 Top N（统计 Tab）。`play_count` 字段同上 |
-| `stats_genre_distribution` | stores/stats.ts | commands/stats.rs | 流派播放时长分布（统计 Tab） |
-| `stats_trend` | stores/stats.ts | commands/stats.rs | 按天聚合播放时长趋势（统计 Tab） |
-| `stats_heatmap` | stores/stats.ts | commands/stats.rs | 365 天每日播放时长热力图（统计 Tab） |
+| `stats_listening_overview` | composables/useListeningReport.ts | commands/stats.rs | 概览卡（报告 Tab 传 start/end）。`play_count` 从 `play_history` 派生（`COUNT(*)`），与 `total_duration_secs` 等其他指标一致地参与时间过滤。**统计 Tab 已改用 `stats_dashboard` 聚合命令（2026-06-26），此命令现仅报告 Tab 调用** |
+| `stats_top_songs` | - | commands/stats.rs | 最爱歌曲 Top N。`play_count` 字段是窗口内 `COUNT(*) FROM play_history`，不是 `songs.play_count` 全库累计。**统计 Tab 已改用 `stats_dashboard`，此命令保留但无调用方** |
+| `stats_top_artists` | - | commands/stats.rs | 最爱歌手 Top N。同上,**统计 Tab 已改用 `stats_dashboard`** |
+| `stats_genre_distribution` | - | commands/stats.rs | 流派播放时长分布。**统计 Tab 已改用 `stats_dashboard`** |
+| `stats_trend` | - | commands/stats.rs | 按天聚合播放时长趋势。**统计 Tab 已改用 `stats_dashboard`** |
+| `stats_heatmap` | - | commands/stats.rs | 365 天每日播放时长热力图。**统计 Tab 已改用 `stats_dashboard`** |
+| `stats_dashboard` | composables/useListeningStats.ts | commands/stats.rs | **统计 Tab 仪表盘聚合（2026-06-26 新增）**：单次 IPC 返回 overview+topSongs+topArtists+genreDistribution+trend+heatmap，替代前端 Promise.all 发 6 个命令。一次锁、一次 prepare，消除 6 次往返与重复锁竞争 |
 | `stats_hourly_distribution` | `{ start, end }` | `HourDuration[]` | 报告 Tab 时段分布图 |
 | **频谱分析** | | | |
-| `analyzer_start` | visualization/useAudioAnalyzer.ts | audio/analyzer_cmds.rs | 启动频谱分析 |
-| `analyzer_stop` | visualization/useAudioAnalyzer.ts | audio/analyzer_cmds.rs | 停止频谱分析 |
+| `analyzer_start` | visualization/useAudioAnalyzer.ts | audio/analyzer_cmds.rs | 启动频谱分析。**2026-06-26 改用 Channel API**：接收 `on_data: Channel<Vec<u8>>` 参数，FFT 线程通过 `channel.send()` 点对点推送，不再 `emit('audio:spectrum')` 广播。channel 销毁即自动停推，无需手动 analyzer_stop 配对 |
+| `analyzer_stop` | visualization/useAudioAnalyzer.ts | audio/analyzer_cmds.rs | 停止频谱分析（主动停止用，channel 自然销毁也会触发后端退出） |
 | **快捷键** | | | |
 | `shortcuts_list_defaults` | composables/useGlobalShortcuts.ts | commands/shortcuts.rs | 返回内置动作清单+默认绑定 |
 | `shortcuts_register` | composables/useGlobalShortcuts.ts | commands/shortcuts.rs | 注册单个快捷键，失败返回错误 |
@@ -135,9 +155,11 @@ App.vue onMounted
 -> lib.rs::scan_music_folder()
 -> 返回歌曲数组
 -> invokeCommand('upsert_songs', {songs})
--> commands/songs.rs::upsert_songs() -> 返回实际 DB ID
--> invokeCommand('clear_playlist', {playlistId})
--> invokeCommand('add_songs_to_playlist', {playlistId, songIds})
+-> commands/songs.rs::upsert_songs()
+   ├─ RETURNING id（2026-06-26）：单条 upsert 同时取回 id，消除原 N 次 SELECT 回查
+   └─ 返回实际 DB ID
+-> invokeCommand('replace_playlist_songs', {playlistId, songIds})
+   └─ 单事务 DELETE + 批量 INSERT（2026-06-26，替代原 clear_playlist + add_songs_to_playlist 两次串行 IPC）
 -> useLibraryStore 状态更新
 ```
 
@@ -198,11 +220,12 @@ App.vue onMounted
 
 | event | payload | 触发时机 | 监听位置 |
 |-------|---------|----------|----------|
-| `audio:progress` | `{current, duration}` | 每 500ms | stores/player.ts |
+| `audio:progress` | `{current, duration}` | 每 500ms（**仅 Playing 状态推送**，2026-06-26 优化：Paused/Stopped 跳过，避免重复推相同值） | stores/player.ts（含跨窗口消费：mini-player/桌面歌词） |
 | `audio:state_change` | `{state, currentSong, queueIndex, mode}` | 播放状态变化 | stores/player.ts |
 | `audio:track_change` | `Song \| null` | 当前曲目变化 | stores/player.ts |
 | `audio:error` | `string` | 音频错误发生 | stores/player.ts |
-| `audio:spectrum` | `number[64]` | 每 33ms (播放时) | visualization/useAudioAnalyzer.ts |
+
+> **`audio:spectrum` 已于 2026-06-26 从广播事件移除**,改用 `Channel<T>` 点对点推送(见上方"通信原语选型")。原 30Hz 广播给全部 4 个 webview,但仅可视化渲染器消费;现通过 `analyzer_start` 的 `on_data: Channel<Vec<u8>>` 参数直接推给订阅方,channel 销毁即停推。
 
 ## 桌面歌词相关事件（自定义）
 
@@ -259,10 +282,9 @@ AppError variants：
 
 所有 IPC 调用都通过 `utils/errorHandler.ts` 统一处理：
 
-- **invokeCommand** - 带错误消息的调用，失败时抛 `AppInvokeError`（保留原始 `{type, message}` payload，可用 `isAppInvokeError(e)` + `e.errorType` 分类处理）
-- **safeInvoke** - 返回 Result 类型（`{error: message}` 兼容旧调用方）
-- **batchInvoke** - 批量调用，错误收集为 `{command, error: message}`
-- **retry** - 重试机制
+- **invokeCommand** - 唯一的命令调用入口，失败时抛 `AppInvokeError`（保留原始 `{type, message}` payload，可用 `isAppInvokeError(e)` + `e.errorType` 分类处理）
+
+> **2026-06-26 清理：** 移除了 `safeInvoke`/`batchInvoke`/`retry` 三个零调用函数,以及 `invokeCommand` 的 `showMessage` 参数(永远 true 且仅 console.error,无真实 UI 反馈)。UI 错误提示(toast)由各 composable 在 catch 中自行处理,本函数只做错误结构化传递。
 
 ## 参数签名变化
 

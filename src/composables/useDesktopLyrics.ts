@@ -160,8 +160,13 @@ export function useDesktopLyrics() {
           // outerPosition 返回物理坐标，除以 scale 转逻辑坐标后存储
           const logicalX = Math.round(pos.x / scale)
           const logicalY = Math.round(pos.y / scale)
-          await invoke('set_setting', { key: STORAGE_KEYS.posX, value: String(logicalX) })
-          await invoke('set_setting', { key: STORAGE_KEYS.posY, value: String(logicalY) })
+          // 合并 posX/posY 为单次 IPC，避免拖动后的串行往返
+          await invoke('set_window_position', {
+            keyX: STORAGE_KEYS.posX,
+            keyY: STORAGE_KEYS.posY,
+            valueX: String(logicalX),
+            valueY: String(logicalY),
+          })
         } catch {
           // 静默失败
         }

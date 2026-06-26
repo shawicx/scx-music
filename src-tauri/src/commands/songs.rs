@@ -20,8 +20,12 @@ pub fn get_all_songs(db: tauri::State<'_, Db>) -> AppResult<Vec<Song>> {
 pub fn upsert_songs(db: tauri::State<'_, Db>, songs: Vec<Song>) -> AppResult<Vec<String>> {
     let conn = crate::audio::lock_or_recover(&db.0);
     let tx = conn.unchecked_transaction()?;
+    let mut ids = Vec::with_capacity(songs.len());
     for s in &songs {
-        tx.execute(
+        // RETURNING id：单条 upsert 同时取回最终 id（冲突时是旧行的 id，否则是新插入的 id），
+        // 消除原 N 次 SELECT id WHERE file_path=? 回查（N+1 → N）。
+        // 要求 SQLite ≥ 3.35（rusqlite 0.31 bundled 捆绑 3.45，满足）。
+        let id: String = tx.query_row(
             "INSERT INTO songs (id, title, artist, album, duration, duration_secs, quality, file_path, art_gradient, genre, file_size)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
              ON CONFLICT(file_path) DO UPDATE SET
@@ -33,14 +37,11 @@ pub fn upsert_songs(db: tauri::State<'_, Db>, songs: Vec<Song>) -> AppResult<Vec
                quality = excluded.quality,
                art_gradient = excluded.art_gradient,
                genre = excluded.genre,
-               file_size = excluded.file_size",
+               file_size = excluded.file_size
+             RETURNING id",
             params![s.id, s.title, s.artist, s.album, s.duration, s.duration_secs, s.quality, s.file_path, s.art_gradient, s.genre, s.file_size],
+            |row| row.get(0),
         )?;
-    }
-    let mut ids = Vec::with_capacity(songs.len());
-    for s in &songs {
-        let id: String = tx
-            .query_row("SELECT id FROM songs WHERE file_path = ?1", params![s.file_path], |row| row.get(0))?;
         ids.push(id);
     }
     tx.commit()?;

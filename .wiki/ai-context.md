@@ -4,7 +4,7 @@
 
 Tauri v2 桌面应用：Vue 3 前端 + Rust 后端
 
-**通信：** IPC (invoke + emit)
+**通信：** IPC (invoke + emit + Channel) — 三种原语按场景选型,详见 [ipc.md](ipc.md)
 **数据：** SQLite 数据库 (WAL 模式)
 **音频：** Rodio 引擎
 **状态管理：** Pinia 3.0
@@ -76,8 +76,10 @@ UI -> usePlayerStore.playFromQueue()
 UI -> useLibraryStore.importToPlaylist()
 -> invokeCommand('scan_music_folder')
 -> lib.rs::scan_music_folder()
--> invokeCommand('upsert_songs') -> 返回实际 DB ID
--> invokeCommand('clear_playlist') + invokeCommand('add_songs_to_playlist')
+-> invokeCommand('upsert_songs')
+   └─ RETURNING id（2026-06-26）：单条 upsert 同时取回 id
+-> invokeCommand('replace_playlist_songs')
+   └─ 单事务 DELETE+INSERT（2026-06-26，替代原 clear+add 两次 IPC）
 -> useLibraryStore 状态更新
 ```
 
@@ -98,7 +100,7 @@ UI -> useLibraryStore.importToPlaylist()
 | useSettingsStore | 设置主题 | Vuetify 主题、系统检测、数据库持久化 |
 | useLyrics | 歌词 | LRC 解析、多源获取、实时同步 |
 | audio/ | 音频引擎 | Rodio 封装、线程安全、设备切换 |
-| analyzer.rs | 频谱分析 | FFT 256点→64bins、30fps 推送 |
+| analyzer.rs | 频谱分析 | FFT 256点→64bins、30fps 推送。**2026-06-26 改用 Channel<T> 点对点推送**（替代 emit 广播），channel 销毁即停推 |
 | bootstrap.rs | 启动加载 | 单次 IPC 全量数据 |
 | lyrics.rs | 歌词后端 | 缓存→内嵌→LRCLIB 三级获取 |
 | db/ | 数据库 | SQLite WAL、迁移管理 (INIT_SCHEMA + V6) |
@@ -113,8 +115,8 @@ UI -> useLibraryStore.importToPlaylist()
 - 防抖搜索 + 排序缓存优化性能
 
 ### 后端
-- 所有 Command 返回 `Result<T, String>`
-- 使用 `?` 传播错误
+- 所有 Command 返回 `AppResult<T>`（统一 `AppError` 枚举，非 `Result<T, String>`）
+- 使用 `?` 传播错误（`From` 自动转换常见错误类型）
 - 线程安全：Arc<Mutex<T>>
 - 进度线程独立运行，需要正确管理生命周期
 - SQLite WAL 模式 + 外键约束

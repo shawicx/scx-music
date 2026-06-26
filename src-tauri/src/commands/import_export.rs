@@ -201,7 +201,7 @@ pub fn export_backup(
 
     // Lyrics
     let mut stmt = conn
-        .prepare("SELECT song_id, raw_lrc, source FROM lyrics")
+        .prepare("SELECT song_id, raw_lrc, source, offset_secs FROM lyrics")
         ?;
     let lyrics: Vec<Lyric> = stmt
         .query_map([], |row| {
@@ -209,6 +209,7 @@ pub fn export_backup(
                 song_id: row.get(0)?,
                 raw_lrc: row.get(1)?,
                 source: row.get(2)?,
+                offset_secs: row.get(3)?,
             })
         })
         ?
@@ -316,8 +317,8 @@ pub fn import_backup(
     for l in &data.lyrics {
         let rows = tx
             .execute(
-                "INSERT OR REPLACE INTO lyrics (song_id, raw_lrc, source) VALUES (?1, ?2, ?3)",
-                params![l.song_id, l.raw_lrc, l.source],
+                "INSERT OR REPLACE INTO lyrics (song_id, raw_lrc, source, offset_secs) VALUES (?1, ?2, ?3, ?4)",
+                params![l.song_id, l.raw_lrc, l.source, l.offset_secs],
             )
             ?;
         lyrics_imported += rows;

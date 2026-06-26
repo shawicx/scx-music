@@ -64,4 +64,8 @@ pub struct Lyric {
     pub song_id: String,
     pub raw_lrc: Option<String>,
     pub source: String,
+    /// 歌词时间偏移（秒）。与 lyrics 表 offset_secs 列对应，
+    /// 备份/恢复时保留（原 model 遗漏此字段会导致 offset 丢失）。
+    #[serde(default)]
+    pub offset_secs: f64,
 }

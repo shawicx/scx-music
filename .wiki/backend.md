@@ -56,11 +56,11 @@
 - `player_get_output_devices` - 枚举音频输出设备 (`device.rs`)
 - `player_set_output_device` - 切换音频输出设备 (`device.rs`)
 - `player_get_current_device` - 获取当前输出设备名 (`device.rs`)
-- `analyzer_start` / `analyzer_stop` - 启动/停止音频频谱分析 (`analyzer_cmds.rs`)
+- `analyzer_start` / `analyzer_stop` - 启动/停止音频频谱分析 (`analyzer_cmds.rs`)。**`analyzer_start` 于 2026-06-26 改用 Channel API**：接收 `on_data: Channel<Vec<u8>>` 参数，FFT 线程通过 `channel.send()` 点对点推送（不再 `emit('audio:spectrum')` 广播），channel 销毁即自动停推
 
 **commands/songs.rs** - 歌曲数据操作
 - `get_all_songs` - 获取所有歌曲
-- `upsert_songs` - 批量插入/更新歌曲（返回实际 DB ID）
+- `upsert_songs` - 批量插入/更新歌曲（返回实际 DB ID）。**2026-06-26 优化：用 `INSERT ... ON CONFLICT ... RETURNING id` 单条 upsert 同时取回 id，消除原 N 次 `SELECT id WHERE file_path=?` 回查（N+1 → N）**。要求 SQLite ≥ 3.35（rusqlite 0.31 bundled 捆绑 3.45，满足）
 - `delete_songs` - 删除歌曲
 - `rename_song` - 重命名歌曲（更新元数据标签 + 重命名文件 + 更新数据库）
 
@@ -73,11 +73,13 @@
 - `add_songs_to_playlist` - 添加歌曲到播放列表
 - `remove_song_from_playlist` - 从播放列表移除歌曲
 - `clear_playlist` - 清空播放列表（保留列表本身）
+- `replace_playlist_songs` - **原子替换歌单全部歌曲（2026-06-26 新增）**：单事务内 DELETE + 批量 INSERT，替代前端 clear_playlist + add_songs_to_playlist 两次 IPC，保证半途崩溃不会留下空歌单
 
 **commands/settings.rs** - 设置管理
 - `get_all_settings` - 获取所有设置
 - `get_setting` - 获取单个设置
 - `set_setting` - 设置单个键值对
+- `set_window_position` - **批量写入窗口位置（2026-06-26 新增）**：单事务双 key（keyX/keyY），复用 set_setting 的白名单校验，用于窗口拖动持久化（替代两次 set_setting 串行 IPC）
 - `get_system_locale` - 获取系统语言
 
 **commands/bootstrap.rs** - 启动批量加载
@@ -104,6 +106,7 @@
 - `stats_trend` - 按天聚合的播放时长趋势
 - `stats_heatmap` - 最近 365 天每日播放时长（GitHub 风格热力图数据）
 - `stats_hourly_distribution(start, end)` — 指定时间范围内按小时（0-23，本地时区）聚合的听歌时长分布。用于周/月/年报告的时段分布图表。返回 `Vec<HourDuration>`。
+- `stats_dashboard` - **统计 Tab 仪表盘聚合（2026-06-26 新增）**：单次 IPC 返回 `StatsDashboard { overview, top_songs, top_artists, genre_distribution, trend, heatmap }`，替代前端 Promise.all 发 6 个命令。一次锁、一次 prepare，消除 6 次往返与重复锁竞争。原 6 个 `stats_*` 命令保留（报告 Tab 仍用 overview + hourly_distribution）
 
 **参数签名变化（所有 `stats_*` 命令）：** `range: String` → `range: Option<String>`，并新增可选 `start`/`end` 参数（绝对日期，格式 `YYYY-MM-DD HH:MM:SS` UTC）。向后兼容：统计 Tab 传 `range`，报告 Tab 传 `start`/`end`。
 
@@ -178,6 +181,32 @@
 - 私钥：`~/.tauri/scx-music.key`（CI 通过 `TAURI_SIGNING_PRIVATE_KEY` 环境变量注入）
 - 公钥：嵌入 `tauri.conf.json`
 
+## Capabilities（权限配置）
+
+**文件位置：** `src-tauri/capabilities/*.json`
+
+Tauri v2 ACL 权限系统，按**发起调用的窗口**（不是目标窗口）检查 capability。每个 capability 文件用 `windows` 数组声明它授权哪些窗口，`permissions` 数组列出允许的命令/权限集。
+
+| 文件 | 授权窗口 | 关键权限 | 说明 |
+|------|---------|---------|------|
+| `default.json` | `main` | `core:default` + 4 个插件 default + 7 个 window allow-* | 主窗口，权限最全（含 `core:default` 隐含的 `allow-get-all-windows`） |
+| `shortcuts.json` | `main` | 3 个 global-shortcut 权限 | 全局快捷键（注册/注销/查询） |
+| `desktop-lyrics.json` | `desktop-lyrics` | webview/app/event + 12 个 window allow-*（**含 `allow-get-all-windows`**） | 桌面歌词窗口，需操作 `desktop-lyrics-lock` 锁窗口 |
+| `mini-player.json` | `mini-player` | webview/app/event + 13 个 window allow-*（**含 `allow-get-all-windows`**） | 迷你播放器，需操作 `main` 窗口（exit 时 show+focus） |
+| `desktop-lyrics-lock.json` | `desktop-lyrics-lock` | 仅 webview/app/event listen/emit | 36×36 锁按钮窗口，只 emit 事件不操作其他窗口（最小权限） |
+
+### 跨窗口操作权限陷阱
+
+**`WebviewWindow.getByLabel(label)` 内部调用 `get_all_windows` 命令**，因此任何用 `getByLabel()` 操作其他窗口的子窗口，其 capability 必须含 `core:window:allow-get-all-windows`（该权限隐含在 `core:default` 中）。
+
+**踩坑记录（2026-06-26）：** `ebf31ff`（2026-06-20）把子窗口的 `core:default` 拆解成精确 allow-* 列表时漏掉 `allow-get-all-windows`，导致：
+1. mini-player 的 `exit()` 里 `getByLabel('main')` 抛权限拒绝 → 无法回到主窗口
+2. desktop-lyrics 的 `updateLockWindowVisibility()` 里 `getByLabel('desktop-lyrics-lock')` 抛权限拒绝 → 锁定后锁窗口不显示
+
+**修复后**，`mini-player.json` 和 `desktop-lyrics.json` 均补上 `allow-get-all-windows`。
+
+**防回归规则：** 给子窗口加 `WebviewWindow.getByLabel(label)` / `getAll()` 等跨窗口句柄操作时，确认该窗口 capability 含 `allow-get-all-windows`。或改用 Rust 侧 `app.emit_to(label, ...)` + 事件驱动，避免前端跨窗口句柄操作（更安全）。详见 [risks.md#capability-风险](risks.md#capability-风险最小权限设计2026-06-20-收紧)。
+
 ## Services
 
 ### audio/ - 音频引擎模块
@@ -232,7 +261,7 @@ macOS CoreAudio 通过 CPAL 暴露设备时存在两个已知问题：
 
 **文件位置：** `src-tauri/src/analyzer.rs`
 
-**作用：** 从音频流中提取频谱数据，通过 Tauri 事件推送到前端
+**作用：** 从音频流中提取频谱数据，通过 Tauri Channel 点对点推送到前端
 
 **核心结构：**
 - `AnalyzerHandle` - 分析器句柄（SampleBuffer + 运行状态）
@@ -240,9 +269,11 @@ macOS CoreAudio 通过 CPAL 暴露设备时存在两个已知问题：
 
 **工作流程：**
 1. `TeeSource` 在音频播放时，将 f32 样本批量 (1024个) 推入 SampleBuffer
-2. `AnalyzerHandle::start()` 启动后台线程，每 33ms 从 buffer 读取 256 个样本
+2. `AnalyzerHandle::start(channel)` 启动后台线程，每 33ms 从 buffer 读取 256 个样本
 3. 应用 Hann 窗函数 → 256 点 FFT → 计算 64 个频率 bin 的幅度
-4. 缩放到 0-255 并通过 `audio:spectrum` 事件推送到前端
+4. 缩放到 0-255 并通过 `channel.send(bins)` 点对点推送到前端
+
+> **2026-06-26 改造：** 从 `app.emit("audio:spectrum", bins)` 广播改为 `Channel<Vec<u8>>` 点对点推送。`send` 失败（channel 销毁/前端断开）时退出线程并置 running=false,无需前端手动 `analyzer_stop` 配对。原广播方式会向全部 4 个 webview 推 30Hz 事件,但仅可视化渲染器消费。
 
 **关键参数：**
 - FFT_SIZE = 256, NUM_BINS = 64, 采样率 ~30fps
@@ -335,7 +366,7 @@ macOS CoreAudio 通过 CPAL 暴露设备时存在两个已知问题：
 - `Song` - id, title, artist, album, duration, duration_secs, quality, file_path, art_gradient, genre, file_size
 - `Playlist` - id, name, sort_order
 - `PlaylistSong` - playlist_id, song_id, sort_order
-- `Lyric` - song_id, raw_lrc, source
+- `Lyric` - song_id, raw_lrc, source, offset_secs（**2026-06-26 补全**：原 model 遗漏 `offset_secs` 字段,与 lyrics 表列不对应,导致备份/恢复丢失歌词偏移。现加 `#[serde(default)]` 确保旧备份文件兼容）
 - `ListeningOverview` - 总播放次数、总播放时长、流派数、歌手数、**独立歌曲数（unique_song_count）**
 - `HourDuration` - 小时（0-23）+ 累计播放时长（用于时段分布图）
 
@@ -358,7 +389,7 @@ macOS CoreAudio 通过 CPAL 暴露设备时存在两个已知问题：
 ## Async Task
 
 **audio/mod.rs** 中的进度跟踪线程
-- 独立线程每 500ms 推送播放进度
+- 独立线程每 500ms 推送播放进度（**2026-06-26 优化：仅 Playing 状态推送，Paused/Stopped 跳过，避免重复推相同进度值**）
 - 检测曲目播放完毕并自动播放下一曲
 - 每 30 秒自动 flush 播放会话到数据库（防崩溃丢数据）
 - 使用 `Arc<AtomicBool>` 控制线程生命周期

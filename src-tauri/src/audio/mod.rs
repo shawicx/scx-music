@@ -84,21 +84,26 @@ pub fn start_progress_thread(state: AudioState, app: AppHandle) -> JoinHandle<()
                 }
             }
 
-            let (progress, duration, song_ended) = {
+            let (state_kind, progress, duration, song_ended) = {
                 let s = lock_or_recover(&state);
                 let playing = s.is_sink_playing();
                 let payload = s.get_state_payload();
                 (
+                    s.state.clone(),
                     payload.progress,
                     payload.duration,
                     matches!(s.state, PlaybackState::Playing) && !playing,
                 )
             };
 
-            let _ = app.emit(
-                "audio:progress",
-                serde_json::json!({ "current": progress, "duration": duration }),
-            );
+            // 仅在 Playing 时推送进度,Paused/Stopped 跳过——
+            // 进度条在暂停时已停在前次值,无需重复推送相同数据。
+            if matches!(state_kind, PlaybackState::Playing) {
+                let _ = app.emit(
+                    "audio:progress",
+                    serde_json::json!({ "current": progress, "duration": duration }),
+                );
+            }
 
             if song_ended {
                 let next = {

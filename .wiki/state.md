@@ -19,6 +19,8 @@
 
 **跨窗口同步**：通过 Tauri `app.emit()`（全局广播）+ 各窗口 `listen()` 实现。`audio:progress` / `audio:track_change` / `audio:state_change` 已在 Rust 侧广播到所有 webview；自定义业务事件（如 `desktop-lyrics:config-changed`、`mini-player:active-changed`）走同样路径。
 
+> **2026-06-26 说明：** `audio:spectrum` **不再广播**，改用 `Channel<T>` 点对点推送——频谱数据仅可视化渲染器消费，无需跨窗口。`audio:progress` 仍广播（mini-player/桌面歌词多窗口共享进度条），但仅 Playing 状态推送。
+
 **单例化**：`useMiniPlayer` / `useDesktopLyrics` / `usePlayer` 均采用模块级状态 + 幂等 init guard，避免主窗口多个组件重复注册监听器导致累积泄漏（详见 `.wiki/risks.md`）。
 
 ## 状态更新方式

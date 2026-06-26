@@ -444,6 +444,190 @@ pub fn stats_hourly_distribution(
     Ok(rows)
 }
 
+// ── Dashboard 聚合（替代前端 6 次扇出）──────────────────────────────────────
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StatsDashboard {
+    pub overview: ListeningOverview,
+    pub top_songs: Vec<TopSong>,
+    pub top_artists: Vec<TopArtist>,
+    pub genre_distribution: Vec<GenreDuration>,
+    pub trend: Vec<DayDuration>,
+    pub heatmap: Vec<DayDuration>,
+}
+
+/// 单次 IPC 返回统计仪表盘全部数据，替代前端 Promise.all 发 6 个命令。
+/// 一次锁、一次 prepare 各 SQL，消除 6 次往返与重复锁竞争。
+///
+/// 参数语义与原 6 个命令一致：
+/// - `range` / `start` / `end`：时间过滤（报告模式用 start/end，统计模式用 range）
+/// - `top_limit`：top_songs / top_artists 的 LIMIT，默认 10
+#[tauri::command]
+pub fn stats_dashboard(
+    range: Option<String>,
+    start: Option<String>,
+    end: Option<String>,
+    top_limit: Option<i64>,
+    db: State<'_, Db>,
+) -> AppResult<StatsDashboard> {
+    let conn = crate::audio::lock_or_recover(&db.0);
+    let limit = top_limit.unwrap_or(10);
+    let (filter_sql, filter_params) =
+        build_time_filter(range.as_deref(), start.as_deref(), end.as_deref());
+
+    // ── overview（原 stats_listening_overview 的 5 个 query_row）──
+    let play_count: i64 = conn
+        .query_row(
+            &format!("SELECT COUNT(*) FROM play_history ph WHERE 1=1 {}", filter_sql),
+            rusqlite::params_from_iter(filter_params.iter()),
+            |r| r.get(0),
+        )
+        .unwrap_or(0);
+
+    let total_duration_secs: f64 = conn
+        .query_row(
+            &format!(
+                "SELECT COALESCE(SUM(ph.duration_secs), 0) FROM play_history ph WHERE 1=1 {}",
+                filter_sql
+            ),
+            rusqlite::params_from_iter(filter_params.iter()),
+            |r| r.get(0),
+        )
+        .unwrap_or(0.0);
+
+    let genre_count: i64 = conn
+        .query_row(
+            &format!(
+                "SELECT COUNT(DISTINCT s.genre) FROM play_history ph JOIN songs s ON s.id = ph.song_id WHERE s.genre != '' {}",
+                filter_sql
+            ),
+            rusqlite::params_from_iter(filter_params.iter()),
+            |r| r.get(0),
+        )
+        .unwrap_or(0);
+
+    let artist_count: i64 = conn
+        .query_row(
+            &format!(
+                "SELECT COUNT(DISTINCT s.artist) FROM play_history ph JOIN songs s ON s.id = ph.song_id WHERE s.artist NOT IN ('Unknown Artist', '') {}",
+                filter_sql
+            ),
+            rusqlite::params_from_iter(filter_params.iter()),
+            |r| r.get(0),
+        )
+        .unwrap_or(0);
+
+    let unique_song_count: i64 = conn
+        .query_row(
+            &format!(
+                "SELECT COUNT(DISTINCT ph.song_id) FROM play_history ph WHERE 1=1 {}",
+                filter_sql
+            ),
+            rusqlite::params_from_iter(filter_params.iter()),
+            |r| r.get(0),
+        )
+        .unwrap_or(0);
+
+    let overview = ListeningOverview {
+        play_count,
+        total_duration_secs,
+        genre_count,
+        artist_count,
+        unique_song_count,
+    };
+
+    // ── top_songs ──
+    let mut stmt = conn.prepare(&format!(
+        "SELECT s.id, s.title, s.artist, COUNT(*) as play_count, COALESCE(SUM(ph.duration_secs), 0) as dur
+         FROM play_history ph JOIN songs s ON s.id = ph.song_id WHERE 1=1 {}
+         GROUP BY s.id ORDER BY dur DESC LIMIT ?", filter_sql
+    ))?;
+    let mut top_params = filter_params.clone();
+    top_params.push(SqlValue::Integer(limit));
+    let top_songs: Vec<TopSong> = stmt
+        .query_map(rusqlite::params_from_iter(top_params.iter()), |row| {
+            Ok(TopSong {
+                song_id: row.get(0)?,
+                title: row.get(1)?,
+                artist: row.get(2)?,
+                play_count: row.get(3)?,
+                total_duration_secs: row.get(4)?,
+            })
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+
+    // ── top_artists ──
+    let mut stmt = conn.prepare(&format!(
+        "SELECT s.artist, COUNT(*) as cnt, COALESCE(SUM(ph.duration_secs), 0) as dur, COUNT(DISTINCT s.id) as songs
+         FROM play_history ph JOIN songs s ON s.id = ph.song_id WHERE s.artist NOT IN ('Unknown Artist', '') {}
+         GROUP BY s.artist ORDER BY dur DESC LIMIT ?", filter_sql
+    ))?;
+    let top_artists: Vec<TopArtist> = stmt
+        .query_map(rusqlite::params_from_iter(top_params.iter()), |row| {
+            Ok(TopArtist {
+                artist: row.get(0)?,
+                play_count: row.get(1)?,
+                total_duration_secs: row.get(2)?,
+                song_count: row.get(3)?,
+            })
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+
+    // ── genre_distribution ──
+    let mut stmt = conn.prepare(&format!(
+        "SELECT COALESCE(NULLIF(s.genre, ''), 'Unknown') as genre, SUM(ph.duration_secs) as dur
+         FROM play_history ph JOIN songs s ON s.id = ph.song_id WHERE 1=1 {}
+         GROUP BY genre ORDER BY dur DESC", filter_sql
+    ))?;
+    let genre_distribution: Vec<GenreDuration> = stmt
+        .query_map(rusqlite::params_from_iter(filter_params.iter()), |row| {
+            Ok(GenreDuration {
+                genre: row.get(0)?,
+                duration_secs: row.get(1)?,
+            })
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+
+    // ── trend ──
+    let mut stmt = conn.prepare(&format!(
+        "SELECT DATE(ph.played_at) as day, SUM(ph.duration_secs) as dur
+         FROM play_history ph WHERE 1=1 {} GROUP BY day ORDER BY day", filter_sql
+    ))?;
+    let trend: Vec<DayDuration> = stmt
+        .query_map(rusqlite::params_from_iter(filter_params.iter()), |row| {
+            Ok(DayDuration {
+                date: row.get(0)?,
+                duration_secs: row.get(1)?,
+            })
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+
+    // ── heatmap（固定 365 天，不受 range/start/end 影响，与原 stats_heatmap 一致）──
+    let mut stmt = conn.prepare(
+        "SELECT DATE(ph.played_at) as day, SUM(ph.duration_secs) as dur
+         FROM play_history ph WHERE ph.played_at >= datetime('now', '-365 days')
+         GROUP BY day ORDER BY day",
+    )?;
+    let heatmap: Vec<DayDuration> = stmt
+        .query_map([], |row| {
+            Ok(DayDuration {
+                date: row.get(0)?,
+                duration_secs: row.get(1)?,
+            })
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+
+    Ok(StatsDashboard {
+        overview,
+        top_songs,
+        top_artists,
+        genre_distribution,
+        trend,
+        heatmap,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -23,8 +23,11 @@
 
 ## IPC 通信方式
 
-**前端 -> 后端：** `invoke('command', {args})`
-**后端 -> 前端：** `emit('event', payload)`
+**前端 -> 后端：** `invoke('command', {args})`（请求-响应）
+**后端 -> 前端：** `emit('event', payload)`（事件广播，多消费者）
+**后端 -> 前端：** `Channel<T>`（流式点对点，单消费者+高频）
+
+> **2026-06-26 优化：** 频谱分析器从 `emit` 广播改为 `Channel<T>` 点对点。三种原语按场景选型:多窗口消费用 `emit`(如 audio:state_change)、单消费者高频流用 `Channel`(如频谱)、一次性请求用 `invoke`。详见 [ipc.md#通信原语选型](ipc.md#通信原语选型)。
 
 ## Plugin 使用
 
@@ -177,3 +180,7 @@ graph TB
 - **事件监听优化：** 合理管理事件监听器生命周期
 - **类型安全：** 完整的 TypeScript 类型系统确保编译时错误检查
 - **WAL 模式：** SQLite WAL 模式提升并发读写性能
+- **IPC 聚合（2026-06-26）：** 统计页 `stats_dashboard` 单次返回 6 类数据（原 Promise.all 发 6 个命令）；导入流程 `replace_playlist_songs` 单事务原子替换（原 clear+add 两次 IPC）；拖动持久化 `set_window_position` 单次双 key（原两次 set_setting）
+- **流式原语（2026-06-26）：** 频谱分析器改用 `Channel<T>` 点对点推送，替代 30Hz 广播给全部 webview；channel 销毁即停推，生命周期自洽
+- **N+1 消除（2026-06-26）：** `upsert_songs` 用 `RETURNING id` 单条取回 id，消除原 N 次 SELECT 回查
+- **进度推送降频（2026-06-26）：** 进度线程仅 Playing 状态推送，Paused/Stopped 跳过重复值

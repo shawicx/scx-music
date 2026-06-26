@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use rodio::Source;
 use rustfft::{num_complex::Complex, FftPlanner};
-use tauri::{AppHandle, Emitter};
+use tauri::ipc::Channel;
 
 const FFT_SIZE: usize = 256;
 const NUM_BINS: usize = 64;
@@ -36,7 +36,10 @@ impl AnalyzerHandle {
         }
     }
 
-    pub fn start(&self, app: AppHandle) {
+    /// 启动 FFT 线程,通过 `channel` 点对点推送频谱数据。
+    /// 生命周期:channel 随调用方(前端 webview)销毁而失效,
+    /// `send` 失败时退出线程并置 running=false,无需前端手动 stop。
+    pub fn start(&self, channel: Channel<Vec<u8>>) {
         if self.running.swap(true, Ordering::SeqCst) {
             return;
         }
@@ -94,8 +97,12 @@ impl AnalyzerHandle {
                     bins[i] = scaled;
                 }
 
-                let _ = app.emit("audio:spectrum", bins);
+                // 点对点推送:channel 销毁或前端断开时 send 返回 Err,退出线程
+                if channel.send(bins).is_err() {
+                    break;
+                }
             }
+            running.store(false, Ordering::SeqCst);
         });
     }
 

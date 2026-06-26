@@ -84,6 +84,33 @@ pub fn set_setting(db: tauri::State<'_, Db>, key: String, value: String) -> AppR
     Ok(())
 }
 
+/// 批量写入窗口位置(逻辑坐标)。合并两次 set_setting 为单次 IPC,
+/// 用于窗口拖动持久化(debounce 后触发)。key_x/key_y 必须通过白名单校验。
+#[tauri::command]
+pub fn set_window_position(
+    db: tauri::State<'_, Db>,
+    key_x: String,
+    key_y: String,
+    value_x: String,
+    value_y: String,
+) -> AppResult<()> {
+    // 复用白名单校验:确保 key_x/key_y 都是合法的持久化键
+    validate_setting_key(&key_x)?;
+    validate_setting_key(&key_y)?;
+    let conn = crate::audio::lock_or_recover(&db.0);
+    let tx = conn.unchecked_transaction()?;
+    tx.execute(
+        "INSERT OR REPLACE INTO settings (key, value) VALUES (?1, ?2)",
+        params![key_x, value_x],
+    )?;
+    tx.execute(
+        "INSERT OR REPLACE INTO settings (key, value) VALUES (?1, ?2)",
+        params![key_y, value_y],
+    )?;
+    tx.commit()?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

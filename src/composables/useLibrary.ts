@@ -298,11 +298,9 @@ export function useLibrary() {
         songs.value = [...songs.value, ...addedToState]
       }
 
-      await invokeCommand('clear_playlist', { playlistId })
       const actualIds = upsertedSongs.map((s) => s.id)
-      if (actualIds.length > 0) {
-        await invokeCommand('add_songs_to_playlist', { playlistId, songIds: actualIds })
-      }
+      // 原子替换：单事务先删后插，替代 clear_playlist + add_songs_to_playlist 两次串行 IPC
+      await invokeCommand('replace_playlist_songs', { playlistId, songIds: actualIds })
       playlistSongs.value = {
         ...playlistSongs.value,
         [playlistId]: actualIds,

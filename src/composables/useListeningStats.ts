@@ -24,21 +24,21 @@ export function useListeningStats() {
     if (range) currentRange.value = range
     loading.value = true
     try {
-      const r = currentRange.value
-      const [ov, songs, artists, genres, trendData, heatmapData] = await Promise.all([
-        invokeCommand<ListeningOverview>('stats_listening_overview', { range: r }),
-        invokeCommand<TopSong[]>('stats_top_songs', { range: r, limit: 10 }),
-        invokeCommand<TopArtist[]>('stats_top_artists', { range: r, limit: 10 }),
-        invokeCommand<GenreDuration[]>('stats_genre_distribution', { range: r }),
-        invokeCommand<DayDuration[]>('stats_trend', { range: r }),
-        invokeCommand<DayDuration[]>('stats_heatmap'),
-      ])
-      overview.value = ov
-      topSongs.value = songs
-      topArtists.value = artists
-      genreDistribution.value = genres
-      trend.value = trendData
-      heatmap.value = heatmapData
+      // 单次 IPC 获取全部仪表盘数据，替代原 Promise.all 6 次扇出
+      const dash = await invokeCommand<{
+        overview: ListeningOverview
+        topSongs: TopSong[]
+        topArtists: TopArtist[]
+        genreDistribution: GenreDuration[]
+        trend: DayDuration[]
+        heatmap: DayDuration[]
+      }>('stats_dashboard', { range: currentRange.value, topLimit: 10 })
+      overview.value = dash.overview
+      topSongs.value = dash.topSongs
+      topArtists.value = dash.topArtists
+      genreDistribution.value = dash.genreDistribution
+      trend.value = dash.trend
+      heatmap.value = dash.heatmap
     } finally {
       loading.value = false
     }
