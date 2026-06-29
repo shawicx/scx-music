@@ -1,5 +1,5 @@
 <script setup lang="ts">
-defineProps<{ locked: boolean }>()
+defineProps<{ locked: boolean; isDark?: boolean }>()
 const emit = defineEmits<{ toggle: [] }>()
 
 function onClick(e: MouseEvent) {
@@ -16,7 +16,7 @@ function onMousedown(e: MouseEvent) {
 <template>
   <button
     class="lock-badge"
-    :class="{ locked }"
+    :class="{ locked, light: !isDark }"
     :title="locked ? '已锁定' : '锁定（点击穿透）'"
     @click="onClick"
     @mousedown="onMousedown"
@@ -32,10 +32,8 @@ function onMousedown(e: MouseEvent) {
   right: 12px;
   width: 28px;
   height: 28px;
-  border-radius: 50%;
+  border-radius: var(--radius-pill);
   border: none;
-  background: rgba(0, 0, 0, 0.4);
-  color: rgba(255, 255, 255, 0.8);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -43,8 +41,23 @@ function onMousedown(e: MouseEvent) {
   opacity: 0;
   transition: opacity 0.2s ease, background 0.2s ease;
 }
+/* 暗色(默认):黑底白字 */
+.lock-badge {
+  background: rgba(0, 0, 0, 0.4);
+  color: rgba(255, 255, 255, 0.8);
+}
 .lock-badge:hover {
   background: rgba(0, 0, 0, 0.7);
+  opacity: 1;
+}
+/* 浅色:白底深字 + 细边框 */
+.lock-badge.light {
+  background: rgba(255, 255, 255, 0.7);
+  color: #333;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}
+.lock-badge.light:hover {
+  background: rgba(255, 255, 255, 0.95);
   opacity: 1;
 }
 .lock-badge.locked {

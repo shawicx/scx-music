@@ -1,6 +1,7 @@
 import { ref, watch, computed } from 'vue'
 import { useTheme as useVuetifyTheme } from 'vuetify'
 import { invoke } from '@tauri-apps/api/core'
+import { emit } from '@tauri-apps/api/event'
 import { usePreferredDark } from '@vueuse/core'
 import type { ThemeColor, ThemeMode } from '../plugins/vuetify'
 
@@ -26,6 +27,8 @@ export function useColorTheme() {
   function setColorTheme(name: ThemeColor) {
     colorName.value = name
     invoke('set_setting', { key: 'theme_color', value: name }).catch(console.error)
+    // 广播给独立 webview（桌面歌词/迷你播放器），它们有独立 Vuetify 实例需手动同步
+    void emit('app:theme-changed', { color: name })
   }
 
   return { colorName, setColorTheme, loadColorFromDb }
@@ -57,6 +60,8 @@ export function useThemeMode() {
   function setMode(newMode: ThemeMode) {
     mode.value = newMode
     invoke('set_setting', { key: 'theme_mode', value: newMode }).catch(console.error)
+    // 广播给独立 webview（桌面歌词/迷你播放器），它们有独立 Vuetify 实例需手动同步
+    void emit('app:theme-changed', { mode: newMode })
   }
 
   const isDark = computed(() => {

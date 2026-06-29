@@ -138,10 +138,25 @@ const sortLabel = computed(() => {
 .top-bar-right {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-sm);
 }
 
 .search-field {
   width: 180px;
+}
+
+/* 窄屏响应式:主窗口默认 1200,缩放时逐级收窄 */
+@media (max-width: 1100px) {
+  .search-field { width: 140px; }
+}
+@media (max-width: 900px) {
+  .search-field { width: 120px; }
+}
+@media (max-width: 720px) {
+  /* 极窄屏:隐藏搜索框与显示模式切换,保留视图切换 + 排序 */
+  .search-field,
+  .top-bar-right > .v-btn-toggle:first-of-type {
+    display: none;
+  }
 }
 </style>

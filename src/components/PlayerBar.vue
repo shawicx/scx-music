@@ -142,7 +142,7 @@ const { progressModel, displayProgress, isDragging } = useDraggableProgress(prog
       <IconButtonWithTooltip
         icon="mdi-chevron-double-up"
         :tooltip="t('miniPlayer.enter')"
-        size="x-small"
+        size="small"
         @click.stop="enterMini"
       />
       <IconButtonWithTooltip
@@ -151,13 +151,13 @@ const { progressModel, displayProgress, isDragging } = useDraggableProgress(prog
         :active="desktopLyricsVisible"
         :tooltip="t('lyrics.desktopLyrics.toggle')"
         color="secondary"
-        size="x-small"
+        size="small"
         @click.stop="toggleDesktopLyrics"
       />
       <IconButtonWithTooltip
         icon="mdi-playlist-music"
         :tooltip="t('player.playlist')"
-        size="x-small"
+        size="small"
         @click.stop="emit('toggleQueue')"
       />
       <v-slider
@@ -224,6 +224,24 @@ const { progressModel, displayProgress, isDragging } = useDraggableProgress(prog
 .time { font-size: var(--text-xs); color: var(--v-text-secondary); min-width: 32px; text-align: center; }
 .progress-slider { flex: 1; }
 
-.player-right { display: flex; align-items: center; gap: 4px; min-width: 180px; justify-content: flex-end; }
-.volume-slider { width: 80px; }
+.player-right {
+  display: flex; align-items: center; gap: var(--space-sm);
+  min-width: 180px; justify-content: flex-end;
+}
+/* 音量滑块与功能按钮组分隔:竖向分隔线,视觉上"按钮 | 音量" */
+.volume-slider {
+  width: 80px;
+  margin-left: var(--space-xs);
+  padding-left: var(--space-sm);
+  border-left: 1px solid var(--glass-border);
+}
+
+/* 窄屏:音量滑块收窄 */
+@media (max-width: 900px) {
+  .volume-slider { width: 64px; }
+}
+/* 极窄屏:隐藏音量滑块(音量用 ArrowUp/Down 快捷键调节) */
+@media (max-width: 720px) {
+  .volume-slider { display: none; }
+}
 </style>

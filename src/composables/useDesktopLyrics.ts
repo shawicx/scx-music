@@ -1,5 +1,6 @@
 import { ref, reactive, type Ref } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
+import { usePreferredDark } from '@vueuse/core'
 import {
   getCurrentWindow,
   LogicalPosition,
@@ -57,6 +58,12 @@ const config = reactive<DesktopLyricsConfig>({ ...DEFAULT_CONFIG })
 const currentSong = ref<Song | null>(null)
 const unlistens: UnlistenFn[] = []
 let stateSyncDone = false
+// 主题模式:独立 webview 需自行感知主窗口主题(settings 表 + app:theme-changed 事件同步)
+const themeMode = ref<'light' | 'dark' | 'system'>('system')
+const preferredDark = usePreferredDark()
+const isDark = ref(true)
+// 主题色(用于歌词渐变文字):独立 webview 自行感知,跟随 app:theme-changed 同步
+const themeColor = ref<string>('teal')
 // lyrics 实例只在 lyrics 窗口首次调用时创建（不跨窗口共享，但同窗口内单例）。
 // 多个 useDesktopLyrics 实例共享同一个 currentSong ref，所以 lyrics 实例可安全复用。
 let lyricsInstance: ReturnType<typeof useLyrics> | null = null
@@ -78,9 +85,19 @@ export function useDesktopLyrics() {
     try {
       const all = await invoke<Record<string, string>>('get_all_settings')
       initialLocked = all[STORAGE_KEYS.locked] === 'true'
+      // 读主题模式(独立 webview 自行感知,主窗口切主题通过 app:theme-changed 同步)
+      if (all['theme_mode'] === 'light' || all['theme_mode'] === 'dark' || all['theme_mode'] === 'system') {
+        themeMode.value = all['theme_mode']
+      }
+      // 读主题色(用于歌词渐变文字)
+      if (all['theme_color']) {
+        themeColor.value = all['theme_color']
+      }
     } catch {
       // 容错：读取失败时按未锁定处理
     }
+    // 计算初始 isDark(system 模式跟随系统偏好)
+    isDark.value = themeMode.value === 'system' ? preferredDark.value : themeMode.value === 'dark'
     locked.value = initialLocked
     if (isLyricsWindow && initialLocked) {
       await current.setIgnoreCursorEvents(true).catch(() => {})
@@ -94,6 +111,21 @@ export function useDesktopLyrics() {
       }
     })
     unlistens.push(un)
+
+    // 监听主窗口主题切换,实时同步 isDark + themeColor(独立 Vuetify 实例不会自动跟随)
+    const unTheme = await listen<{ mode?: 'light' | 'dark' | 'system'; color?: string }>(
+      'app:theme-changed',
+      (e) => {
+        if (e.payload.mode) {
+          themeMode.value = e.payload.mode
+          isDark.value = themeMode.value === 'system' ? preferredDark.value : themeMode.value === 'dark'
+        }
+        if (e.payload.color) {
+          themeColor.value = e.payload.color
+        }
+      },
+    )
+    unlistens.push(unTheme)
   }
 
   async function syncLockWindowPosition() {
@@ -311,6 +343,8 @@ export function useDesktopLyrics() {
     lines,
     currentLineIndex,
     isLyricsWindow,
+    isDark,
+    themeColor,
     toggle,
     toggleLock,
     updateConfig,

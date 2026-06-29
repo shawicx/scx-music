@@ -169,7 +169,6 @@ const showQueue = ref(false)
 }
 html, body, #app {
   height: 100%; overflow: hidden;
-  background: rgb(var(--v-theme-background)); color: rgb(var(--v-theme-on-background));
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   font-size: clamp(16px, 1vw + 4px, 24px);
 }
@@ -179,7 +178,14 @@ html, body, #app {
 </style>
 
 <style scoped>
-.app-shell { display: flex; height: 100vh; position: relative; }
+/* 主窗口背景/前景色:限定 scoped,避免泄漏到子窗口(桌面歌词/mini)导致透明失效 */
+.app-shell {
+  display: flex;
+  height: 100vh;
+  position: relative;
+  background: rgb(var(--v-theme-background));
+  color: rgb(var(--v-theme-on-background));
+}
 .main-area { flex: 1; display: flex; flex-direction: column; overflow: hidden; position: relative; }
 .library-wrapper { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
 </style>

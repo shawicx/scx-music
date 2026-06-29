@@ -49,22 +49,6 @@ async function onDesktopLyricsConfigChange(key: keyof typeof desktopLyricsConfig
     </div>
 
     <div class="desktop-lyrics-row">
-      <div class="desktop-lyrics-label">{{ t('lyrics.desktopLyrics.bgOpacity') }}</div>
-      <div class="desktop-lyrics-control">
-        <v-slider
-          :model-value="desktopLyricsConfig.bgOpacity"
-          :min="0"
-          :max="1"
-          :step="0.05"
-          thumb-label
-          hide-details
-          color="primary"
-          @update:model-value="(v) => onDesktopLyricsConfigChange('bgOpacity', v)"
-        />
-      </div>
-    </div>
-
-    <div class="desktop-lyrics-row">
       <div class="desktop-lyrics-label">{{ t('lyrics.desktopLyrics.fontSize') }}</div>
       <div class="desktop-lyrics-control">
         <v-slider
