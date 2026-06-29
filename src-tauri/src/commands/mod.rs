@@ -1,3 +1,4 @@
+pub mod autostart;
 pub mod bootstrap;
 pub mod import_export;
 pub mod lyrics;

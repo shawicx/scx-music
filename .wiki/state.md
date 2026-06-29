@@ -164,6 +164,23 @@ listen('audio:state_change', (e) => {
 
 **注意**：可见性 (`visible`) 不持久化 —— 主窗口 PlayerBar 按钮态由本地 ref 维护，应用重启后 lyrics 窗口默认隐藏（来自 `tauri.conf.json`），符合"不做启动自动打开"的设计。
 
+## 启动选项设置项（2026-06-29 新增）
+
+恢复上次播放的持久化键存入既有 `settings` 表（**无数据库迁移**）；开机自启状态**不入库**，完全由操作系统托管。
+
+| Key | 默认值 | 类型 | 说明 |
+|---|---|---|---|
+| `restore_last_playback` | `false` | bool string | 启动恢复播放总开关。key 不存在时默认 false（避免新用户意外行为） |
+| `last_position` | （无）| float string | 上次播放位置（秒）。`usePlayer` 的 progress 监听 debounce 5s 写入；仅在 Playing 时有事件推送 |
+
+**复用的既有 key**（启动时已有）：
+- `currentSongId` — 上次播放的歌曲 ID（`useLibrary.playSong` 切歌时写入）
+- `activePlaylistId` — 队列来源（null=全部曲库，有值=某歌单；`useLibrary.setActivePlaylist` 写入）
+
+**开机自启**：状态由 `tauri-plugin-autostart` 注册到 OS 启动项（macOS LaunchAgent / Windows 注册表 Run 键 / Linux .desktop），**不读 settings 表**。设置页 `StartupSettings.vue` 每次打开调 `app_get_autostart` 查询系统真实状态，避免与系统脱节（如用户在系统设置手动删启动项）。
+
+**恢复流程边界**：歌曲已删除(`findIndex<0`)/歌单已删除(空映射)/位置非法(NaN/负数归零) → 静默跳过，不报错不阻塞启动。
+
 ## 最关键状态
 
 1. **播放队列** - queue + queueIndex

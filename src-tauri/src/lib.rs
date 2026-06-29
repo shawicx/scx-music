@@ -198,6 +198,10 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            None,
+        ))
         .plugin(
             ShortcutBuilder::new().with_handler(|app: &tauri::AppHandle, shortcut, event| {
                 if event.state != ShortcutState::Pressed {
@@ -301,6 +305,8 @@ pub fn run() {
             commands::shortcuts::shortcuts_is_registered,
             commands::shortcuts::shortcuts_register_all,
             commands::window::app_toggle_main_window,
+            commands::autostart::app_get_autostart,
+            commands::autostart::app_set_autostart,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

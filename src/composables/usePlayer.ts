@@ -6,6 +6,7 @@ import { formatTimecode as formatTime } from '../utils/format'
 import { useToast } from './useToast'
 import i18n from '../i18n'
 import { generateQueue } from './usePlayQueue'
+import { savePlaybackPosition } from './useStartupOptions'
 
 type PlayerStateReturnType = {
   currentSong: Song | null
@@ -42,6 +43,8 @@ async function setupListeners() {
     await listen<{ current: number; duration: number }>('audio:progress', (e) => {
       progress.value = e.payload.current
       duration.value = e.payload.duration
+      // debounce 5s 持久化播放位置（用于启动恢复）
+      void savePlaybackPosition(e.payload.current)
     }),
   )
 

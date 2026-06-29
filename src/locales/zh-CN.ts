@@ -92,6 +92,7 @@ export default {
       lyrics: '桌面歌词',
       shortcuts: '快捷键',
       data: '数据管理',
+      startup: '启动',
     },
     themeMode: '主题模式',
     themeColor: '主题颜色',
@@ -116,6 +117,14 @@ export default {
     settingsTransfer: '设置迁移',
     exportSettingsBtn: '导出设置',
     importSettingsBtn: '导入设置',
+    // 启动选项
+    startupTitle: '启动',
+    autostart: '开机自启',
+    autostartDesc: '登录系统时自动启动 scx-music',
+    restorePlayback: '启动时恢复上次播放',
+    restorePlaybackDesc: '打开应用时恢复上次的播放队列与进度（暂停状态）',
+    autostartEnableFailed: '设置开机自启失败',
+    autostartUpdated: '开机自启设置已更新',
     shortcuts: {
       title: '快捷键',
       subtitle: '配置全局媒体键和应用快捷动作。注：macOS 上其他媒体应用（系统 Music、Spotify）活跃时，媒体键可能失效。',
