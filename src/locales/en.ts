@@ -116,6 +116,42 @@ export default {
     settingsTransfer: 'Settings Transfer',
     exportSettingsBtn: 'Export Settings',
     importSettingsBtn: 'Import Settings',
+    // Cache & data cleanup
+    cacheManagement: {
+      title: 'Cache & Data Cleanup',
+      lyricsCache: {
+        title: 'Lyrics Cache',
+        desc: '{count} entries · {size}',
+        clearBtn: 'Clear',
+        empty: 'No cached data',
+      },
+      orphanLyrics: {
+        title: 'Orphan Lyrics',
+        desc: '{count} entries (residue from deleted songs)',
+        clearBtn: 'Clean',
+        empty: 'No orphan data',
+      },
+      playHistory: {
+        title: 'Play History',
+        desc: '{count} entries · earliest {date}',
+        descNoDate: '{count} entries',
+        empty: 'No play history',
+        retention: 'Keep',
+        retentionOptions: {
+          '30d': 'Last 30 days',
+          '90d': 'Last 90 days',
+          '1y': 'Last year',
+          all: 'Clear all',
+        },
+        clearBtn: 'Clean',
+      },
+      confirm: {
+        title: 'Confirm Cleanup',
+        lyricsBody: 'This will clear all lyrics cache ({count} entries). Lyrics will be refetched on next play. Continue?',
+        historyBody: 'This will clear play history ({scope}). This cannot be undone. Continue?',
+        confirmBtn: 'Cleanup',
+      },
+    },
     shortcuts: {
       title: 'Shortcuts',
       subtitle: 'Configure global media keys and app shortcut actions. Note: media keys may not work when other media apps (system Music, Spotify) are active on macOS.',
@@ -202,6 +238,11 @@ export default {
     settingsImported: '{count} settings imported',
     settingsImportFailed: 'Failed to import settings',
     offsetResetFailed: 'Failed to reset lyric offset',
+    lyricsCacheCleared: 'Cleared {count} lyrics cache entries',
+    orphanLyricsCleared: 'Cleaned {count} orphan entries',
+    historyCleared: 'Cleared play history ({scope})',
+    cacheClearFailed: 'Cleanup failed',
+    statsLoadFailed: 'Failed to load statistics',
   },
   empty: {
     noPlaylistTitle: 'Select a playlist to start',

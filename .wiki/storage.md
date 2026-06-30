@@ -67,6 +67,14 @@
 **前端：** Pinia Store 状态缓存，虚拟滚动优化大量数据渲染
 **后端：** 歌词缓存 (lyrics 表)，无其他缓存层，直接查询 SQLite
 
+**缓存清理（2026-06-30 新增）：** `commands/cache.rs` 提供 5 个命令：
+- `get_lyrics_cache_stats` / `get_play_history_stats` — 统计规模（条数/大小/孤儿数/最早时间）
+- `clear_lyrics_cache` — 清空全部歌词缓存（含 source='none' 负缓存）
+- `clear_orphan_lyrics` — 清理 song_id 不在 songs 表的孤儿歌词（删歌曲残留，因 lyrics 表无外键）
+- `clear_play_history(before_days)` — 按时间段清理播放历史（None=全部，Some(n)=保留近 n 天）
+
+入口：设置 → 数据管理 → "缓存与数据清理"卡片（`DataManagementSettings.vue`）。设计：核心 SQL 提取为 `_inner(&Connection)` 纯函数，便于内存 SQLite 单元测试。
+
 ## App Data
 
 **位置：** 与数据库相同目录

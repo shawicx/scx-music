@@ -301,6 +301,11 @@ pub fn run() {
             commands::shortcuts::shortcuts_is_registered,
             commands::shortcuts::shortcuts_register_all,
             commands::window::app_toggle_main_window,
+            commands::cache::get_lyrics_cache_stats,
+            commands::cache::get_play_history_stats,
+            commands::cache::clear_lyrics_cache,
+            commands::cache::clear_orphan_lyrics,
+            commands::cache::clear_play_history,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

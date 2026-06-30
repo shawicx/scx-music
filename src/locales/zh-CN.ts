@@ -116,6 +116,42 @@ export default {
     settingsTransfer: '设置迁移',
     exportSettingsBtn: '导出设置',
     importSettingsBtn: '导入设置',
+    // 缓存与数据清理
+    cacheManagement: {
+      title: '缓存与数据清理',
+      lyricsCache: {
+        title: '歌词缓存',
+        desc: '共 {count} 条 · {size}',
+        clearBtn: '清空',
+        empty: '无缓存数据',
+      },
+      orphanLyrics: {
+        title: '孤儿歌词数据',
+        desc: '共 {count} 条（已删除歌曲的残留）',
+        clearBtn: '清理',
+        empty: '无冗余数据',
+      },
+      playHistory: {
+        title: '播放历史',
+        desc: '共 {count} 条 · 最早 {date}',
+        descNoDate: '共 {count} 条',
+        empty: '暂无播放历史',
+        retention: '保留',
+        retentionOptions: {
+          '30d': '近 30 天',
+          '90d': '近 90 天',
+          '1y': '近 1 年',
+          all: '全部清空',
+        },
+        clearBtn: '清理',
+      },
+      confirm: {
+        title: '确认清理',
+        lyricsBody: '将清空全部歌词缓存（{count} 条），下次播放会重新获取。是否继续？',
+        historyBody: '将清理 {scope} 的播放历史，此操作不可恢复。是否继续？',
+        confirmBtn: '清理',
+      },
+    },
     shortcuts: {
       title: '快捷键',
       subtitle: '配置全局媒体键和应用快捷动作。注：macOS 上其他媒体应用（系统 Music、Spotify）活跃时，媒体键可能失效。',
@@ -202,6 +238,11 @@ export default {
     settingsImported: '已导入 {count} 项设置',
     settingsImportFailed: '设置导入失败',
     offsetResetFailed: '歌词偏移重置失败',
+    lyricsCacheCleared: '已清理 {count} 条歌词缓存',
+    orphanLyricsCleared: '已清理 {count} 条冗余数据',
+    historyCleared: '已清理播放历史（{scope}）',
+    cacheClearFailed: '清理失败',
+    statsLoadFailed: '统计加载失败',
   },
   empty: {
     noPlaylistTitle: '选择一个歌单开始',

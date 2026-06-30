@@ -89,6 +89,14 @@
 - `get_lyrics` - 获取歌词（缓存 → 内嵌 → LRCLIB API）
 - `refresh_lyrics` - 强制刷新歌词（跳过缓存）
 
+**commands/cache.rs** - 缓存与冗余数据清理（2026-06-30 新增）
+- `get_lyrics_cache_stats` / `get_play_history_stats` - 统计规模（条数/大小/孤儿数/最早时间）
+- `clear_lyrics_cache` - 清空全部歌词缓存（含 source='none' 负缓存）
+- `clear_orphan_lyrics` - 清理孤儿歌词（song_id 不在 songs 表，删歌曲残留）
+- `clear_play_history(before_days)` - 按时间段清理播放历史（None=全部，Some(n)=保留近 n 天）
+
+设计：核心 SQL 提取为 `_inner(&Connection)` 纯函数，命令做薄包装调 `lock_or_recover`，便于内存 SQLite 单元测试。`clear_play_history` 用 SQLite 内置 `datetime('now', '-N days')` 计算阈值避免时区问题；before_days=0 或负数返回 `InvalidArgument`。
+
 **commands/import_export.rs** - 数据导入导出
 - `export_playlist_m3u` - 导出播放列表为 M3U 格式
 - `export_playlist_pls` - 导出播放列表为 PLS 格式

@@ -1,3 +1,4 @@
+pub mod cache;
 pub mod bootstrap;
 pub mod import_export;
 pub mod lyrics;

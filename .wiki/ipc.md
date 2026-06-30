@@ -72,6 +72,12 @@ const result = await invokeCommand('command_name', { param: value })
 | **歌词** | | | |
 | `get_lyrics` | composables/useLyrics.ts | commands/lyrics.rs | 获取歌词 (缓存→内嵌→LRCLIB) |
 | `refresh_lyrics` | - | commands/lyrics.rs | 强制刷新歌词 |
+| **缓存清理** | | | |
+| `get_lyrics_cache_stats` | composables/useCache.ts | commands/cache.rs | 歌词缓存统计（总数/大小/孤儿数/by_source） |
+| `get_play_history_stats` | composables/useCache.ts | commands/cache.rs | 播放历史统计（总数/最早时间/估算大小） |
+| `clear_lyrics_cache` | composables/useCache.ts | commands/cache.rs | 清空全部歌词缓存（含 source='none' 负缓存），不打断当前播放 |
+| `clear_orphan_lyrics` | composables/useCache.ts | commands/cache.rs | 清理孤儿歌词（song_id 不在 songs 表，删歌曲残留） |
+| `clear_play_history` | composables/useCache.ts | commands/cache.rs | 按时间段清理播放历史（beforeDays：null=全部，正数=保留近 N 天） |
 | **导入导出** | | | |
 | `export_playlist_m3u` | composables/useImportExport.ts | commands/import_export.rs | 导出播放列表为 M3U 格式（**路径校验**：绝对路径 + 拒绝 `..`） |
 | `export_playlist_pls` | composables/useImportExport.ts | commands/import_export.rs | 导出播放列表为 PLS 格式（同上） |
