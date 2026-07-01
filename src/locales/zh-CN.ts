@@ -56,6 +56,12 @@ export default {
     visualizationWave: '流动波形',
     visualizationWaveFill: '波形山峦',
     visualizationStyle: '可视化风格',
+    sleepTimer: {
+      title: '睡眠定时器',
+      minutes: '{count} 分钟',
+      cancel: '取消定时',
+      remaining: '剩余 {time}',
+    },
   },
   lyrics: {
     noLyrics: '暂无歌词',
@@ -252,6 +258,10 @@ export default {
     historyCleared: '已清理播放历史（{scope}）',
     cacheClearFailed: '清理失败',
     statsLoadFailed: '统计加载失败',
+    sleepTimerSet: '将在 {minutes} 分钟后停止播放',
+    sleepTimerStopped: '睡眠定时结束，已停止播放',
+    sleepTimerCanceled: '已取消睡眠定时器',
+    sleepTimerFailed: '睡眠定时器设置失败',
   },
   empty: {
     noPlaylistTitle: '选择一个歌单开始',

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { ref, computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { usePlayerStore } from '../stores/player'
 import { useLibraryStore } from '../stores/library'
@@ -9,6 +9,7 @@ import { usePlaybackMode } from '../composables/usePlaybackMode'
 import { useDesktopLyrics } from '../composables/useDesktopLyrics'
 import { useDraggableProgress } from '../composables/useDraggableProgress'
 import { useMiniPlayer } from '../composables/useMiniPlayer'
+import { useSleepTimer } from '../composables/useSleepTimer'
 import { useI18n } from '../composables/useI18n'
 
 const emit = defineEmits<{ expand: []; toggleQueue: [] }>()
@@ -18,7 +19,30 @@ const libraryStore = useLibraryStore()
 const { modeIcon, modeLabel, isModeActive, cycleMode } = usePlaybackMode()
 const { visible: desktopLyricsVisible, toggle: toggleDesktopLyrics } = useDesktopLyrics()
 const { enter: enterMini } = useMiniPlayer()
+const { isActive: sleepTimerActive, remainingSecs, totalMinutes, formatRemaining, start: startSleepTimer, cancel: cancelSleepTimer } = useSleepTimer()
 const { t } = useI18n()
+
+// ── 睡眠定时器 ──────────────────────────────────────────────────────────────
+const sleepMenuOpen = ref(false)
+const durationOptions = [
+  { minutes: 15 },
+  { minutes: 30 },
+  { minutes: 45 },
+  { minutes: 60 },
+]
+const sleepTooltip = computed(() =>
+  sleepTimerActive.value
+    ? t('player.sleepTimer.remaining', { time: formatRemaining(remainingSecs.value) })
+    : t('player.sleepTimer.title'),
+)
+function onSelectSleepDuration(minutes: number) {
+  startSleepTimer(minutes)
+  sleepMenuOpen.value = false
+}
+function onCancelSleepTimer() {
+  cancelSleepTimer()
+  sleepMenuOpen.value = false
+}
 
 const {
   currentSong,
@@ -160,6 +184,36 @@ const { progressModel, displayProgress, isDragging } = useDraggableProgress(prog
         size="small"
         @click.stop="emit('toggleQueue')"
       />
+      <v-menu v-model="sleepMenuOpen" :close-on-content-click="false" location="top">
+        <template #activator="{ props: menuProps }">
+          <IconButtonWithTooltip
+            v-bind="menuProps"
+            icon="mdi-power-sleep"
+            :active="sleepTimerActive"
+            :tooltip="sleepTooltip"
+            color="secondary"
+            size="small"
+          />
+        </template>
+        <v-list density="compact" min-width="160">
+          <v-list-subheader>{{ t('player.sleepTimer.title') }}</v-list-subheader>
+          <v-list-item
+            v-for="opt in durationOptions"
+            :key="opt.minutes"
+            :title="t('player.sleepTimer.minutes', { count: opt.minutes })"
+            :active="totalMinutes === opt.minutes"
+            @click="onSelectSleepDuration(opt.minutes)"
+          />
+          <v-divider />
+          <v-list-item
+            v-if="sleepTimerActive"
+            prepend-icon="mdi-close"
+            :title="t('player.sleepTimer.cancel')"
+            base-color="error"
+            @click="onCancelSleepTimer"
+          />
+        </v-list>
+      </v-menu>
       <v-slider
         v-model="volumeModel"
         :max="100"

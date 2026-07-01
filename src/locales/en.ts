@@ -56,6 +56,12 @@ export default {
     visualizationWave: 'Waveform',
     visualizationWaveFill: 'Wave Mountain',
     visualizationStyle: 'Visualization Style',
+    sleepTimer: {
+      title: 'Sleep Timer',
+      minutes: '{count} min',
+      cancel: 'Cancel Timer',
+      remaining: '{time} left',
+    },
   },
   lyrics: {
     noLyrics: 'No lyrics available',
@@ -252,6 +258,10 @@ export default {
     historyCleared: 'Cleared play history ({scope})',
     cacheClearFailed: 'Cleanup failed',
     statsLoadFailed: 'Failed to load statistics',
+    sleepTimerSet: 'Playback will stop in {minutes} minutes',
+    sleepTimerStopped: 'Sleep timer ended, playback stopped',
+    sleepTimerCanceled: 'Sleep timer canceled',
+    sleepTimerFailed: 'Failed to set sleep timer',
   },
   empty: {
     noPlaylistTitle: 'Select a playlist to start',
