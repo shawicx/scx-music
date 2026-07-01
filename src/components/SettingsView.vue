@@ -7,12 +7,13 @@ import AudioDeviceSettings from './settings/AudioDeviceSettings.vue'
 import DesktopLyricsSettings from './settings/DesktopLyricsSettings.vue'
 import ShortcutSettings from './settings/ShortcutSettings.vue'
 import DataManagementSettings from './settings/DataManagementSettings.vue'
+import StartupSettings from './settings/StartupSettings.vue'
 
 const emit = defineEmits<{ back: [] }>()
 
 const { t } = useI18n()
 
-type TabId = 'appearance' | 'audio' | 'lyrics' | 'shortcuts' | 'data'
+type TabId = 'appearance' | 'audio' | 'lyrics' | 'shortcuts' | 'data' | 'startup'
 const activeTab = ref<TabId>('appearance')
 
 const tabs: { id: TabId; icon: string; label: string }[] = [
@@ -21,6 +22,7 @@ const tabs: { id: TabId; icon: string; label: string }[] = [
   { id: 'lyrics', icon: 'mdi-monitor-eye', label: 'settings.tabs.lyrics' },
   { id: 'shortcuts', icon: 'mdi-keyboard', label: 'settings.tabs.shortcuts' },
   { id: 'data', icon: 'mdi-database', label: 'settings.tabs.data' },
+  { id: 'startup', icon: 'mdi-power', label: 'settings.tabs.startup' },
 ]
 
 /** 内容区容器引用：tab 切换时对新内容做 GSAP 淡入上移动画。 */
@@ -65,6 +67,7 @@ watch(activeTab, async () => {
       <DesktopLyricsSettings v-else-if="activeTab === 'lyrics'" />
       <ShortcutSettings v-else-if="activeTab === 'shortcuts'" />
       <DataManagementSettings v-else-if="activeTab === 'data'" />
+      <StartupSettings v-else-if="activeTab === 'startup'" />
     </div>
   </div>
 </template>

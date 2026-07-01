@@ -62,7 +62,7 @@ const result = await invokeCommand('command_name', { param: value })
 | **设置** | | | |
 | `get_all_settings` | - | commands/settings.rs | 获取所有设置 |
 | `get_setting` | stores/settings.ts | commands/settings.rs | 获取单个设置 |
-| `set_setting` | stores/settings.ts, stores/library.ts | commands/settings.rs | 设置单个键值对（**key 白名单校验**：精确 9 项 + 前缀 4 项；前缀必须带非空子键） |
+| `set_setting` | stores/settings.ts, stores/library.ts | commands/settings.rs | 设置单个键值对（**key 白名单校验**：精确 11 项 + 前缀 4 项；前缀必须带非空子键。2026-06-29 新增 `last_position` / `restore_last_playback` 两个精确 key 用于启动恢复播放） |
 | `set_window_position` | composables/useMiniPlayer.ts, composables/useDesktopLyrics.ts | commands/settings.rs | 批量写入窗口位置（单事务双 key，2026-06-26 新增，替代拖动后的两次 set_setting） |
 | `get_system_locale` | composables/useI18n.ts | commands/settings.rs | 获取系统语言 |
 | **文件扫描** | | | |
@@ -106,6 +106,9 @@ const result = await invokeCommand('command_name', { param: value })
 | `shortcuts_is_registered` | composables/useGlobalShortcuts.ts | commands/shortcuts.rs | 检查组合键是否已被注册（系统层冲突预检） |
 | `shortcuts_register_all` | composables/useGlobalShortcuts.ts | commands/shortcuts.rs | 批量注册（启动场景） |
 | `app_toggle_main_window` | composables/useGlobalShortcuts.ts | commands/window.rs | 切换主窗口可见性（仅 main，不影响其他窗口） |
+| **启动选项** | | | |
+| `app_get_autostart` | composables/useStartupOptions.ts | commands/autostart.rs | 查询开机自启状态（**读操作系统真实状态**，不读 settings 表） |
+| `app_set_autostart` | composables/useStartupOptions.ts | commands/autostart.rs | 开启/关闭开机自启（写入 OS 启动项：macOS LaunchAgent / Windows 注册表 / Linux .desktop）。状态**不落库** |
 
 ## 前后端调用链
 
@@ -194,6 +197,28 @@ App.vue onMounted
 -> Vuetify 主题系统响应
 -> UI 更新
 ```
+
+### 启动恢复播放流程（2026-06-29 新增）
+
+```
+App.vue onMounted（在 startCheck 之后、迷你模式恢复之前）
+-> isRestoreEnabled()                  // 读 settings['restore_last_playback']，默认 false
+-> invoke('get_all_settings')          // 取 currentSongId / activePlaylistId / last_position
+-> 仅当 restoreEnabled && currentSongId 存在：
+   ├─ rebuildSourceList(songs, playlistSongs, pid)  // null=全部曲库，否则按 activePlaylistId 过滤
+   ├─ sourceList.findIndex(s => s.id === lastSongId)  // 找不到(idx<0)→静默跳过
+   ├─ playerStore.playFromQueue(sourceList, idx)    // 内部 player_set_queue，自动开始播放
+   ├─ playerStore.seek(lastPos)                     // parsePosition 钳制非法值/越界
+   └─ invoke('player_pause')                        // ★直接调 Rust 暂停，绕过前端 isPlaying 竞态
+-> try/catch 包裹，失败仅 console.warn，不阻塞启动
+```
+
+**位置持久化（运行时）**：`usePlayer` 的 `audio:progress` 监听内，每 5s debounce 一次 `set_setting('last_position', currentSecs)`。仅在 Playing 时有事件推送，Paused/Stopped 不写。
+
+**关键设计点**：
+- 恢复后**立即暂停**（调 `invoke('player_pause')` 而非 `togglePlayPause()`）——前端 `isPlaying` 经事件异步更新，若用 togglePlayPause 可能误走 resume 分支
+- 队列来源**数据已就绪**——`get_bootstrap_data` 启动时已加载全部 `playlist_songs` 映射，无需异步拉取
+- 边界静默处理：歌曲删除(idx<0)/歌单删除(空映射)/位置非法(归零) → 不报错不阻塞
 
 ### 歌单导出流程
 

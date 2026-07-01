@@ -21,6 +21,7 @@ import { usePlayerExpand } from './composables/usePlayerExpand'
 import { useAutoUpdate } from './composables/useAutoUpdate'
 import { useMiniPlayer } from './composables/useMiniPlayer'
 import { useGlobalShortcuts } from './composables/useGlobalShortcuts'
+import { isRestoreEnabled, rebuildSourceList, parsePosition } from './composables/useStartupOptions'
 import UpdateDialog from './components/UpdateDialog.vue'
 
 const settingsStore = useSettingsStore()
@@ -92,6 +93,36 @@ onMounted(async () => {
   console.log(`[perf] App initialized in ${(performance.now() - t0).toFixed(0)}ms`)
 
   startCheck()
+
+  // 启动恢复播放（若开启）：重建队列 → playFromQueue → seek → 立即暂停
+  try {
+    const restoreEnabled = await isRestoreEnabled()
+    const settings = await invoke<Record<string, string>>('get_all_settings')
+    const lastSongId = settings['currentSongId']
+    if (restoreEnabled && lastSongId) {
+      const pid = settings['activePlaylistId'] ?? null
+      const sourceList = rebuildSourceList(
+        libraryStore.songs,
+        libraryStore.playlistSongs,
+        pid,
+      )
+      const idx = sourceList.findIndex((s) => s.id === lastSongId)
+      if (idx >= 0) {
+        // playFromQueue 内部会调 player_set_queue → 自动开始播放
+        await playerStore.playFromQueue(sourceList, idx)
+        // seek 到上次位置（parsePosition 自带非法值/越界钳制）
+        const lastPos = parsePosition(settings['last_position'] ?? '', playerStore.duration)
+        if (lastPos > 0) {
+          await playerStore.seek(lastPos)
+        }
+        // 直接调 Rust player_pause，避免前端 isPlaying 竞态（事件异步更新）
+        await invoke('player_pause')
+      }
+    }
+  } catch (e) {
+    // 恢复失败不应阻塞启动，静默降级
+    console.warn('[startup] restore playback failed:', e)
+  }
 
   // 启动恢复迷你模式：根据上次状态决定显示哪个窗口
   // 主窗口默认 visible:false（tauri.conf.json），必须显式 show

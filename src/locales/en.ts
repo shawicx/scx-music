@@ -92,6 +92,7 @@ export default {
       lyrics: 'Desktop Lyrics',
       shortcuts: 'Shortcuts',
       data: 'Data',
+      startup: 'Startup',
     },
     themeMode: 'Theme Mode',
     themeColor: 'Theme Color',
@@ -152,6 +153,14 @@ export default {
         confirmBtn: 'Cleanup',
       },
     },
+    // Startup options
+    startupTitle: 'Startup',
+    autostart: 'Launch at login',
+    autostartDesc: 'Automatically launch scx-music on system login',
+    restorePlayback: 'Restore last playback on launch',
+    restorePlaybackDesc: 'Resume last queue and position when opening the app (paused)',
+    autostartEnableFailed: 'Failed to set launch at login',
+    autostartUpdated: 'Launch at login updated',
     shortcuts: {
       title: 'Shortcuts',
       subtitle: 'Configure global media keys and app shortcut actions. Note: media keys may not work when other media apps (system Music, Spotify) are active on macOS.',

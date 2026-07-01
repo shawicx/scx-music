@@ -23,6 +23,9 @@ const ALLOWED_EXACT_KEYS: &[&str] = &[
     "activePlaylistId",
     "displayMode",
     "currentSongId",
+    // 启动恢复播放（useStartupOptions / App.vue）
+    "last_position",
+    "restore_last_playback",
 ];
 
 fn validate_setting_key(key: &str) -> AppResult<()> {
@@ -126,6 +129,8 @@ mod tests {
         assert!(validate_setting_key("activePlaylistId").is_ok());
         assert!(validate_setting_key("displayMode").is_ok());
         assert!(validate_setting_key("currentSongId").is_ok());
+        assert!(validate_setting_key("last_position").is_ok());
+        assert!(validate_setting_key("restore_last_playback").is_ok());
     }
 
     #[test]
