@@ -10,14 +10,13 @@
 
 ## 预览
 
-### 主界面
-
 <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem;">
-  <img src="docs/screenshots/main.png" />
-  <img src="docs/screenshots/playlist.png" />
-  <img src="docs/screenshots/player.png" />
-  <img src="docs/screenshots/night.png" />
-  <img src="docs/screenshots/settings.png" />
+  <img src="docs/screenshots/main.png" alt="主界面" />
+  <img src="docs/screenshots/playlist.png" alt="播放列表" />
+  <img src="docs/screenshots/desktoplyric.png" alt="桌面歌词" />
+  <img src="docs/screenshots/player.png" alt="当前播放" />
+  <img src="docs/screenshots/night.png" alt="夜间模式" />
+  <img src="docs/screenshots/settings.png" alt="设置页面" />
 </div>
 
 ---
@@ -104,7 +103,7 @@ scx-music/
 │   └── tauri.conf.json     # Tauri 配置
 ├── .wiki/                  # 项目文档
 ├── docs/                   # 文档资源（截图等）
-└── CLAUDE.md               # AI 辅助开发指南
+└── AGENTS.md               # AI 辅助开发指南
 ```
 
 ### 开发命令
@@ -118,7 +117,7 @@ scx-music/
 
 ## 文档
 
-- [项目结构 + 命令](./CLAUDE.md) — Claude Code 工作约定 + 命令参考
+- [项目结构 + 命令](./AGENTS.md) — AI 辅助开发工作约定 + 命令参考
 - [架构 Wiki](.wiki/) — 详细架构文档（见下）
 
 ## Wiki
