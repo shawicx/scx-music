@@ -127,6 +127,13 @@
 - `formattedTotalSize` / `formattedTotalDuration` - 格式化计算属性
 - `formatFileSize()` / `formatDuration()` - 格式化工具（2026-06-21 D1 重构后，实现在 `utils/format.ts::formatFileSize` / `formatHoursMinutes`，此处为别名 re-export）
 
+### stores/stats.ts - 听歌统计 (useStatsStore)
+
+**薄 Store 包装：** 实际逻辑在 `composables/useListeningStats.ts`
+
+**IPC 封装：**
+- `loadData(range?)` -> `stats_dashboard`（统计 Tab 单次聚合加载 overview + 排行 + 分布 + 趋势 + 热力图，`topLimit: 10`）
+
 **主题系统：**
 - 使用 Vuetify 3.x 主题系统
 - 支持 6 种主题颜色：青色、靛蓝、蓝色、深紫、红色、琥珀
@@ -234,6 +241,9 @@ SettingsView.vue 是容器（tab 切换），6 个 tab 各委托一个子组件�
 - **composables/useGlobalShortcuts.ts** - 全局快捷键注册与路由（见下文）
 - **composables/useStartupOptions.ts** - 启动选项封装（开机自启 IPC 读写 + 恢复播放持久化 + 纯逻辑：来源重建/位置解析/debounce 判定，2026-06-29 新增）。纯函数 TDD 覆盖（13 测试）。
 - **composables/useSleepTimer.ts** - 睡眠定时器（2026-07-01 新增）。单例模式（模块级状态），倒计时 X 分钟后调 `player_stop` 完全停止播放，最后 30 秒音量线性渐弱到 0；取消/到点均恢复原音量。不持久化（一次性操作）。复用 `usePlayer.setVolume` / `usePlayer.stop`。
+- **composables/useListeningStats.ts** - 统计 Tab 仪表盘聚合加载（`stats_dashboard` 单次 IPC 替代 6 个命令，2026-06-26；stores/stats.ts 薄封装）
+- **composables/useCache.ts** - 缓存清理（歌词缓存/播放历史统计与清理 IPC 封装，2026-06-30；入口在设置 → 数据管理）
+- **composables/useDraggableProgress.ts** - 进度条拖拽逻辑（PlayerBar 与 MiniPlayer 共用）：`progressModel` 值变实时 seek；`isDragging` 控制拖拽中显示本地进度对应时间，否则显示真实 progress
 
 > **Composable 单例模式（2026-06-20 加固）：** `useMiniPlayer` / `useDesktopLyrics` / `usePlayer` 都采用模块级状态 + 幂等 init guard（`stateSyncDone` / `listenersSetup`），避免主窗口多个组件（App.vue / PlayerBar / SettingsView / useGlobalShortcuts 间接）重复注册 Tauri 事件监听器导致的累积泄漏。模块级监听器不通过 `onUnmounted` 清理，依赖 webview 销毁时 Tauri 运行时自动回收。`useLyrics` 因接受 `currentSong` ref 参数不能完全单例化，改用 `_listenPromise` 追踪 listen 的 promise，`onUnmounted` 改为 async 先 await promise 再 unlisten。详见 `.wiki/risks.md` 的「监听器累积泄漏」章节。
 
@@ -372,6 +382,11 @@ LyricsDisplay.vue
 - 正则 `\[(\d{2}):(\d{2})\.(\d{2,3})](.*)` 解析时间戳
 - `LrcLine { time: number, text: string }` 结构
 
+### 歌词偏移
+- `useLyrics.adjustOffset(±0.1)` / `resetOffset()`：步进 0.1s，范围 ±10s（`OFFSET_MIN`/`OFFSET_MAX`）
+- 持久化走 `set_lyric_offset` 命令，直接 `UPDATE lyrics SET offset_secs`（存 lyrics 表，非 settings）
+- 写入失败静默降级——内存中的偏移仍生效
+
 ## 国际化 (i18n)
 
 ### 架构
@@ -396,7 +411,7 @@ App.vue onMounted
 - `src/composables/useI18n.ts`: i18n 组合式函数
 
 ### 命名空间
-common / sidebar / library / player / settings / playbackMode / toast / empty / importExport / update / analysis / report
+common / sidebar / library / player / lyrics / miniPlayer / settings / playbackMode / toast / empty / importExport / update / analysis / stats / report
 
 ### player 命名空间（播放队列相关）
 - `playQueue` - "播放队列" / "Play Queue"
@@ -424,6 +439,8 @@ common / sidebar / library / player / settings / playbackMode / toast / empty / 
 
 `tauri.conf.json` 第二个窗口：`transparent: true`、`decorations: false`、`alwaysOnTop: true`、`skipTaskbar: true`、`closable: false`（防 Alt+F4 销毁）、`visible: false`（默认隐藏，PlayerBar 按钮触发显示）。
 
+> **macOS 透明双保险（2026-08）：** `transparent: true` 在部分 macOS 版本打包后会失效（WKWebView 原生层不透明，tauri#13415）。已加 `app.macOSPrivateApi: true` + `lib.rs::make_nswindow_transparent`（objc 直设 NSWindow 透明），详见 [architecture.md 窗口系统](architecture.md#窗口系统)。
+
 ### 与主窗口的关系
 
 - **事件复用**：`audio:progress` / `audio:track_change` 已广播到所有 webview，歌词窗口自动接收，无需新增 IPC
@@ -448,7 +465,7 @@ common / sidebar / library / player / settings / playbackMode / toast / empty / 
 
 ### 窗口属性
 
-`tauri.conf.json` 第三个业务窗口：`transparent: false`（不透明）、`decorations: false`、`alwaysOnTop: true`、`resizable: false`、固定 360×100、`visible: false`（默认隐藏，由 PlayerBar 按钮 / 快捷键 / 最小化按钮触发显示）。
+`tauri.conf.json` 第三个业务窗口：`transparent: false`（不透明）、`decorations: false`、`alwaysOnTop: true`、`resizable: false`、固定 360×120、`visible: false`（默认隐藏，由 PlayerBar 按钮 / 快捷键触发显示）。
 
 ### 与主窗口的关系（互斥）
 
@@ -461,8 +478,7 @@ common / sidebar / library / player / settings / playbackMode / toast / empty / 
 ### 触发入口
 
 - PlayerBar 上的迷你模式按钮（`enter()`）
-- Cmd/Ctrl+M 快捷键（App.vue 注册，`toggle()`）
-- 系统最小化按钮拦截（可选，进入迷你模式而非最小化）
+- Cmd/Ctrl+Shift+M 快捷键（App.vue `onKeyStroke('m')` 注册，Shift 修饰避开 macOS Cmd+M 系统最小化加速器）
 
 ## 关键业务逻辑
 

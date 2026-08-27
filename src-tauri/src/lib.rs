@@ -243,6 +243,14 @@ pub fn run() {
                 eprintln!("[shortcuts] startup registration failed: {e}");
             }
 
+            // 桌面歌词窗口：强制原生层透明（macOS 打包后 transparent 易失效的双保险）。
+            // 窗口此时可能未显示，但 NSWindow 对象已随配置创建，可立即设置。
+            for label in ["desktop-lyrics", "desktop-lyrics-lock"] {
+                if let Some(win) = app.get_webview_window(label) {
+                    make_nswindow_transparent(&win);
+                }
+            }
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -362,3 +370,29 @@ fn setup_shortcuts_at_start(app: tauri::AppHandle) -> Result<(), Box<dyn std::er
     }
     Ok(())
 }
+
+/// macOS：强制 NSWindow 透明（桌面歌词窗口双保险）。
+///
+/// 即使 tauri.conf.json 已设 `transparent: true` + `macOSPrivateApi: true`，
+/// 部分 macOS 版本 / 打包场景下 WKWebView 原生层仍会绘制不透明背景
+/// （见 tauri#13415：打包后透明失效）。此处直接通过 objc 调用
+/// `[nsWindow setOpaque:NO]` + `setBackgroundColor:[NSColor clearColor]`，
+/// 绕过 Tauri 抽象层确保透明生效。仅在 macOS 编译。
+#[cfg(target_os = "macos")]
+fn make_nswindow_transparent(win: &tauri::WebviewWindow) {
+    use objc::runtime::{Class, Object, NO};
+    use objc::{msg_send, sel, sel_impl};
+
+    let Ok(ptr) = win.ns_window() else { return };
+    unsafe {
+        let ns_window = ptr as *mut Object;
+        let clear_color: *mut Object = msg_send![Class::get("NSColor").unwrap(), clearColor];
+        let _: () = msg_send![ns_window, setOpaque: NO];
+        let _: () = msg_send![ns_window, setBackgroundColor: clear_color];
+    }
+}
+
+/// 非 macOS 平台：空实现（保持调用点跨平台，避免 cfg 污染 setup 逻辑）。
+#[cfg(not(target_os = "macos"))]
+fn make_nswindow_transparent(_win: &tauri::WebviewWindow) {}
+

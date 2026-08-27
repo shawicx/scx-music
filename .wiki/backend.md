@@ -88,6 +88,7 @@
 **commands/lyrics.rs** - 歌词管理
 - `get_lyrics` - 获取歌词（缓存 → 内嵌 → LRCLIB API）
 - `refresh_lyrics` - 强制刷新歌词（跳过缓存）
+- `set_lyric_offset` - 持久化歌词偏移（`UPDATE lyrics SET offset_secs`；前端 `useLyrics.adjustOffset/resetOffset` 调用，步进 0.1s、范围 ±10s）
 
 **commands/cache.rs** - 缓存与冗余数据清理（2026-06-30 新增）
 - `get_lyrics_cache_stats` / `get_play_history_stats` - 统计规模（条数/大小/孤儿数/最早时间）
@@ -128,6 +129,10 @@
 **commands/window.rs** - 窗口可见性管理
 - `app_toggle_main_window` - 切换主窗口可见性（hide ↔ show + set_focus）；仅操作 main 窗口，不影响 mini-player / desktop-lyrics
 
+**commands/autostart.rs** - 开机自启
+- `app_get_autostart` - 查询 OS 启动项真实状态（**不读 settings 表**，避免与系统脱节）
+- `app_set_autostart` - 开/关开机自启（`tauri-plugin-autostart`，lib.rs 注册时用 `MacosLauncher::LaunchAgent`：macOS LaunchAgent / Windows 注册表 / Linux .desktop）。状态不落库
+
 **commands/songs.rs - rename_song 详解**
 
 **文件位置：** `src-tauri/src/commands/songs.rs`
@@ -166,6 +171,14 @@
   - **递归防护（2026-06-21）：** `MAX_RECURSION_DEPTH=16`（防循环符号链接栈溢出）、
     `MAX_FILES_TOTAL=50_000`（防超大目录卡死）、`symlink_metadata` 跳过符号链接。
     超限静默截断/跳过，不报错（用户可能不知道有循环符号链接）。
+
+**lib.rs** - macOS 桌面歌词窗口透明（双保险，2026-08）
+
+部分 macOS 版本/打包场景下，即使 `tauri.conf.json` 已设 `transparent: true`，WKWebView 原生层仍会绘制不透明背景（tauri#13415）。三层保障：
+
+- `tauri.conf.json`：`app.macOSPrivateApi: true`
+- `Cargo.toml`：`tauri` 加 feature `macos-private-api`；`[target.'cfg(target_os = "macos")'.dependencies]` 增加 `objc = "0.2"`
+- `lib.rs::make_nswindow_transparent(win)`：setup 阶段对 `desktop-lyrics` / `desktop-lyrics-lock` 两窗口调用，通过 objc 直接 `msg_send![ns_window, setOpaque: NO]` + `setBackgroundColor: clearColor`，绕过 Tauri 抽象层。窗口此时可能未显示，但 NSWindow 对象已随配置创建，可立即设置。仅 macOS 编译，其他平台空实现（保持调用点跨平台，避免 cfg 污染 setup 逻辑）
 
 
 

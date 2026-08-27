@@ -18,7 +18,7 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = [] }
+tauri = { version = "2", features = ["macos-private-api"] }
 tauri-plugin-opener = "2"
 tauri-plugin-dialog = "2"
 serde = { version = "1", features = ["derive"] }
@@ -37,3 +37,7 @@ tauri-plugin-process = "2"
 sha2 = "0.11.0"
 tauri-plugin-global-shortcut = "2"
 tauri-plugin-autostart = "2"
+
+# macOS 桌面歌词透明窗口:强制 NSWindow 透明(WKWebView 原生层双保险)
+[target.'cfg(target_os = "macos")'.dependencies]
+objc = "0.2"

@@ -33,7 +33,7 @@ pnpm app:build
 
 ```
 src/                        # Vue 3 前端
-├── stores/                 # Pinia 状态管理 (player, library, settings, analysis)
+├── stores/                 # Pinia 状态管理 (player, library, settings, analysis, stats)
 ├── composables/            # Vue composables (usePlayer, useLyrics, useDesktopLyrics, useMiniPlayer, useGlobalShortcuts …)
 ├── components/             # UI 组件
 │   ├── library/           # 音乐库子组件
@@ -63,4 +63,7 @@ src-tauri/                  # Rust 后端
 - [frontend.md](frontend.md) - 前端结构
 - [backend.md](backend.md) - 后端结构
 - [ipc.md](ipc.md) - IPC 通信
+- [state.md](state.md) - 状态管理
+- [storage.md](storage.md) - 数据存储
+- [risks.md](risks.md) - 风险点与历史加固记录
 - [ai-context.md](ai-context.md) - AI 快速上下文

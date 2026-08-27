@@ -42,13 +42,14 @@ const result = await invokeCommand('command_name', { param: value })
 | `player_previous` | stores/player.ts | audio/commands.rs | 上一曲 |
 | `player_set_mode` | stores/player.ts | audio/commands.rs | 设置播放模式 |
 | `player_get_state` | stores/player.ts | audio/commands.rs | 获取当前播放状态 |
-| `player_get_output_devices` | - | audio/device.rs | 枚举音频输出设备 |
-| `player_set_output_device` | - | audio/device.rs | 切换音频输出设备 |
-| `player_get_current_device` | - | audio/device.rs | 获取当前输出设备 |
+| `player_get_output_devices` | composables/useAudioDevice.ts | audio/device.rs | 枚举音频输出设备 |
+| `player_set_output_device` | composables/useAudioDevice.ts | audio/device.rs | 切换音频输出设备 |
+| `player_get_current_device` | composables/useAudioDevice.ts | audio/device.rs | 获取当前输出设备 |
 | **歌曲** | | | |
 | `get_all_songs` | - | commands/songs.rs | 获取所有歌曲 |
 | `upsert_songs` | stores/library.ts | commands/songs.rs | 批量插入/更新歌曲 |
 | `delete_songs` | - | commands/songs.rs | 删除歌曲 |
+| `rename_song` | stores/library.ts | commands/songs.rs | 重命名歌曲（元数据标签+文件+数据库，流程详见 backend.md） |
 | **播放列表** | | | |
 | `get_playlists` | - | commands/playlists.rs | 获取所有播放列表 |
 | `create_playlist` | stores/library.ts | commands/playlists.rs | 创建播放列表 |
@@ -60,7 +61,7 @@ const result = await invokeCommand('command_name', { param: value })
 | `clear_playlist` | stores/library.ts | commands/playlists.rs | 清空播放列表 |
 | `replace_playlist_songs` | stores/library.ts | commands/playlists.rs | 原子替换歌单全部歌曲（单事务 DELETE+INSERT，2026-06-26 新增，替代 clear+add 两次 IPC） |
 | **设置** | | | |
-| `get_all_settings` | - | commands/settings.rs | 获取所有设置 |
+| `get_all_settings` | useStartupOptions.ts / useMiniPlayer.ts / useDesktopLyrics.ts / useGlobalShortcuts.ts / App.vue 等 | commands/settings.rs | 获取所有设置 |
 | `get_setting` | stores/settings.ts | commands/settings.rs | 获取单个设置 |
 | `set_setting` | stores/settings.ts, stores/library.ts | commands/settings.rs | 设置单个键值对（**key 白名单校验**：精确 11 项 + 前缀 4 项；前缀必须带非空子键。2026-06-29 新增 `last_position` / `restore_last_playback` 两个精确 key 用于启动恢复播放） |
 | `set_window_position` | composables/useMiniPlayer.ts, composables/useDesktopLyrics.ts | commands/settings.rs | 批量写入窗口位置（单事务双 key，2026-06-26 新增，替代拖动后的两次 set_setting） |
@@ -72,6 +73,7 @@ const result = await invokeCommand('command_name', { param: value })
 | **歌词** | | | |
 | `get_lyrics` | composables/useLyrics.ts | commands/lyrics.rs | 获取歌词 (缓存→内嵌→LRCLIB) |
 | `refresh_lyrics` | - | commands/lyrics.rs | 强制刷新歌词 |
+| `set_lyric_offset` | composables/useLyrics.ts | commands/lyrics.rs | 持久化歌词偏移（步进 0.1s、范围 ±10s；`UPDATE lyrics SET offset_secs`） |
 | **缓存清理** | | | |
 | `get_lyrics_cache_stats` | composables/useCache.ts | commands/cache.rs | 歌词缓存统计（总数/大小/孤儿数/by_source） |
 | `get_play_history_stats` | composables/useCache.ts | commands/cache.rs | 播放历史统计（总数/最早时间/估算大小） |
@@ -95,7 +97,7 @@ const result = await invokeCommand('command_name', { param: value })
 | `stats_trend` | - | commands/stats.rs | 按天聚合播放时长趋势。**统计 Tab 已改用 `stats_dashboard`** |
 | `stats_heatmap` | - | commands/stats.rs | 365 天每日播放时长热力图。**统计 Tab 已改用 `stats_dashboard`** |
 | `stats_dashboard` | composables/useListeningStats.ts | commands/stats.rs | **统计 Tab 仪表盘聚合（2026-06-26 新增）**：单次 IPC 返回 overview+topSongs+topArtists+genreDistribution+trend+heatmap，替代前端 Promise.all 发 6 个命令。一次锁、一次 prepare，消除 6 次往返与重复锁竞争 |
-| `stats_hourly_distribution` | `{ start, end }` | `HourDuration[]` | 报告 Tab 时段分布图 |
+| `stats_hourly_distribution` | composables/useListeningReport.ts | commands/stats.rs | 指定时间范围（start/end）按小时 0-23（本地时区）聚合的听歌时长分布（报告 Tab 时段分布图） |
 | **频谱分析** | | | |
 | `analyzer_start` | visualization/useAudioAnalyzer.ts | audio/analyzer_cmds.rs | 启动频谱分析。**2026-06-26 改用 Channel API**：接收 `on_data: Channel<Vec<u8>>` 参数，FFT 线程通过 `channel.send()` 点对点推送，不再 `emit('audio:spectrum')` 广播。channel 销毁即自动停推，无需手动 analyzer_stop 配对 |
 | `analyzer_stop` | visualization/useAudioAnalyzer.ts | audio/analyzer_cmds.rs | 停止频谱分析（主动停止用，channel 自然销毁也会触发后端退出） |

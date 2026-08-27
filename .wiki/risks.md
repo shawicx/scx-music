@@ -55,7 +55,7 @@
 
 ## P0 加固（2026-06-20）
 
-本次加固修复了全量代码审查发现的 8 个 P0 级问题。详细 spec/plan 见 `docs/superpowers/specs|plans/2026-06-20-p0-hardening-*.md`。
+本次加固修复了全量代码审查发现的 8 个 P0 级问题。详细 spec/plan 见 `superpowers/specs|plans/2026-06-20-p0-hardening-*.md`。
 
 ### SQL 注入
 **风险点：** `commands/stats.rs::build_time_filter` 曾用 `format!()` 把前端传入的 `start`/`end` 日期字符串拼进 SQL
@@ -95,7 +95,7 @@
 
 ## P1 后端健壮性（2026-06-21）
 
-本次修复了后端架构债务 + 5 项命令级健壮性问题。详细 spec/plan 见 `docs/superpowers/specs|plans/2026-06-21-p1-backend-robustness-*.md`。
+本次修复了后端架构债务 + 5 项命令级健壮性问题。详细 spec/plan 见 `superpowers/specs|plans/2026-06-21-p1-backend-robustness-*.md`。
 
 ### AppError 全量迁移（架构债务）
 **风险点：** `error.rs` 的 `AppError`/`AppResult` 曾是死代码（未编译进 crate），50+ 命令返回 `Result<T, String>` 用 `.map_err(|e| e.to_string())?` 样板
@@ -219,6 +219,7 @@ P1 启用 AppError 时保留了 60 处 `.map_err(|e| e.to_string())?` 残留（�
 
 ## 桌面歌词窗口跨平台风险
 
+- **macOS 打包后透明失效（2026-08 修复）**：部分 macOS 版本/打包场景下 WKWebView 原生层绘制不透明背景，`transparent: true` 失效（tauri#13415）。已做双保险：`app.macOSPrivateApi: true` + Cargo `macos-private-api` feature + `lib.rs::make_nswindow_transparent`（objc 直接设 `NSWindow setOpaque:NO` + clearColor 背景，绕过 Tauri 抽象层）。若未来升级 Tauri 版本后原生层行为变化，此 objc 路径仍需保留观察
 - **macOS 透明窗口在某些桌面壁纸下出现黑边**：已通过 `shadow: false` + 圆角 8px 缓解，但仍可能在动态壁纸/特定主题下出现
 - **Windows 透明窗口 + alwaysOnTop 在部分全屏应用（游戏、视频播放器全屏）下可能被遮挡**：MVP 接受此限制，用户可退出全屏或调整 always-on-top 行为（未来扩展）
 - **锁定后无法从窗口本身解锁**：`setIgnoreCursorEvents(true)` 是整窗穿透，LockBadge 也不可点击；依赖 SettingsView "锁定"复选框作为唯一解锁入口（已加 tooltip 提示"锁定后窗口点击穿透，可在此解锁"）

@@ -31,6 +31,11 @@ src/components/NowPlayingOverlay.vue # 正在播放覆盖层
 src/visualization/               # 音频可视化 (4 种渲染器)
 src/utils/virtualScroll.ts       # 虚拟滚动工具
 src/utils/errorHandler.ts        # 统一错误处理
+src/stores/stats.ts              # 听歌统计 (useStatsStore，薄封装 useListeningStats)
+src/composables/useListeningStats.ts # 统计 Tab 仪表盘聚合 (stats_dashboard 单次 IPC)
+src/composables/useSleepTimer.ts # 睡眠定时器（X 分钟后停止播放，末 30s 音量渐弱）
+src/composables/useCache.ts      # 缓存清理（歌词缓存/播放历史统计与清理）
+src/composables/useStartupOptions.ts # 开机自启 + 启动恢复播放
 ```
 
 ### 后端
@@ -44,6 +49,8 @@ src-tauri/src/commands/lyrics.rs  # 歌词获取 (缓存→内嵌→LRCLIB)
 src-tauri/src/commands/songs.rs   # 歌曲数据操作
 src-tauri/src/commands/playlists.rs  # 播放列表操作
 src-tauri/src/commands/settings.rs   # 设置管理
+src-tauri/src/commands/cache.rs      # 缓存清理（歌词缓存/播放历史统计与清理）
+src-tauri/src/commands/autostart.rs  # 开机自启（读/写 OS 启动项，不落库）
 src-tauri/src/db/mod.rs           # 数据库管理
 src-tauri/src/db/migrations.rs    # 数据库迁移 (INIT_SCHEMA + V6_PLAY_HISTORY)
 src-tauri/src/db/models.rs        # 数据模型 (Song, Playlist)
@@ -104,6 +111,9 @@ UI -> useLibraryStore.importToPlaylist()
 | bootstrap.rs | 启动加载 | 单次 IPC 全量数据 |
 | lyrics.rs | 歌词后端 | 缓存→内嵌→LRCLIB 三级获取 |
 | db/ | 数据库 | SQLite WAL、迁移管理 (INIT_SCHEMA + V6) |
+| useSleepTimer | 睡眠定时器 | 倒计时到点调 `player_stop` 完全停止，末 30s 音量线性渐弱；**不持久化**（2026-07-01） |
+| cache.rs | 缓存清理 | 歌词缓存/孤儿歌词/播放历史的统计与清理命令（2026-06-30） |
+| autostart.rs + useStartupOptions | 启动选项 | 开机自启写 OS 启动项（不落库）；启动恢复上次播放（`last_position` 等 settings key，2026-06-29） |
 
 ## 注意事项
 
@@ -120,6 +130,7 @@ UI -> useLibraryStore.importToPlaylist()
 - 线程安全：Arc<Mutex<T>>
 - 进度线程独立运行，需要正确管理生命周期
 - SQLite WAL 模式 + 外键约束
+- 桌面歌词窗口 macOS 透明双保险（2026-08）：`tauri.conf.json` `macOSPrivateApi: true` + Cargo `tauri` feature `macos-private-api` + `lib.rs::make_nswindow_transparent`（objc 直接调 `NSWindow setOpaque:NO`），防打包后 WKWebView 原生层不透明（tauri#13415）
 
 ### 风险点
 - 音频设备切换需要重建引擎

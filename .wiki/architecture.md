@@ -34,6 +34,8 @@
 - `tauri-plugin-opener` - URL 打开
 - `tauri-plugin-dialog` - 文件对话框
 - `tauri-plugin-global-shortcut` - 系统级全局快捷键
+- `tauri-plugin-updater` / `tauri-plugin-process` - 自动更新检查/下载与重启（详见 [backend.md](backend.md) 自动更新）
+- `tauri-plugin-autostart` - 开机自启（macOS LaunchAgent / Windows 注册表 / Linux .desktop；状态由 OS 托管，不落库）
 
 ## 全局快捷键 (Global Shortcuts)
 
@@ -67,6 +69,8 @@ Rust Handler -> IPC Event -> Pinia Store -> UI Update
 
 > 各窗口的根组件结构见 [frontend.md#多窗口架构](frontend.md#多窗口架构)；跨窗口状态来源与同步见 [state.md#多窗口状态来源](state.md#多窗口状态来源)。四个窗口各自独立 JS 上下文，composable 模块级状态在窗口内单例；跨窗口通过 `app.emit()` 广播 + 各窗口 `listen()` 接收同步。
 
+> **macOS 透明双保险（2026-08）：** 桌面歌词两窗口（`desktop-lyrics` / `desktop-lyrics-lock`）依赖 `transparent: true`，但部分 macOS 版本/打包场景下 WKWebView 原生层仍绘制不透明背景（tauri#13415）。三层保障：① `tauri.conf.json` 开 `app.macOSPrivateApi: true`；② `Cargo.toml` 的 `tauri` 加 `macos-private-api` feature（macOS-only 依赖 `objc`）；③ `lib.rs` setup 中对两窗口调 `make_nswindow_transparent()`——objc 直接 `[nsWindow setOpaque:NO]` + `[NSColor clearColor]` 背景，绕过 Tauri 抽象层。仅 macOS 编译，其他平台空实现。
+
 ### mini-player 窗口
 
 **用途：** 迷你播放器悬浮窗口，与主窗口互斥切换。
@@ -74,7 +78,7 @@ Rust Handler -> IPC Event -> Pinia Store -> UI Update
 **配置（`tauri.conf.json`）：**
 - Label: `mini-player`
 - URL: `index.html#mini-player`
-- 尺寸：固定 360×100（不可调整）
+- 尺寸：固定 360×120（不可调整）
 - 装饰：无边框（`decorations: false`），不透明背景，系统阴影
 - 默认置顶（`alwaysOnTop: true`），可通过按钮切换
 - `visible: false` 初始隐藏，由 `useMiniPlayer` composable 控制
@@ -83,8 +87,7 @@ Rust Handler -> IPC Event -> Pinia Store -> UI Update
 
 **触发入口：**
 - PlayerBar 上的迷你模式按钮
-- Cmd/Ctrl+M 快捷键
-- 系统最小化按钮（拦截为进入迷你模式）
+- Cmd/Ctrl+Shift+M 快捷键（App.vue onKeyStroke，Shift 修饰避开 macOS Cmd+M 系统最小化加速器）
 
 ## 启动数据流
 
