@@ -98,6 +98,12 @@
 
 设计：核心 SQL 提取为 `_inner(&Connection)` 纯函数，命令做薄包装调 `lock_or_recover`，便于内存 SQLite 单元测试。`clear_play_history` 用 SQLite 内置 `datetime('now', '-N days')` 计算阈值避免时区问题；before_days=0 或负数返回 `InvalidArgument`。
 
+**commands/covers.rs** - 专辑封面提取与缓存（2026-08-27 新增）
+- `get_song_cover(song_id)` - 获取封面 raw bytes（`tauri::ipc::Response` 直传，前端收 ArrayBuffer；空 body = 无封面）。按需提取：查 songs 表 file_path → `{app_cache_dir}/covers/{song_id}.{ext}` 文件缓存 → 未命中用 Lofty 提取内嵌 picture（`Probe` + `read_properties(false)` 跳过帧扫描）；无内嵌封面写 `{song_id}.none` 负缓存标记
+- `get_cover_cache_stats` / `clear_cover_cache` - 封面缓存统计与清理（接入 cache 体系，设置 → 数据管理）
+
+设计：核心逻辑为接收 `&Path`/`&Connection` 的纯函数，命令层薄包装 State/AppHandle；测试用手构造的最小 FLAC（fLaC 魔数 + STREAMINFO + PICTURE 块）夹具，无外部资源依赖。
+
 **commands/import_export.rs** - 数据导入导出
 - `export_playlist_m3u` - 导出播放列表为 M3U 格式
 - `export_playlist_pls` - 导出播放列表为 PLS 格式

@@ -318,6 +318,9 @@ pub fn run() {
             commands::cache::clear_lyrics_cache,
             commands::cache::clear_orphan_lyrics,
             commands::cache::clear_play_history,
+            commands::covers::get_song_cover,
+            commands::covers::get_cover_cache_stats,
+            commands::covers::clear_cover_cache,
             commands::autostart::app_get_autostart,
             commands::autostart::app_set_autostart,
         ])

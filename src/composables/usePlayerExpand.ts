@@ -6,18 +6,19 @@ export function usePlayerExpand() {
 
   function onEnter(el: Element, done: () => void) {
     const overlay = el as HTMLElement
+    const bgLayer = overlay.querySelector('.bg-layer')
     const closeBtn = overlay.querySelector('.close-btn')
-    const topSection = overlay.querySelector('.top-section')
+    const status = overlay.querySelector('.mode-status-bar')
+    const coverColumn = overlay.querySelector('.cover-column')
+    const lyricsColumn = overlay.querySelector('.lyrics-column')
     const progressSection = overlay.querySelector('.progress-section')
     const controls = overlay.querySelector('.controls')
-    const vignette = overlay.querySelector('.vignette')
-    const status = overlay.querySelector('.mode-status-bar')
 
     const tl = createTimeline({
       onComplete: done,
     })
 
-    // Background fade in
+    // 背景色整体渐显（无封面回退时依然有意义）
     tl.fromTo(overlay, {
       opacity: 0,
     }, {
@@ -26,17 +27,15 @@ export function usePlayerExpand() {
       ease: easings.gentle,
     })
 
-    // Vignette（主题色晕染层）
-    if (vignette) {
-      tl.fromTo(vignette, {
+    // 背景层（含模糊封面 + vignette，2026-08-27 重设计后并入同一层）
+    if (bgLayer) {
+      tl.fromTo(bgLayer, {
         opacity: 0,
-        scale: 0.8,
       }, {
         opacity: 1,
-        scale: 1,
-        duration: 0.5,
+        duration: 0.4,
         ease: easings.smooth,
-      }, '<0.1')
+      }, '<0.05')
     }
 
     // Close button
@@ -65,9 +64,22 @@ export function usePlayerExpand() {
       }, '<')
     }
 
-    // Top section (title + artist)
-    if (topSection) {
-      tl.fromTo(topSection, {
+    // 封面列：轻微生长入场
+    if (coverColumn) {
+      tl.fromTo(coverColumn, {
+        opacity: 0,
+        scale: 0.94,
+      }, {
+        opacity: 1,
+        scale: 1,
+        duration: 0.45,
+        ease: easings.smooth,
+      }, '<0.05')
+    }
+
+    // 歌词列（歌名/艺术家 + 歌词）
+    if (lyricsColumn) {
+      tl.fromTo(lyricsColumn, {
         opacity: 0,
         y: 16,
       }, {
@@ -75,7 +87,7 @@ export function usePlayerExpand() {
         y: 0,
         duration: 0.4,
         ease: easings.smooth,
-      }, '<0.05')
+      }, '<0.1')
     }
 
     // Progress section

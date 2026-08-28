@@ -2,6 +2,7 @@ import { ref, reactive } from 'vue'
 import { invokeCommand } from '../utils/errorHandler'
 import { useToast } from './useToast'
 import { useI18n } from './useI18n'
+import { evictCoverUrlCache } from './useCoverArt'
 
 /** 后端 LyricsCacheStats 的前端镜像（camelCase 由 serde rename 自动转换）。 */
 export interface LyricsCacheStats {
@@ -15,6 +16,12 @@ export interface LyricsCacheStats {
 export interface PlayHistoryStats {
   total: number
   oldestAt: string | null
+  sizeBytes: number
+}
+
+/** 后端 CoverCacheStats 的前端镜像。 */
+export interface CoverCacheStats {
+  total: number
   sizeBytes: number
 }
 
@@ -40,23 +47,27 @@ export function useCache() {
 
   const lyricsStats = ref<LyricsCacheStats | null>(null)
   const historyStats = ref<PlayHistoryStats | null>(null)
+  const coverStats = ref<CoverCacheStats | null>(null)
   const loading = reactive({
     stats: false,
     lyrics: false,
     orphan: false,
     history: false,
+    cover: false,
   })
 
-  /** 并行拉取两个统计命令。 */
+  /** 并行拉取统计命令。 */
   async function loadStats(): Promise<void> {
     loading.stats = true
     try {
-      const [lyrics, history] = await Promise.all([
+      const [lyrics, history, cover] = await Promise.all([
         invokeCommand<LyricsCacheStats>('get_lyrics_cache_stats'),
         invokeCommand<PlayHistoryStats>('get_play_history_stats'),
+        invokeCommand<CoverCacheStats>('get_cover_cache_stats'),
       ])
       lyricsStats.value = lyrics
       historyStats.value = history
+      coverStats.value = cover
     } catch (e) {
       showError(`${t('toast.statsLoadFailed')}: ${(e as Error).message}`)
     } finally {
@@ -130,13 +141,30 @@ export function useCache() {
     }
   }
 
+  /** 清空封面文件缓存，并同步作废前端 blob URL 缓存（下次展示重新提取）。 */
+  async function clearCoverCache(): Promise<void> {
+    loading.cover = true
+    try {
+      const result = await invokeCommand<ClearedResult>('clear_cover_cache')
+      evictCoverUrlCache()
+      showSuccess(t('toast.coverCacheCleared', { count: result.cleared }))
+      await loadStats()
+    } catch (e) {
+      showError(`${t('toast.cacheClearFailed')}: ${(e as Error).message}`)
+    } finally {
+      loading.cover = false
+    }
+  }
+
   return {
     lyricsStats,
     historyStats,
+    coverStats,
     loading,
     loadStats,
     clearLyricsCache,
     clearOrphanLyrics,
     clearPlayHistory,
+    clearCoverCache,
   }
 }

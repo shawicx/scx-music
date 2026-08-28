@@ -4,6 +4,7 @@ import { storeToRefs } from 'pinia'
 import { usePlayerStore } from '../stores/player'
 import { useLibraryStore } from '../stores/library'
 import IconButtonWithTooltip from './IconButtonWithTooltip.vue'
+import CoverArt from './player/CoverArt.vue'
 import PulseDots from './common/PulseDots.vue'
 import { usePlaybackMode } from '../composables/usePlaybackMode'
 import { useDesktopLyrics } from '../composables/useDesktopLyrics'
@@ -90,9 +91,7 @@ const { progressModel, displayProgress, isDragging } = useDraggableProgress(prog
 <template>
   <div class="player-bar">
     <div class="player-left" @click="$emit('expand')">
-      <div class="cover-art">
-        <v-icon v-if="!currentSong" icon="mdi-music-note" size="20" color="rgba(255,255,255,0.6)"></v-icon>
-      </div>
+      <CoverArt :song-id="currentSong?.id" class="cover-art" />
       <div class="song-meta">
         <div class="song-name">{{ currentSong?.title ?? t('player.notPlaying') }}</div>
         <div class="song-artist">
@@ -249,11 +248,9 @@ const { progressModel, displayProgress, isDragging } = useDraggableProgress(prog
 
 .cover-art {
   width: 48px; height: 48px;
-  background: var(--v-gradient-brand);
   border-radius: var(--radius-md);
   box-shadow: 0 4px 12px var(--v-accent-shadow);
   flex-shrink: 0;
-  display: flex; align-items: center; justify-content: center;
 }
 
 .song-meta { display: flex; flex-direction: column; gap: 0.2rem; overflow: hidden; }

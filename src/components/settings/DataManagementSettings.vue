@@ -15,11 +15,13 @@ const { exportBackup, importBackup, exportSettings, importSettings } = useImport
 const {
   lyricsStats,
   historyStats,
+  coverStats,
   loading,
   loadStats,
   clearLyricsCache,
   clearOrphanLyrics,
   clearPlayHistory,
+  clearCoverCache,
 } = useCache()
 
 type RetentionOption = '30d' | '90d' | '1y' | 'all'
@@ -76,6 +78,16 @@ function openHistoryConfirm() {
     bodyKey: 'settings.cacheManagement.confirm.historyBody',
     params: { scope },
     action: () => clearPlayHistory(beforeDays),
+  }
+}
+
+function openCoverConfirm() {
+  const count = coverStats.value?.total ?? 0
+  cacheConfirm.value = {
+    open: true,
+    bodyKey: 'settings.cacheManagement.confirm.coverBody',
+    params: { count },
+    action: clearCoverCache,
   }
 }
 
@@ -257,6 +269,32 @@ async function confirmRestore() {
           {{ t('settings.cacheManagement.playHistory.clearBtn') }}
         </v-btn>
       </div>
+    </div>
+
+    <v-divider />
+
+    <div class="cache-item">
+      <div class="cache-item-info">
+        <span class="cache-item-title">{{ t('settings.cacheManagement.coverCache.title') }}</span>
+        <span class="cache-item-desc">
+          {{
+            coverStats && coverStats.total > 0
+              ? t('settings.cacheManagement.coverCache.desc', {
+                  count: coverStats.total,
+                  size: formatFileSize(coverStats.sizeBytes),
+                })
+              : t('settings.cacheManagement.coverCache.empty')
+          }}
+        </span>
+      </div>
+      <v-btn
+        variant="outlined"
+        :loading="loading.cover"
+        :disabled="!coverStats || coverStats.total === 0"
+        @click="openCoverConfirm"
+      >
+        {{ t('settings.cacheManagement.coverCache.clearBtn') }}
+      </v-btn>
     </div>
   </v-card>
 

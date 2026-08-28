@@ -4,13 +4,14 @@
 
 - **App.vue** - 根组件，侧边栏 + 主区域布局，负责初始化 Store 和事件监听
 - **LibraryView.vue** - 音乐库主视图
-- **PlayerBar.vue** - 底部播放控制条（播放控制 + 进度条 + 音量；右侧功能区含迷你播放器/桌面歌词/队列/睡眠定时器入口）
+- **PlayerBar.vue** - 底部播放控制条（播放控制 + 进度条 + 音量；右侧功能区含迷你播放器/桌面歌词/队列/睡眠定时器入口；48px 真实封面走 CoverArt，无封面回退渐变）
 - **PlayQueueDrawer.vue** - 播放队列右侧抽屉（GSAP Flip 重排动画、当前歌曲高亮、模式切换）
 - **SettingsView.vue** - 设置页面
 - **AnalysisView.vue** - 曲库分析（概览卡片 + ECharts 图表 + 排行列表）
 - **StatsView.vue** - 听歌统计（双 Tab：`统计`=概览卡片+最爱歌曲/歌手排行+流派分布+播放趋势+年度热力图；`报告`=基于自然周期的听歌总结）
-- **NowPlayingOverlay.vue** - 正在播放覆盖层
+- **NowPlayingOverlay.vue** - 正在播放覆盖层（2026-08-27 重设计：沉浸式布局——左侧静态方形大封面 + 右侧歌词（复用 LyricsDisplay）+ 封面模糊沉浸背景（blur(60px) + 主题分档暗化遮罩，无封面回退纯色 + vignette）；<880px 窄屏纵向排列；控制区含频谱 toggle（默认隐藏）与队列入口（emit toggleQueue → App.vue 切 PlayQueueDrawer））
 - **LyricsDisplay.vue** - 歌词显示组件（LRC 解析、同步滚动、点击跳转）
+- **player/CoverArt.vue** - 封面组件（songId → useCoverArt blob URL；加载态/渐变回退/淡入切换；PlayerBar 48px 与全屏页大封面复用，尺寸由父级 CSS 控制）
 
 ### 独立窗口根组件
 - **App.vue** - 主窗口根（侧边栏 + 主区域 + PlayerBar）
@@ -242,8 +243,9 @@ SettingsView.vue 是容器（tab 切换），6 个 tab 各委托一个子组件�
 - **composables/useStartupOptions.ts** - 启动选项封装（开机自启 IPC 读写 + 恢复播放持久化 + 纯逻辑：来源重建/位置解析/debounce 判定，2026-06-29 新增）。纯函数 TDD 覆盖（13 测试）。
 - **composables/useSleepTimer.ts** - 睡眠定时器（2026-07-01 新增）。单例模式（模块级状态），倒计时 X 分钟后调 `player_stop` 完全停止播放，最后 30 秒音量线性渐弱到 0；取消/到点均恢复原音量。不持久化（一次性操作）。复用 `usePlayer.setVolume` / `usePlayer.stop`。
 - **composables/useListeningStats.ts** - 统计 Tab 仪表盘聚合加载（`stats_dashboard` 单次 IPC 替代 6 个命令，2026-06-26；stores/stats.ts 薄封装）
-- **composables/useCache.ts** - 缓存清理（歌词缓存/播放历史统计与清理 IPC 封装，2026-06-30；入口在设置 → 数据管理）
+- **composables/useCache.ts** - 缓存清理（歌词缓存/播放历史/封面缓存统计与清理 IPC 封装，2026-06-30；封面清理会同步 `evictCoverUrlCache()` 作废前端 blob URL；入口在设置 → 数据管理）
 - **composables/useDraggableProgress.ts** - 进度条拖拽逻辑（PlayerBar 与 MiniPlayer 共用）：`progressModel` 值变实时 seek；`isDragging` 控制拖拽中显示本地进度对应时间，否则显示真实 progress
+- **composables/useCoverArt.ts** - 封面加载（2026-08-27 新增）：`getCoverUrl(songId)` IPC raw bytes → 魔数嗅探 MIME → Blob URL；模块级 Map + LRU（50 张，淘汰 revoke）+ 同 songId inflight 去重；失败/无封面静默返回 null；`evictCoverUrlCache()` 供清理后作废。单测覆盖（7 测试）
 
 > **Composable 单例模式（2026-06-20 加固）：** `useMiniPlayer` / `useDesktopLyrics` / `usePlayer` 都采用模块级状态 + 幂等 init guard（`stateSyncDone` / `listenersSetup`），避免主窗口多个组件（App.vue / PlayerBar / SettingsView / useGlobalShortcuts 间接）重复注册 Tauri 事件监听器导致的累积泄漏。模块级监听器不通过 `onUnmounted` 清理，依赖 webview 销毁时 Tauri 运行时自动回收。`useLyrics` 因接受 `currentSong` ref 参数不能完全单例化，改用 `_listenPromise` 追踪 listen 的 promise，`onUnmounted` 改为 async 先 await promise 再 unlisten。详见 `.wiki/risks.md` 的「监听器累积泄漏」章节。
 
@@ -314,7 +316,7 @@ GSAP-powered animation system across five interaction scenarios:
 | `usePageTransition` | Library ↔ Settings | Fade + translateY page transition (out-in mode) |
 | `usePlaylistTransition` | Playlist switching | Slide-left-out + slide-right-in content transition |
 | `useViewModeFlip` | List ↔ Grid toggle | GSAP Flip layout animation with stagger |
-| `usePlayerExpand` | Player expand/collapse | Staggered timeline for overlay elements |
+| `usePlayerExpand` | Player expand/collapse | Staggered timeline: bg-layer fade → cover scale 0.94→1 → lyrics column fade-up → progress/controls（2026-08-27 适配新沉浸式布局 DOM） |
 | PlayQueueDrawer | Play queue reorder | GSAP Flip list reorder on mode switch (0.35s) |
 | `useLyricsAnimation` | Lyrics display | Spotlight opacity gradient + GSAP ScrollTo |
 

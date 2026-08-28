@@ -1,6 +1,7 @@
 pub mod autostart;
 pub mod cache;
 pub mod bootstrap;
+pub mod covers;
 pub mod import_export;
 pub mod lyrics;
 pub mod playlists;

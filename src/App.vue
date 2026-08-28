@@ -165,6 +165,7 @@ const showQueue = ref(false)
               <NowPlayingOverlay
                 v-if="showNowPlaying"
                 @close="showNowPlaying = false"
+                @toggle-queue="showQueue = !showQueue"
               />
             </Transition>
           </div>

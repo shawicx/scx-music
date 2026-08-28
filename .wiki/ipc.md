@@ -80,6 +80,9 @@ const result = await invokeCommand('command_name', { param: value })
 | `clear_lyrics_cache` | composables/useCache.ts | commands/cache.rs | 清空全部歌词缓存（含 source='none' 负缓存），不打断当前播放 |
 | `clear_orphan_lyrics` | composables/useCache.ts | commands/cache.rs | 清理孤儿歌词（song_id 不在 songs 表，删歌曲残留） |
 | `clear_play_history` | composables/useCache.ts | commands/cache.rs | 按时间段清理播放历史（beforeDays：null=全部，正数=保留近 N 天） |
+| `get_song_cover` | composables/useCoverArt.ts | commands/covers.rs | 获取歌曲封面（**raw bytes**：`tauri::ipc::Response` → 前端 ArrayBuffer，空 body = 无封面；后端文件缓存 + Lofty 按需提取 + `.none` 负缓存） |
+| `get_cover_cache_stats` | composables/useCache.ts | commands/covers.rs | 封面缓存统计（文件数/总字节） |
+| `clear_cover_cache` | composables/useCache.ts | commands/covers.rs | 清空封面文件缓存（前端同步作废 blob URL 缓存） |
 | **导入导出** | | | |
 | `export_playlist_m3u` | composables/useImportExport.ts | commands/import_export.rs | 导出播放列表为 M3U 格式（**路径校验**：绝对路径 + 拒绝 `..`） |
 | `export_playlist_pls` | composables/useImportExport.ts | commands/import_export.rs | 导出播放列表为 PLS 格式（同上） |
