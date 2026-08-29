@@ -36,7 +36,7 @@ const tooltipText = computed(() =>
     :color="active ? color : undefined"
     @click="emit('click', $event)"
   >
-    <v-tooltip activator="parent" location="top">{{ tooltipText }}</v-tooltip>
+    <v-tooltip activator="parent" location="top" content-class="scx-tip">{{ tooltipText }}</v-tooltip>
     <v-icon :icon="active && iconActive ? iconActive : icon"></v-icon>
   </v-btn>
 </template>

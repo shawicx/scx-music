@@ -48,6 +48,8 @@ export default {
     noQueue: 'No play queue',
     collapse: 'Collapse',
     visualizer: 'Visualizer',
+    mute: 'Mute',
+    unmute: 'Unmute',
     unlike: 'Unlike',
     addToFavorite: 'Add to Favorites',
     visualizationBar: 'Spectrum Bars',

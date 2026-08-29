@@ -48,6 +48,8 @@ export default {
     noQueue: '暂无播放队列',
     collapse: '收起',
     visualizer: '频谱',
+    mute: '静音',
+    unmute: '取消静音',
     unlike: '取消喜欢',
     addToFavorite: '添加到喜欢',
     visualizationBar: '频谱柱状图',

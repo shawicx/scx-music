@@ -85,6 +85,18 @@ const volumeModel = computed({
   set: (val: number) => setVolume(val / 100),
 })
 
+// 静音切换：记住静音前音量，取消静音时恢复（音量为 0 视为已静音）
+const lastVolume = ref(0.8)
+const isMuted = computed(() => volume.value === 0)
+function toggleMute() {
+  if (volume.value > 0) {
+    lastVolume.value = volume.value
+    setVolume(0)
+  } else {
+    setVolume(lastVolume.value || 0.8)
+  }
+}
+
 const { progressModel, displayProgress, isDragging } = useDraggableProgress(progress, duration, seek)
 </script>
 
@@ -163,14 +175,14 @@ const { progressModel, displayProgress, isDragging } = useDraggableProgress(prog
     </div>
     <div class="player-right">
       <IconButtonWithTooltip
-        icon="mdi-chevron-double-up"
+        icon="mdi-picture-in-picture-top-right"
         :tooltip="t('miniPlayer.enter')"
         size="small"
         @click.stop="enterMini"
       />
       <IconButtonWithTooltip
-        icon="mdi-monitor-eye"
-        icon-active="mdi-monitor-eye"
+        icon="mdi-subtitles-outline"
+        icon-active="mdi-subtitles"
         :active="desktopLyricsVisible"
         :tooltip="t('lyrics.desktopLyrics.toggle')"
         color="secondary"
@@ -178,7 +190,7 @@ const { progressModel, displayProgress, isDragging } = useDraggableProgress(prog
         @click.stop="toggleDesktopLyrics"
       />
       <IconButtonWithTooltip
-        icon="mdi-playlist-music"
+        icon="mdi-playlist-music-outline"
         :tooltip="t('player.playlist')"
         size="small"
         @click.stop="emit('toggleQueue')"
@@ -213,15 +225,24 @@ const { progressModel, displayProgress, isDragging } = useDraggableProgress(prog
           />
         </v-list>
       </v-menu>
-      <v-slider
-        v-model="volumeModel"
-        :max="100"
-        hide-details
-        density="compact"
-        color="secondary"
-        track-color="surface-variant"
-        class="volume-slider"
-      />
+      <div class="volume-group">
+        <IconButtonWithTooltip
+          :icon="isMuted ? 'mdi-volume-off' : 'mdi-volume-high'"
+          :active="isMuted"
+          :tooltip="() => isMuted ? t('player.unmute') : t('player.mute')"
+          size="small"
+          @click.stop="toggleMute"
+        />
+        <v-slider
+          v-model="volumeModel"
+          :max="100"
+          hide-details
+          density="compact"
+          color="secondary"
+          track-color="surface-variant"
+          class="volume-slider"
+        />
+      </div>
     </div>
   </div>
 </template>
@@ -279,17 +300,20 @@ const { progressModel, displayProgress, isDragging } = useDraggableProgress(prog
   display: flex; align-items: center; gap: var(--space-sm);
   min-width: 180px; justify-content: flex-end;
 }
-/* 音量滑块与功能按钮组分隔:竖向分隔线,视觉上"按钮 | 音量" */
-.volume-slider {
-  width: 80px;
+/* 功能按钮 | 音量组（图标 + 滑块）竖向分隔 */
+.volume-group {
+  display: flex;
+  align-items: center;
+  gap: 0;
   margin-left: var(--space-xs);
   padding-left: var(--space-sm);
   border-left: 1px solid var(--glass-border);
 }
+.volume-slider { width: 72px; }
 
 /* 窄屏:音量滑块收窄 */
 @media (max-width: 900px) {
-  .volume-slider { width: 64px; }
+  .volume-slider { width: 56px; }
 }
 /* 极窄屏:隐藏音量滑块(音量用 ArrowUp/Down 快捷键调节) */
 @media (max-width: 720px) {

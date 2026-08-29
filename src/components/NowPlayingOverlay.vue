@@ -171,7 +171,7 @@ const showVisualizer = ref(false)
             @click.stop="showVisualizer = !showVisualizer"
           />
           <IconButtonWithTooltip
-            icon="mdi-playlist-music"
+            icon="mdi-playlist-music-outline"
             :tooltip="t('player.playlist')"
             size="small"
             @click.stop="emit('toggleQueue')"

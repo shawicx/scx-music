@@ -207,6 +207,20 @@ html, body, #app {
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: rgb(var(--v-theme-surface-variant)); border-radius: var(--radius-sm); }
+
+/* Tooltip 皮肤：玻璃胶囊，匹配 PlayerBar 的玻璃语言（暗色毛玻璃/浅色极简自动切换） */
+.v-tooltip .v-overlay__content.scx-tip {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  letter-spacing: 0.02em;
+  padding: 5px 10px;
+  color: rgb(var(--v-theme-on-background));
+  box-shadow: 0 4px 16px rgb(0 0 0 / 0.18);
+}
 </style>
 
 <style scoped>
