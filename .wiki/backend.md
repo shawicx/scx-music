@@ -56,7 +56,7 @@
 - `player_get_output_devices` - 枚举音频输出设备 (`device.rs`)
 - `player_set_output_device` - 切换音频输出设备 (`device.rs`)
 - `player_get_current_device` - 获取当前输出设备名 (`device.rs`)
-- `analyzer_start` / `analyzer_stop` - 启动/停止音频频谱分析 (`analyzer_cmds.rs`)。**`analyzer_start` 于 2026-06-26 改用 Channel API**：接收 `on_data: Channel<Vec<u8>>` 参数，FFT 线程通过 `channel.send()` 点对点推送（不再 `emit('audio:spectrum')` 广播），channel 销毁即自动停推
+- `analyzer_start` / `analyzer_stop` - 启动/停止音频频谱分析 (`analyzer_cmds.rs`)。**`analyzer_start` 于 2026-06-26 改用 Channel API**：接收 `on_data: Channel<Vec<f32>>` 参数（2026-09-19 起为 f32 归一化幅值），FFT 线程通过 `channel.send()` 点对点推送（不再 `emit('audio:spectrum')` 广播），channel 销毁即自动停推
 
 **commands/songs.rs** - 歌曲数据操作
 - `get_all_songs` - 获取所有歌曲
@@ -295,15 +295,17 @@ macOS CoreAudio 通过 CPAL 暴露设备时存在两个已知问题：
 - `TeeSource<S>` - Source 包装器，在流经时复制 f32 样本到分析器
 
 **工作流程：**
-1. `TeeSource` 在音频播放时，将 f32 样本批量 (1024个) 推入 SampleBuffer
-2. `AnalyzerHandle::start(channel)` 启动后台线程，每 33ms 从 buffer 读取 256 个样本
-3. 应用 Hann 窗函数 → 256 点 FFT → 计算 64 个频率 bin 的幅度
-4. 缩放到 0-255 并通过 `channel.send(bins)` 点对点推送到前端
+1. `TeeSource` 在音频播放时，将 f32 样本批量 (1024个) 推入 SampleBuffer，并把真实采样率同步到 handle（AtomicU32）
+2. `AnalyzerHandle::start(channel)` 启动后台线程，每 16ms 从 buffer 读取 1024 个样本
+3. 应用 Hann 窗函数 → 1024 点 FFT → **对数分箱**（20Hz–16kHz 几何级数划分，按真实采样率计算边界，奈奎斯特钳制）→ 各频段取峰值幅值 → **dB 归一化**（Hann 相干增益 FFT_SIZE/4 为 0dB 参考，-60dB→0.0，0dB→1.0）
+4. 得到 64 个 f32（0..1）通过 `channel.send(bins)` 点对点推送到前端
 
-> **2026-06-26 改造：** 从 `app.emit("audio:spectrum", bins)` 广播改为 `Channel<Vec<u8>>` 点对点推送。`send` 失败（channel 销毁/前端断开）时退出线程并置 running=false,无需前端手动 `analyzer_stop` 配对。原广播方式会向全部 4 个 webview 推 30Hz 事件,但仅可视化渲染器消费。
+> **2026-06-26 改造：** 从 `app.emit("audio:spectrum", bins)` 广播改为 Channel 点对点推送。`send` 失败（channel 销毁/前端断开）时退出线程并置 running=false,无需前端手动 `analyzer_stop` 配对。原广播方式会向全部 4 个 webview 推 30Hz 事件,但仅可视化渲染器消费。
+>
+> **2026-09-19 重设计：** FFT_SIZE 256→1024（高频分辨率）、线性分箱→**对数分箱**（人耳对数感知，根治低频满屏高频死寂）、u8 线性缩放→**f32 dB 归一化**（小音量细节不被压平）、30fps→60fps（与 rAF 对齐）。纯函数 `log_bin_edges` / `magnitude_to_normalized` / `spectrum_from_fft` 有单元测试。
 
 **关键参数：**
-- FFT_SIZE = 256, NUM_BINS = 64, 采样率 ~30fps
+- FFT_SIZE = 1024, NUM_BINS = 64, F_MIN = 20Hz, F_MAX = 16kHz（奈奎斯特钳制），DB_FLOOR = -60dB，~60fps
 - 依赖 `rustfft` crate
 
 ### lyrics.rs - 歌词服务

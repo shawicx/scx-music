@@ -28,7 +28,7 @@ src/components/PlayerBar.vue     # 播放控制 UI
 src/components/LibraryView.vue   # 音乐库视图
 src/components/LyricsDisplay.vue # 歌词显示
 src/components/NowPlayingOverlay.vue # 正在播放覆盖层
-src/visualization/               # 音频可视化 (4 种渲染器)
+src/visualization/               # (已删除) 前端频谱展示 2026-09-19 移除，后端保留待重设计
 src/utils/virtualScroll.ts       # 虚拟滚动工具
 src/utils/errorHandler.ts        # 统一错误处理
 src/stores/stats.ts              # 听歌统计 (useStatsStore，薄封装 useListeningStats)
@@ -107,7 +107,7 @@ UI -> useLibraryStore.importToPlaylist()
 | useSettingsStore | 设置主题 | Vuetify 主题、系统检测、数据库持久化 |
 | useLyrics | 歌词 | LRC 解析、多源获取、实时同步 |
 | audio/ | 音频引擎 | Rodio 封装、线程安全、设备切换 |
-| analyzer.rs | 频谱分析 | FFT 256点→64bins、30fps 推送。**2026-06-26 改用 Channel<T> 点对点推送**（替代 emit 广播），channel 销毁即停推 |
+| analyzer.rs | 频谱分析（后端保留，前端展示 2026-09-19 移除待重设计） | 1024 点 FFT→对数分箱 64 bins→f32 dB 归一化、60fps 推送。Channel<T> 点对点，channel 销毁即停推 |
 | bootstrap.rs | 启动加载 | 单次 IPC 全量数据 |
 | lyrics.rs | 歌词后端 | 缓存→内嵌→LRCLIB 三级获取 |
 | db/ | 数据库 | SQLite WAL、迁移管理 (INIT_SCHEMA + V6) |

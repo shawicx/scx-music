@@ -7,7 +7,6 @@ import { usePlaybackMode } from '../composables/usePlaybackMode'
 import { useI18n } from '../composables/useI18n'
 import { useLyrics } from '../composables/useLyrics'
 import { getCoverUrl } from '../composables/useCoverArt'
-import { AudioVisualizer } from '../visualization'
 import LyricsDisplay from './LyricsDisplay.vue'
 import PulseDots from './common/PulseDots.vue'
 import IconButtonWithTooltip from './IconButtonWithTooltip.vue'
@@ -77,8 +76,6 @@ watch(
   { immediate: true },
 )
 
-// 频谱：默认隐藏，会话内记忆（不持久化）
-const showVisualizer = ref(false)
 </script>
 
 <template>
@@ -88,7 +85,6 @@ const showVisualizer = ref(false)
       <div class="bg-dim" />
       <div class="vignette" />
     </div>
-    <AudioVisualizer v-if="showVisualizer" class="overlay-visualizer" />
 
     <div class="mode-status-bar" v-if="isModeActive">
       <div class="status-item">
@@ -163,14 +159,6 @@ const showVisualizer = ref(false)
 
         <div class="controls-extra">
           <IconButtonWithTooltip
-            :icon="showVisualizer ? 'mdi-equalizer' : 'mdi-equalizer-outline'"
-            icon-active="mdi-equalizer"
-            :active="showVisualizer"
-            :tooltip="t('player.visualizer')"
-            size="small"
-            @click.stop="showVisualizer = !showVisualizer"
-          />
-          <IconButtonWithTooltip
             icon="mdi-playlist-music-outline"
             :tooltip="t('player.playlist')"
             size="small"
@@ -215,13 +203,6 @@ const showVisualizer = ref(false)
   background: radial-gradient(ellipse at center top, rgb(var(--v-theme-primary) / 0.12), transparent 60%);
 }
 :global(.v-theme--light) .vignette { display: none; }
-
-.overlay-visualizer {
-  position: absolute; inset: 0;
-  z-index: 1;
-  opacity: 0.35;
-  pointer-events: none;
-}
 
 /* 顶部悬浮件须高于 .content（同 z-index 时 DOM 靠后的 .content padding 区会盖住点击） */
 .close-btn { position: absolute; top: 16px; left: 20px; z-index: 3; color: var(--v-text-secondary); }

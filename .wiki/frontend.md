@@ -9,7 +9,7 @@
 - **SettingsView.vue** - 设置页面
 - **AnalysisView.vue** - 曲库分析（概览卡片 + ECharts 图表 + 排行列表）
 - **StatsView.vue** - 听歌统计（双 Tab：`统计`=概览卡片+最爱歌曲/歌手排行+流派分布+播放趋势+年度热力图；`报告`=基于自然周期的听歌总结）
-- **NowPlayingOverlay.vue** - 正在播放覆盖层（2026-08-27 重设计：沉浸式布局——左侧静态方形大封面 + 右侧歌词（复用 LyricsDisplay）+ 封面模糊沉浸背景（blur(60px) + 主题分档暗化遮罩，无封面回退纯色 + vignette）；<880px 窄屏纵向排列；控制区含频谱 toggle（默认隐藏）与队列入口（emit toggleQueue → App.vue 切 PlayQueueDrawer））
+- **NowPlayingOverlay.vue** - 正在播放覆盖层（2026-08-27 重设计：沉浸式布局——左侧静态方形大封面 + 右侧歌词（复用 LyricsDisplay）+ 封面模糊沉浸背景（blur(60px) + 主题分档暗化遮罩，无封面回退纯色 + vignette）；<880px 窄屏纵向排列；控制区含队列入口（emit toggleQueue → App.vue 切 PlayQueueDrawer）。**2026-09-19 起频谱前端展示已移除，无频谱入口**）
 - **LyricsDisplay.vue** - 歌词显示组件（LRC 解析、同步滚动、点击跳转）
 - **player/CoverArt.vue** - 封面组件（songId → useCoverArt blob URL；加载态/渐变回退/淡入切换；PlayerBar 48px 与全屏页大封面复用，尺寸由父级 CSS 控制）
 
@@ -331,36 +331,7 @@ Every composable uses `useAnimation()` for scoped GSAP context. Cleanup is autom
 
 ## 音频可视化
 
-### 文件结构 (src/visualization/)
-
-| 文件 | 作用 |
-|------|------|
-| `useAudioAnalyzer.ts` | Composable: 通过 **Tauri Channel** 接收频谱数据（2026-06-26 从 `listen('audio:spectrum')` 改为 `Channel<number[]>` 点对点），提供响应式频率数据 |
-| `useVisualizationRenderer.ts` | Composable: 管理 Canvas、requestAnimationFrame 渲染循环、DPR 适配 |
-| `AudioVisualizer.vue` | 主组件: Canvas + 风格选择器 + 样式持久化 |
-| `index.ts` | 桶导出 |
-| `renderers/types.ts` | Renderer/RendererContext 类型定义 |
-| `renderers/barRenderer.ts` | 频谱柱状图渲染器（含顶部帽效果） |
-| `renderers/circularRenderer.ts` | 环形放射渲染器 |
-| `renderers/waveRenderer.ts` | 流动波形渲染器（3层叠加） |
-| `renderers/particleRenderer.ts` | 粒子系统渲染器（250个粒子） |
-
-### 数据流
-
-```
-Rust TeeSource (音频流复制样本)
-  ↓ push_samples
-AnalyzerHandle (FFT 线程)
-  ↓ channel.send(64 bins)   ← 2026-06-26: 从 emit 广播改为 Channel 点对点
-useAudioAnalyzer (前端 Channel.onmessage)
-  ↓ ref<Uint8Array>
-useVisualizationRenderer (Canvas rAF)
-  ↓ Renderer(context)
-Canvas 2D 渲染
-```
-
-### VisualizationStyle 类型
-`'bar' | 'circular' | 'wave' | 'particle'` — 通过设置面板切换，持久化到 settings 表
+> **2026-09-19：前端频谱展示已整体移除**（用户决策：旧展示难看且不好用，待重新设计后再实现）。`src/visualization/` 目录已删除，全屏播放页不再有频谱入口/切换器/画布。**Rust 后端完整保留**（analyzer.rs 对数分箱 FFT + analyzer_start/stop Channel 推送 + visualization_* 设置键），未来重建前端时直接对接：`Channel<number[]>`（64 个 f32 0..1，60fps）。
 
 ## 歌词系统
 

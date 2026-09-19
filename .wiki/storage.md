@@ -43,7 +43,8 @@
 - `displayMode` - 显示模式
 - `activePlaylistId` - 当前播放列表
 - `language` - 界面语言
-- `visualization_style` - 可视化风格
+- `visualization_style` - 可视化风格（前端展示 2026-09-19 移除；键与旧值保留在库中，待重设计后决定迁移策略）
+- `visualization_enabled` - 频谱开关（同上，暂无前端消费方）
 - `last_position` - 上次播放位置（秒，启动恢复播放用）
 - `restore_last_playback` - 启动恢复播放总开关
 - `desktop-lyrics.*` - 桌面歌词配置（前缀）

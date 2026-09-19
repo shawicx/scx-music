@@ -17,7 +17,7 @@
 - **数据库：** SQLite (Rusqlite 0.31, WAL 模式)
 - **IPC：** Tauri Commands + Events
 - **线程：** 独立进度跟踪线程
-- **频谱分析：** rustfft (256 点 FFT → 64 bins)
+- **频谱分析：** rustfft (1024 点 FFT → 对数分箱 64 bins → f32 dB 归一化, 60fps)
 - **元数据：** Lofty (音频标签解析 + 内嵌歌词提取)
 - **歌词源：** LRCLIB API (网络歌词搜索)
 

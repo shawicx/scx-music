@@ -18,6 +18,7 @@ const ALLOWED_EXACT_KEYS: &[&str] = &[
     "theme_color",
     "theme_mode",
     "visualization_style",
+    "visualization_enabled",
     "output_device",
     // 库视图状态持久化（useLibrary.ts）
     "activePlaylistId",
@@ -125,6 +126,7 @@ mod tests {
         assert!(validate_setting_key("theme_color").is_ok());
         assert!(validate_setting_key("theme_mode").is_ok());
         assert!(validate_setting_key("visualization_style").is_ok());
+        assert!(validate_setting_key("visualization_enabled").is_ok());
         assert!(validate_setting_key("output_device").is_ok());
         assert!(validate_setting_key("activePlaylistId").is_ok());
         assert!(validate_setting_key("displayMode").is_ok());

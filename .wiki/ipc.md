@@ -8,7 +8,7 @@
 |------|---------|-----------|
 | **`invoke`** | 请求-响应(一次性) | 绝大多数 CRUD 命令(songs/playlists/settings/lyrics…) |
 | **`emit`/`listen`** | 事件广播(多消费者) | `audio:state_change`/`track_change`(多窗口消费)、跨窗口业务事件(`mini-player:*`/`desktop-lyrics:*`) |
-| **`Channel<T>`** | 流式点对点(单消费者+高频) | `audio:spectrum`(频谱分析器,30Hz,仅可视化渲染器消费) |
+| **`Channel<T>`** | 流式点对点(单消费者+高频) | `audio:spectrum`(频谱分析器,60Hz,仅可视化渲染器消费) |
 
 **选型决策矩阵:**
 - 消费者数 ≥2 个窗口 → `emit` 广播
@@ -102,8 +102,8 @@ const result = await invokeCommand('command_name', { param: value })
 | `stats_dashboard` | composables/useListeningStats.ts | commands/stats.rs | **统计 Tab 仪表盘聚合（2026-06-26 新增）**：单次 IPC 返回 overview+topSongs+topArtists+genreDistribution+trend+heatmap，替代前端 Promise.all 发 6 个命令。一次锁、一次 prepare，消除 6 次往返与重复锁竞争 |
 | `stats_hourly_distribution` | composables/useListeningReport.ts | commands/stats.rs | 指定时间范围（start/end）按小时 0-23（本地时区）聚合的听歌时长分布（报告 Tab 时段分布图） |
 | **频谱分析** | | | |
-| `analyzer_start` | visualization/useAudioAnalyzer.ts | audio/analyzer_cmds.rs | 启动频谱分析。**2026-06-26 改用 Channel API**：接收 `on_data: Channel<Vec<u8>>` 参数，FFT 线程通过 `channel.send()` 点对点推送，不再 `emit('audio:spectrum')` 广播。channel 销毁即自动停推，无需手动 analyzer_stop 配对 |
-| `analyzer_stop` | visualization/useAudioAnalyzer.ts | audio/analyzer_cmds.rs | 停止频谱分析（主动停止用，channel 自然销毁也会触发后端退出） |
+| `analyzer_start` | -（前端展示 2026-09-19 移除，待重设计） | audio/analyzer_cmds.rs | 启动频谱分析。**2026-06-26 改用 Channel API**：接收 `on_data: Channel<Vec<f32>>` 参数（f32 归一化幅值 0..1），FFT 线程通过 `channel.send()` 点对点推送，不再 `emit('audio:spectrum')` 广播。channel 销毁即自动停推，无需手动 analyzer_stop 配对 |
+| `analyzer_stop` | -（前端展示 2026-09-19 移除，待重设计） | audio/analyzer_cmds.rs | 停止频谱分析（主动停止用，channel 自然销毁也会触发后端退出） |
 | **快捷键** | | | |
 | `shortcuts_list_defaults` | composables/useGlobalShortcuts.ts | commands/shortcuts.rs | 返回内置动作清单+默认绑定 |
 | `shortcuts_register` | composables/useGlobalShortcuts.ts | commands/shortcuts.rs | 注册单个快捷键，失败返回错误 |
@@ -261,7 +261,7 @@ App.vue onMounted（在 startCheck 之后、迷你模式恢复之前）
 | `audio:track_change` | `Song \| null` | 当前曲目变化 | stores/player.ts |
 | `audio:error` | `string` | 音频错误发生 | stores/player.ts |
 
-> **`audio:spectrum` 已于 2026-06-26 从广播事件移除**,改用 `Channel<T>` 点对点推送(见上方"通信原语选型")。原 30Hz 广播给全部 4 个 webview,但仅可视化渲染器消费;现通过 `analyzer_start` 的 `on_data: Channel<Vec<u8>>` 参数直接推给订阅方,channel 销毁即停推。
+> **`audio:spectrum` 已于 2026-06-26 从广播事件移除**,改用 `Channel<T>` 点对点推送(见上方"通信原语选型")。原 30Hz 广播给全部 4 个 webview,但仅可视化渲染器消费;现通过 `analyzer_start` 的 `on_data: Channel<Vec<f32>>` 参数直接推给订阅方(2026-09-19 起 60Hz、f32 幅值),channel 销毁即停推。
 
 ## 桌面歌词相关事件（自定义）
 
