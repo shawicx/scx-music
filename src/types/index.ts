@@ -150,3 +150,20 @@ export interface PeriodState {
   kind: PeriodKind
   offset: number
 }
+
+// ===== 音效（EQ 预设）=====
+
+/** 内置 EQ 预设定义（Rust effects.rs EqPresetDef 的 camelCase 序列化形态） */
+export interface EqPresetDef {
+  id: string
+  preampDb: number
+  gainsDb: number[]
+}
+
+/** 当前 EQ 参数（Rust effects.rs EqParams 的 camelCase 序列化形态） */
+export interface EqParams {
+  presetId: string
+  enabled: boolean
+  preampDb: number
+  gainsDb: number[]
+}

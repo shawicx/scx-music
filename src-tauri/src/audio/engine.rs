@@ -10,6 +10,7 @@ use tauri::Manager;
 use crate::analyzer::{AnalyzerHandle, TeeSource};
 
 use super::device::{find_device_by_name, try_output_stream_for_device};
+use super::effects::{EffectsHandle, EffectsSource};
 use super::tracker::{finalize_session, PlaySession};
 use super::types::*;
 use crate::error::{AppError, AppResult};
@@ -40,6 +41,7 @@ pub struct AudioStateInner {
     pub(super) progress_thread_handle: Option<std::thread::JoinHandle<()>>,
     pub(super) output_device_name: Option<String>,
     pub analyzer: AnalyzerHandle,
+    pub effects: EffectsHandle,
     pub play_session: Option<PlaySession>,
 }
 
@@ -59,6 +61,7 @@ impl AudioStateInner {
             progress_thread_handle: None,
             output_device_name: None,
             analyzer: AnalyzerHandle::new(),
+            effects: EffectsHandle::new(),
             play_session: None,
         }
     }
@@ -138,6 +141,25 @@ impl AudioStateInner {
                 .unwrap_or(0.0)
     }
 
+    /// 构建播放源链：Decoder → skip(seek) → convert_samples::<f32> → EffectsSource(EQ) → TeeSource(频谱)。
+    /// EQ 在频谱采样之前，可视化反映实际听感。play_file_at_index 与 seek_by_restart 共用。
+    fn build_play_source(
+        &self,
+        file_path: &str,
+        skip_secs: Option<f64>,
+    ) -> AppResult<impl Source<Item = f32> + Send + 'static> {
+        let file = File::open(file_path).map_err(|e| format!("File open error: {}", e))?;
+        let decoder =
+            Decoder::new(BufReader::new(file)).map_err(|e| format!("Decode error: {}", e))?;
+        let base = decoder
+            .skip_duration(Duration::from_secs_f64(skip_secs.unwrap_or(0.0)))
+            .convert_samples::<f32>();
+        Ok(TeeSource::new(
+            EffectsSource::new(base, self.effects.clone()),
+            self.analyzer.clone(),
+        ))
+    }
+
     pub(super) fn play_file_at_index(
         &mut self,
         index: usize,
@@ -187,13 +209,10 @@ impl AudioStateInner {
             }
         };
 
-        let file = File::open(&song.file_path).map_err(|e| format!("File open error: {}", e))?;
-        let source =
-            Decoder::new(BufReader::new(file)).map_err(|e| format!("Decode error: {}", e))?;
+        let source = self.build_play_source(&song.file_path, None)?;
 
         sink.set_volume(self.volume);
-        let teed = TeeSource::new(source.convert_samples::<f32>(), self.analyzer.clone());
-        sink.append(teed);
+        sink.append(source);
         self.engine.as_mut().ok_or(AppError::AudioPlayback("No audio engine".to_string()))?.sink = Some(sink);
 
         self.current_song = Some(song);
@@ -260,6 +279,7 @@ impl AudioStateInner {
         let song = self.current_song.clone().ok_or(AppError::AudioPlayback("No song playing".to_string()))?;
         let was_paused = matches!(self.state, PlaybackState::Paused);
         self.ensure_engine()?;
+        let source = self.build_play_source(&song.file_path, Some(position_secs))?;
         let engine = self.engine.as_mut().ok_or(AppError::AudioPlayback("No audio engine".to_string()))?;
 
         if let Some(old) = engine.sink.take() {
@@ -268,16 +288,9 @@ impl AudioStateInner {
         }
 
         let sink = Sink::try_new(&engine.handle).map_err(|e| format!("Sink error: {}", e))?;
-        let file = File::open(&song.file_path).map_err(|e| format!("File open error: {}", e))?;
-        let source = Decoder::new(BufReader::new(file))
-            .map_err(|e| format!("Decode error: {}", e))?
-            .skip_duration(Duration::from_secs_f64(position_secs))
-            .convert_samples::<f32>();
-
-        let teed = TeeSource::new(source, self.analyzer.clone());
 
         sink.set_volume(self.volume);
-        sink.append(teed);
+        sink.append(source);
         engine.sink = Some(sink);
 
         if was_paused {

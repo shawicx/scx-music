@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { usePlayerStore } from '../stores/player'
 import { useLibraryStore } from '../stores/library'
+import { useAudioEffectsStore } from '../stores/audioEffects'
 import { usePlaybackMode } from '../composables/usePlaybackMode'
 import { useI18n } from '../composables/useI18n'
 import { useLyrics } from '../composables/useLyrics'
@@ -17,6 +18,15 @@ const emit = defineEmits<{ close: []; toggleQueue: [] }>()
 const playerStore = usePlayerStore()
 const { t } = useI18n()
 const libraryStore = useLibraryStore()
+const audioEffectsStore = useAudioEffectsStore()
+const { presets, currentPresetId: eqPresetId, enabled: eqEnabled } = storeToRefs(audioEffectsStore)
+const { switchPreset, setEnabled } = audioEffectsStore
+const eqPanelOpen = ref(false)
+
+// v-switch 的 update:model-value 类型为 boolean | null（indeterminate 态），null 时忽略
+function onEqToggle(v: boolean | null) {
+  if (v !== null) setEnabled(v)
+}
 const { modeIcon, modeLabel, isModeActive, cycleMode } = usePlaybackMode()
 
 const {
@@ -158,6 +168,45 @@ watch(
         </v-btn>
 
         <div class="controls-extra">
+          <div class="eq-entry">
+            <div v-if="eqPanelOpen" class="eq-backdrop" @click="eqPanelOpen = false" />
+            <Transition name="eq-pop">
+              <div v-if="eqPanelOpen" class="eq-panel">
+                <div class="eq-panel-header">
+                  <span class="eq-panel-title">{{ t('settings.eq.title') }}</span>
+                  <v-switch
+                    :model-value="eqEnabled"
+                    density="compact"
+                    color="secondary"
+                    hide-details
+                    :aria-label="t('settings.eq.enabled')"
+                    @update:model-value="onEqToggle"
+                  />
+                </div>
+                <button
+                  v-for="preset in presets"
+                  :key="preset.id"
+                  :class="['eq-preset', { active: eqPresetId === preset.id }]"
+                  @click="switchPreset(preset.id)"
+                >
+                  <span class="eq-preset-name">{{ t(`settings.eq.presets.${preset.id}`) }}</span>
+                  <span class="eq-preset-curve" aria-hidden="true">
+                    <i
+                      v-for="(g, i) in preset.gainsDb"
+                      :key="i"
+                      :style="{ height: `${Math.max(2, 8 + g)}px` }"
+                    />
+                  </span>
+                </button>
+              </div>
+            </Transition>
+            <IconButtonWithTooltip
+              icon="mdi-tune-variant"
+              :tooltip="t('settings.eq.title')"
+              size="small"
+              @click.stop="eqPanelOpen = !eqPanelOpen"
+            />
+          </div>
           <IconButtonWithTooltip
             icon="mdi-playlist-music-outline"
             :tooltip="t('player.playlist')"
@@ -276,6 +325,81 @@ watch(
 .controls-extra {
   margin-left: auto;
   display: flex; align-items: center; gap: var(--space-sm);
+}
+
+/* ===== 音效快捷入口 ===== */
+.eq-entry { position: relative; display: flex; align-items: center; }
+.eq-backdrop {
+  position: fixed; inset: 0; z-index: 4;
+  /* 透明点击层：点面板外关闭 */
+}
+.eq-panel {
+  position: absolute;
+  bottom: calc(100% + 12px);
+  right: 0;
+  z-index: 5;
+  width: 248px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: rgb(var(--v-theme-surface) / 0.96);
+  border: 1px solid var(--v-border-color);
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgb(0 0 0 / 0.35);
+  backdrop-filter: blur(12px);
+}
+.eq-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+.eq-panel-title {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: rgb(var(--v-theme-on-background));
+}
+.eq-preset {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  color: rgb(var(--v-theme-on-background));
+  font-size: var(--text-sm);
+  text-align: left;
+}
+.eq-preset:hover { background: var(--v-accent-bg); }
+.eq-preset.active {
+  border-color: rgb(var(--v-theme-secondary) / 0.6);
+  background: rgb(var(--v-theme-secondary) / 0.12);
+  font-weight: 600;
+}
+.eq-preset-name { white-space: nowrap; }
+/* 迷你 EQ 曲线：0dB=8px，±12dB→-4..20px（下限 2px） */
+.eq-preset-curve {
+  display: flex; align-items: center; gap: 2px;
+  flex: 0 0 auto;
+}
+.eq-preset-curve i {
+  width: 3px;
+  border-radius: 1.5px;
+  background: rgb(var(--v-theme-secondary) / 0.45);
+}
+.eq-preset.active .eq-preset-curve i { background: rgb(var(--v-theme-secondary)); }
+
+.eq-pop-enter-active, .eq-pop-leave-active {
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+.eq-pop-enter-from, .eq-pop-leave-to {
+  opacity: 0;
+  transform: translateY(6px);
 }
 
 /* ===== 窄屏：<880px 纵向排列 ===== */

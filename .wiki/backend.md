@@ -57,6 +57,7 @@
 - `player_set_output_device` - 切换音频输出设备 (`device.rs`)
 - `player_get_current_device` - 获取当前输出设备名 (`device.rs`)
 - `analyzer_start` / `analyzer_stop` - 启动/停止音频频谱分析 (`analyzer_cmds.rs`)。**`analyzer_start` 于 2026-06-26 改用 Channel API**：接收 `on_data: Channel<Vec<f32>>` 参数（2026-09-19 起为 f32 归一化幅值），FFT 线程通过 `channel.send()` 点对点推送（不再 `emit('audio:spectrum')` 广播），channel 销毁即自动停推
+- `player_list_eq_presets` / `player_get_eq` / `player_set_eq_preset` / `player_set_eq_enabled` - EQ 音效命令（`effects_cmds.rs`，2026-09-21 新增）。切换预设只更新 `AudioStateInner.effects` 共享参数并 bump 版本号，播放中的 `EffectsSource` 在块边界（512 样本）感知后经 1024 样本系数平滑过渡实时生效，不重启 Sink
 
 **commands/songs.rs** - 歌曲数据操作
 - `get_all_songs` - 获取所有歌曲
@@ -78,7 +79,7 @@
 **commands/settings.rs** - 设置管理
 - `get_all_settings` - 获取所有设置
 - `get_setting` - 获取单个设置
-- `set_setting` - 设置单个键值对
+- `set_setting` - 设置单个键值对（白名单精确 key：language/theme/theme_color/theme_mode/visualization_style/visualization_enabled/output_device/eq_preset/eq_enabled + 库视图/启动恢复 key；前缀 key：mini-player./desktop-lyrics./shortcut./lyric.offset.）
 - `set_window_position` - **批量写入窗口位置（2026-06-26 新增）**：单事务双 key（keyX/keyY），复用 set_setting 的白名单校验，用于窗口拖动持久化（替代两次 set_setting 串行 IPC）
 - `get_system_locale` - 获取系统语言
 
@@ -246,6 +247,8 @@ Tauri v2 ACL 权限系统，按**发起调用的窗口**（不是目标窗口）
 - `engine.rs` — `AudioEngine`（Rodio OutputStream/Sink 封装）+ `AudioStateInner`（播放状态与逻辑）
 - `commands.rs` — 10 个播放控制命令（player_set_queue、player_pause 等）
 - `device.rs` — 设备辅助函数（`try_output_stream_for_device` 等）+ 3 个设备命令
+- `effects.rs` — **EQ 音效核心（2026-09-21 新增）**：10 频段 ISO 倍频程 biquad EQ（RBJ Cookbook 纯函数系数：31Hz 低架、16kHz 高架、中间 8 个 peaking Q=1.41）+ 内置预设表（flat/pop/rock/classical/jazz/vocal/bass_boost/electronic）+ `EffectsHandle`（`Arc<Mutex<EqParams>>` + AtomicU64 版本号共享）+ `EffectsSource<S>` Source 包装器（仿 TeeSource：每 512 样本轮询版本、系数 1024 样本线性平滑防爆音、disabled/flat 精确直通零开销、f0 钳制 0.45×奈奎斯特防失稳）。播放链：`Decoder → skip → convert_samples::<f32> → EffectsSource → TeeSource → Sink`（EQ 在频谱采样前，可视化反映实际听感）；`engine.rs::build_play_source` 为 play/seek 两处共用 helper
+- `effects_cmds.rs` — 4 个 EQ 命令（player_list_eq_presets / player_get_eq / player_set_eq_preset / player_set_eq_enabled），预设查找失败返回 `InvalidArgument`
 - `analyzer_cmds.rs` — `analyzer_start` / `analyzer_stop` 命令
 - `tracker.rs` — 播放会话追踪（`PlaySession` struct + `flush_session` 写入数据库）
 

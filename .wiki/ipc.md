@@ -45,6 +45,10 @@ const result = await invokeCommand('command_name', { param: value })
 | `player_get_output_devices` | composables/useAudioDevice.ts | audio/device.rs | 枚举音频输出设备 |
 | `player_set_output_device` | composables/useAudioDevice.ts | audio/device.rs | 切换音频输出设备 |
 | `player_get_current_device` | composables/useAudioDevice.ts | audio/device.rs | 获取当前输出设备 |
+| `player_list_eq_presets` | composables/useAudioEffects.ts | audio/effects_cmds.rs | 枚举内置 EQ 预设（id + preamp + 10 频段增益） |
+| `player_get_eq` | - | audio/effects_cmds.rs | 获取当前 EQ 参数 |
+| `player_set_eq_preset` | composables/useAudioEffects.ts | audio/effects_cmds.rs | 切换 EQ 预设（播放中实时平滑生效；未知 id → InvalidArgument） |
+| `player_set_eq_enabled` | composables/useAudioEffects.ts | audio/effects_cmds.rs | EQ 总开关（关闭 = 直通，预设保留） |
 | **歌曲** | | | |
 | `get_all_songs` | - | commands/songs.rs | 获取所有歌曲 |
 | `upsert_songs` | stores/library.ts | commands/songs.rs | 批量插入/更新歌曲 |

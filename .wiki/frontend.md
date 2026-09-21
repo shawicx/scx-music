@@ -187,6 +187,7 @@
 SettingsView.vue 是容器（tab 切换），6 个 tab 各委托一个子组件（2026-06-21 D2 拆分；2026-06-29 新增启动 tab）：
 - `AppearanceSettings.vue` — 外观（语言/主题模式/主题颜色）
 - `AudioDeviceSettings.vue` — 音频输出设备（依赖 `useAudioDevice` composable）
+- `AudioEffectSettings.vue` — 音效 EQ 预设（启用开关 + 预设单选网格 + 迷你 EQ 曲线；依赖 `useAudioEffectsStore`，2026-09-21 新增）
 - `DesktopLyricsSettings.vue` — 桌面歌词配置（bgOpacity/fontSize/colorCurrent/colorNext/glowStrength/锁定）
 - `ShortcutSettings.vue` — 快捷键（见下）
 - `DataManagementSettings.vue` — 数据管理（备份/恢复/设置导入导出）
@@ -228,6 +229,7 @@ SettingsView.vue 是容器（tab 切换），6 个 tab 各委托一个子组件�
 - **composables/useToast.ts** - Toast 通知封装（全局消息提示）
 - **composables/useI18n.ts** - 国际化封装（语言初始化、切换、持久化）
 - **composables/usePlaybackMode.ts** - 播放模式切换（cycleMode 后调用 regenerateQueue 重新生成队列）
+- **composables/useAudioEffects.ts** - EQ 音效管理（init 启动恢复 eq_preset/eq_enabled、switchPreset/setEnabled 实时生效并持久化；薄 Store 包装 `stores/audioEffects.ts`；App.vue onMounted 并行 init，2026-09-21 新增。全屏播放页有快捷入口：NowPlayingOverlay 控制区 mdi-tune-variant 按钮弹出预设面板）
 - **composables/usePlayQueue.ts** - 播放队列生成（Fisher-Yates 洗牌、模式映射：sequential/repeat_all=原序、repeat_one=仅当前歌曲、shuffle=洗牌后当前歌曲排首位）
 - **composables/useLyrics.ts** - 歌词获取 + LRC 解析 + 同步跟踪（listen promise 加 await，防卸载竞态泄漏）
 - **composables/useDebounceSearch.ts** - 搜索防抖（300ms）

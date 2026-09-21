@@ -4,6 +4,7 @@ import gsap from 'gsap'
 import { useI18n } from '../composables/useI18n'
 import AppearanceSettings from './settings/AppearanceSettings.vue'
 import AudioDeviceSettings from './settings/AudioDeviceSettings.vue'
+import AudioEffectSettings from './settings/AudioEffectSettings.vue'
 import DesktopLyricsSettings from './settings/DesktopLyricsSettings.vue'
 import ShortcutSettings from './settings/ShortcutSettings.vue'
 import DataManagementSettings from './settings/DataManagementSettings.vue'
@@ -63,7 +64,10 @@ watch(activeTab, async () => {
 
     <div ref="contentRef" class="settings-content">
       <AppearanceSettings v-if="activeTab === 'appearance'" />
-      <AudioDeviceSettings v-else-if="activeTab === 'audio'" />
+      <template v-else-if="activeTab === 'audio'">
+        <AudioDeviceSettings />
+        <AudioEffectSettings />
+      </template>
       <DesktopLyricsSettings v-else-if="activeTab === 'lyrics'" />
       <ShortcutSettings v-else-if="activeTab === 'shortcuts'" />
       <DataManagementSettings v-else-if="activeTab === 'data'" />

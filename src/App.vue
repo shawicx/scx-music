@@ -6,6 +6,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { useSettingsStore } from './stores/settings'
 import { useLibraryStore } from './stores/library'
 import { usePlayerStore } from './stores/player'
+import { useAudioEffectsStore } from './stores/audioEffects'
 import AppSidebar from './components/AppSidebar.vue'
 const LibraryView = defineAsyncComponent(() => import('./components/LibraryView.vue'))
 const SettingsView = defineAsyncComponent(() => import('./components/SettingsView.vue'))
@@ -27,6 +28,7 @@ import UpdateDialog from './components/UpdateDialog.vue'
 const settingsStore = useSettingsStore()
 const libraryStore = useLibraryStore()
 const playerStore = usePlayerStore()
+const audioEffectsStore = useAudioEffectsStore()
 const { toastMessage, toastVisible, toastColor } = useToast()
 const { initLocale } = useI18n()
 const { onEnter: onPageEnter, onLeave: onPageLeave } = usePageTransition()
@@ -88,6 +90,8 @@ onMounted(async () => {
     libraryStore.loadFromDb(),
     playerStore.setupListeners().then(() => playerStore.getState()),
     initGlobalShortcuts(),
+    // 音效恢复：在启动恢复播放之前应用，首播即带 EQ
+    audioEffectsStore.init(),
   ])
 
   console.log(`[perf] App initialized in ${(performance.now() - t0).toFixed(0)}ms`)

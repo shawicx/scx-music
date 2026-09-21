@@ -1,6 +1,8 @@
 mod analyzer_cmds;
 mod commands;
 mod device;
+mod effects;
+mod effects_cmds;
 mod engine;
 mod tracker;
 mod types;
@@ -8,6 +10,7 @@ mod types;
 pub use analyzer_cmds::*;
 pub use commands::*;
 pub use device::*;
+pub use effects_cmds::*;
 pub use engine::AudioStateInner;
 pub use tracker::*;
 pub use types::*;

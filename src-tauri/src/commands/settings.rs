@@ -20,6 +20,9 @@ const ALLOWED_EXACT_KEYS: &[&str] = &[
     "visualization_style",
     "visualization_enabled",
     "output_device",
+    // 音效（EQ 预设）
+    "eq_preset",
+    "eq_enabled",
     // 库视图状态持久化（useLibrary.ts）
     "activePlaylistId",
     "displayMode",
@@ -133,6 +136,8 @@ mod tests {
         assert!(validate_setting_key("currentSongId").is_ok());
         assert!(validate_setting_key("last_position").is_ok());
         assert!(validate_setting_key("restore_last_playback").is_ok());
+        assert!(validate_setting_key("eq_preset").is_ok());
+        assert!(validate_setting_key("eq_enabled").is_ok());
     }
 
     #[test]
