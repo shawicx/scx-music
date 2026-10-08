@@ -73,6 +73,12 @@ function onLyricSeek(time: number) {
   seek(time)
 }
 
+// 歌词偏移步进（底部操作栏中央，仅有同步歌词时显示）
+const offsetLabel = computed(() => {
+  const v = offsetSecs.value
+  return v === 0 ? '0.0s' : v > 0 ? `+${v.toFixed(1)}s` : `${v.toFixed(1)}s`
+})
+
 // 沉浸背景：与 CoverArt 共享 useCoverArt 的缓存/inflight，不会重复 IPC
 const bgUrl = ref<string | null>(null)
 watch(
@@ -124,9 +130,6 @@ watch(
             :lines="lines"
             :current-line-index="currentLineIndex"
             :is-loading="isLoading"
-            :offset-secs="offsetSecs"
-            :adjust-offset="adjustOffset"
-            :reset-offset="resetOffset"
             :get-seek-time="getSeekTime"
             @seek="onLyricSeek"
           />
@@ -166,6 +169,26 @@ watch(
         <v-btn icon variant="plain" :disabled="!currentSong" @click="toggleLike">
           <v-icon :icon="isLiked ? 'mdi-heart' : 'mdi-heart-outline'" :color="isLiked ? 'secondary' : undefined"></v-icon>
         </v-btn>
+
+        <div v-if="lines.length > 0" class="offset-bar">
+          <v-btn icon variant="text" size="small" density="compact" @click="adjustOffset(-0.1)">
+            <v-icon icon="mdi-minus" size="20" />
+          </v-btn>
+          <span class="offset-value">{{ offsetLabel }}</span>
+          <v-btn icon variant="text" size="small" density="compact" @click="adjustOffset(0.1)">
+            <v-icon icon="mdi-plus" size="20" />
+          </v-btn>
+          <v-btn
+            v-if="offsetSecs !== 0"
+            icon
+            variant="text"
+            size="small"
+            density="compact"
+            @click="resetOffset"
+          >
+            <v-icon icon="mdi-restore" size="20" />
+          </v-btn>
+        </div>
 
         <div class="controls-extra">
           <div class="eq-entry">
@@ -316,8 +339,25 @@ watch(
 .time-row { display: flex; justify-content: space-between; margin-top: 6px; font-size: var(--text-xs); color: var(--v-text-muted); }
 
 .controls {
+  position: relative;
   display: flex; align-items: center; gap: 12px; z-index: 2; flex-shrink: 0;
   width: 100%;
+}
+/* 歌词偏移步进栏：绝对定位居中于操作行，不参与两侧 flex 布局 */
+.offset-bar {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.offset-value {
+  font-size: var(--text-md);
+  color: var(--v-text-secondary);
+  min-width: 56px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
 }
 .play-btn-lg { box-shadow: var(--shadow-accent-lg); transition: transform 0.15s, box-shadow 0.15s; }
 .play-btn-lg:hover { transform: scale(1.06); }

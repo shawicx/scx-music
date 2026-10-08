@@ -8,9 +8,6 @@ const props = defineProps<{
   lines: LrcLine[]
   currentLineIndex: number
   isLoading: boolean
-  offsetSecs: number
-  adjustOffset: (delta: number) => void
-  resetOffset: () => void
   getSeekTime: (lineTime: number) => number
 }>()
 
@@ -43,11 +40,6 @@ function onClickLine(line: LrcLine) {
     emit('seek', seekTime)
   }
 }
-
-const offsetLabel = computed(() => {
-  const v = props.offsetSecs
-  return v === 0 ? '0.0s' : v > 0 ? `+${v.toFixed(1)}s` : `${v.toFixed(1)}s`
-})
 </script>
 
 <template>
@@ -72,25 +64,6 @@ const offsetLabel = computed(() => {
         </div>
         <div class="lyric-spacer" />
       </template>
-    </div>
-    <div v-if="lines.length > 0" class="offset-bar">
-      <v-btn icon variant="text" size="x-small" density="compact" @click="adjustOffset(-0.1)">
-        <v-icon icon="mdi-minus" size="16" />
-      </v-btn>
-      <span class="offset-value">{{ offsetLabel }}</span>
-      <v-btn icon variant="text" size="x-small" density="compact" @click="adjustOffset(0.1)">
-        <v-icon icon="mdi-plus" size="16" />
-      </v-btn>
-      <v-btn
-        v-if="offsetSecs !== 0"
-        icon
-        variant="text"
-        size="x-small"
-        density="compact"
-        @click="resetOffset"
-      >
-        <v-icon icon="mdi-restore" size="16" />
-      </v-btn>
     </div>
   </div>
 </template>
@@ -166,22 +139,5 @@ const offsetLabel = computed(() => {
 @keyframes skeleton-pulse {
   0%, 100% { opacity: 0.4; }
   50% { opacity: 1; }
-}
-
-.offset-bar {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  padding: 4px 8px;
-  flex-shrink: 0;
-  border-top: 1px solid rgba(var(--v-theme-on-background), 0.06);
-}
-.offset-value {
-  font-size: 12px;
-  color: var(--v-text-secondary);
-  min-width: 44px;
-  text-align: center;
-  font-variant-numeric: tabular-nums;
 }
 </style>

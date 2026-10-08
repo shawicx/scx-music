@@ -361,6 +361,7 @@ LyricsDisplay.vue
 - `useLyrics.adjustOffset(±0.1)` / `resetOffset()`：步进 0.1s，范围 ±10s（`OFFSET_MIN`/`OFFSET_MAX`）
 - 持久化走 `set_lyric_offset` 命令，直接 `UPDATE lyrics SET offset_secs`（存 lyrics 表，非 settings）
 - 写入失败静默降级——内存中的偏移仍生效
+- 偏移步进栏 UI 位于 NowPlayingOverlay 底部操作行正中（绝对定位居中，2026-09-22 从 LyricsDisplay 底部迁入；仅在有同步歌词时显示，偏移 ≠ 0 时追加重置按钮；LyricsDisplay 不再接收 offset 相关 props）
 
 ## 国际化 (i18n)
 
