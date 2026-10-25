@@ -251,10 +251,22 @@ pub fn run() {
                 }
             }
 
+            // 主窗口：直接隐藏原生标题文字并透明化标题栏背景。
+            // 仅 setTitle('') 不够——macOS 对空标题会回退绘制应用名，且个别系统
+            // 版本忽略 titleBarStyle: Overlay 的文字隐藏部分；NSWindow API 最可靠。
+            if let Some(win) = app.get_webview_window("main") {
+                hide_nswindow_title(&win);
+                // 玻璃质感正在播放层：窗口透明 + 原生 UnderWindowBackground 毛玻璃
+                // （CSS backdrop-filter 模糊不到桌面，模糊必须由原生材质完成）
+                make_nswindow_transparent(&win);
+                apply_main_window_vibrancy(&win);
+            }
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             scan_music_folder,
+            commands::window::get_titlebar_inset_height,
             audio::player_set_queue,
             audio::player_pause,
             audio::player_resume,
@@ -323,6 +335,7 @@ pub fn run() {
             commands::cache::clear_orphan_lyrics,
             commands::cache::clear_play_history,
             commands::covers::get_song_cover,
+            commands::covers::get_cover_accent,
             commands::covers::get_cover_cache_stats,
             commands::covers::clear_cover_cache,
             commands::autostart::app_get_autostart,
@@ -402,4 +415,40 @@ fn make_nswindow_transparent(win: &tauri::WebviewWindow) {
 /// 非 macOS 平台：空实现（保持调用点跨平台，避免 cfg 污染 setup 逻辑）。
 #[cfg(not(target_os = "macos"))]
 fn make_nswindow_transparent(_win: &tauri::WebviewWindow) {}
+
+/// 隐藏主窗口原生标题文字 + 透明化标题栏背景（NSWindowTitleHidden = 1）。
+/// 应用名只由侧栏 brand 呈现，避免标题栏再画一份（空标题会被系统回退成应用名）。
+#[cfg(target_os = "macos")]
+fn hide_nswindow_title(win: &tauri::WebviewWindow) {
+    use objc::runtime::Object;
+    use objc::{msg_send, sel, sel_impl};
+
+    let Ok(ptr) = win.ns_window() else { return };
+    unsafe {
+        let ns_window = ptr as *mut Object;
+        let _: () = msg_send![ns_window, setTitleVisibility: 1i64];
+        let _: () = msg_send![ns_window, setTitlebarAppearsTransparent: true];
+    }
+}
+
+/// 非 macOS 平台：空实现。
+#[cfg(not(target_os = "macos"))]
+fn hide_nswindow_title(_win: &tauri::WebviewWindow) {}
+
+/// 主窗口挂原生毛玻璃材质（NSVisualEffectView, UnderWindowBackground）：
+/// 桌面与窗口后内容被系统模糊，配合窗口透明实现玻璃质感。
+#[cfg(target_os = "macos")]
+fn apply_main_window_vibrancy(win: &tauri::WebviewWindow) {
+    use tauri::window::{Effect, EffectsBuilder};
+    let effects = EffectsBuilder::new()
+        .effect(Effect::UnderWindowBackground)
+        .build();
+    if let Err(e) = win.set_effects(Some(effects)) {
+        eprintln!("[vibrancy] set_effects failed: {e}");
+    }
+}
+
+/// 非 macOS 平台：空实现。
+#[cfg(not(target_os = "macos"))]
+fn apply_main_window_vibrancy(_win: &tauri::WebviewWindow) {}
 

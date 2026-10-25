@@ -18,11 +18,12 @@ export function useLyricsAnimation(
 
     lineElements.forEach((el, i) => {
       const distance = Math.abs(i - currentIdx)
+      // 衰减放缓（对齐原型：非当前行保持可读），色阶由行基色 --np-fg-3 提供
       let opacity: number
       if (distance === 0) opacity = 1
-      else if (distance === 1) opacity = 0.5
-      else if (distance === 2) opacity = 0.3
-      else opacity = 0.2
+      else if (distance === 1) opacity = 0.85
+      else if (distance === 2) opacity = 0.7
+      else opacity = 0.55
 
       if (distance === 0) {
         gsap.to(el, {

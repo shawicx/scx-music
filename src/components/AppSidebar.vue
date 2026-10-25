@@ -8,7 +8,7 @@ import { useI18n } from '../composables/useI18n'
 import { useImportExport } from '../composables/useImportExport'
 
 defineProps<{ activeView: string }>()
-const emit = defineEmits<{ navigate: [view: string] }>()
+const emit = defineEmits<{ navigate: [view: string]; resize: [width: number] }>()
 
 const libraryStore = useLibraryStore()
 const { showSuccess, showWarning } = useToast()
@@ -16,7 +16,9 @@ const { t } = useI18n()
 const { exportPlaylist } = useImportExport()
 
 const {
+  songs,
   playlists,
+  playlistSongs,
   activePlaylistId,
 } = storeToRefs(libraryStore)
 
@@ -29,6 +31,12 @@ const {
   setActivePlaylist,
 } = libraryStore
 
+// 'fav'（我的收藏）显示在「资料库」组，其余歌单归「歌单」组
+const customPlaylists = computed(() => playlists.value.filter((p) => p.id !== 'fav'))
+const allCount = computed(() => songs.value.length)
+const favCount = computed(() => playlistSongs.value['fav']?.length ?? 0)
+const plCount = (id: string) => playlistSongs.value[id]?.length ?? 0
+
 const showAddDialog = ref(false)
 const newPlaylistName = ref('')
 const contextMenu = ref<{ show: boolean; x: number; y: number; playlistId: string; playlistName: string }>({
@@ -39,14 +47,14 @@ const renameValue = ref('')
 const renamingPlaylistId = ref('')
 const isImporting = ref<string | null>(null)
 
-// 拖拽调整宽度
+// 拖拽调整宽度（写回 App.vue 的 --sb-w 网格列）
 const { x: mouseX } = useMouse()
 const isDragging = ref(false)
 const dragStartX = ref(0)
-const dragStartWidth = ref(200)
-const sidebarWidth = ref(200)
-const minWidth = 160
-const maxWidth = 400
+const dragStartWidth = ref(236)
+const sidebarWidth = ref(236)
+const minWidth = 208
+const maxWidth = 320
 
 function startDrag(e: MouseEvent) {
   e.preventDefault()
@@ -55,7 +63,6 @@ function startDrag(e: MouseEvent) {
   dragStartWidth.value = sidebarWidth.value
 }
 
-// 监听鼠标移动来调整宽度
 const currentWidth = computed(() => {
   if (!isDragging.value) return sidebarWidth.value
   const delta = mouseX.value - dragStartX.value
@@ -65,11 +72,11 @@ const currentWidth = computed(() => {
 function stopDrag() {
   if (isDragging.value) {
     sidebarWidth.value = currentWidth.value
+    emit('resize', sidebarWidth.value)
     isDragging.value = false
   }
 }
 
-// 监听鼠标释放
 onMounted(() => {
   document.addEventListener('mouseup', stopDrag)
 })
@@ -157,81 +164,93 @@ function handleExportPlaylist() {
 </script>
 
 <template>
-  <aside
-    class="sidebar"
-    :class="{ dragging: isDragging }"
-    :style="{ width: `${currentWidth}px` }"
-    @click="closeContextMenu"
-  >
-    <!-- 拖拽手柄 -->
+  <aside class="sidebar" :class="{ dragging: isDragging }" @click="closeContextMenu">
     <div class="resize-handle" @mousedown.stop="startDrag" />
-    <!-- Logo -->
-    <div class="sidebar-logo">
-      <span class="logo-icon"><v-icon icon="mdi-music" size="14"></v-icon></span>
-      <span class="logo-text">scx-music</span>
+
+    <!-- 品牌 -->
+    <div class="sb-brand">
+      <span class="mark"><v-icon icon="mdi-music" size="13"></v-icon></span>
+      <span class="name">scx-music</span>
     </div>
 
-    <!-- Playlists -->
-    <div class="sidebar-section">
-      <div class="section-header">
-        <span class="section-title">{{ t('sidebar.playlists') }}</span>
-        <v-btn icon size="x-small" variant="plain" density="compact" @click="showAddDialog = true">
-          <v-icon icon="mdi-plus" size="20"></v-icon>
-        </v-btn>
-      </div>
-      <v-list density="comfortable" bg-color="transparent" class="playlist-list" color="secondary">
-        <v-list-item
-          v-for="pl in playlists"
-          :key="pl.id"
-          :title="pl.name"
-          rounded="lg"
-          :active="pl.id === activePlaylistId && activeView === 'library'"
-          @click="handlePlaylistClick(pl.id)"
-          @contextmenu="handleContextMenu($event, pl)"
-        >
-          <template #append>
-            <v-progress-circular
-              v-if="isImporting === pl.id"
-              size="14"
-              width="2"
-              indeterminate
-              color="secondary"
-            />
-          </template>
-        </v-list-item>
-      </v-list>
-    </div>
+    <!-- 资料库 -->
+    <nav class="sb-group" :aria-label="t('sidebar.library')">
+      <div class="sb-group-label">{{ t('sidebar.library') }}</div>
+      <button
+        class="sb-item"
+        :aria-current="activePlaylistId === 'all' && activeView === 'library'"
+        @click="handlePlaylistClick('all')"
+      >
+        <v-icon icon="mdi-music" size="17"></v-icon>
+        <span>{{ t('sidebar.allSongs') }}</span>
+        <span class="count num">{{ allCount }}</span>
+      </button>
+      <button
+        class="sb-item"
+        :aria-current="activePlaylistId === 'fav' && activeView === 'library'"
+        @click="handlePlaylistClick('fav')"
+      >
+        <v-icon icon="mdi-heart-outline" size="17"></v-icon>
+        <span>{{ t('sidebar.favorites') }}</span>
+        <span class="count num">{{ favCount }}</span>
+      </button>
+    </nav>
 
-    <!-- Settings -->
-    <div class="sidebar-bottom">
-      <v-btn
-        block
-        variant="text"
-        prepend-icon="mdi-chart-timeline-variant"
-        :class="['settings-btn', { active: activeView === 'stats' }]"
+    <!-- 歌单 -->
+    <nav class="sb-group sb-group-playlists" :aria-label="t('sidebar.playlists')">
+      <div class="sb-group-label">{{ t('sidebar.playlists') }}</div>
+      <button
+        v-for="pl in customPlaylists"
+        :key="pl.id"
+        class="sb-item"
+        :aria-current="pl.id === activePlaylistId && activeView === 'library'"
+        @click="handlePlaylistClick(pl.id)"
+        @contextmenu="handleContextMenu($event, pl)"
+      >
+        <v-icon icon="mdi-playlist-music" size="17"></v-icon>
+        <span class="pl-name">{{ pl.name }}</span>
+        <v-progress-circular
+          v-if="isImporting === pl.id"
+          size="12"
+          width="1.5"
+          indeterminate
+          class="count"
+        />
+        <span v-else class="count num">{{ plCount(pl.id) }}</span>
+      </button>
+      <button class="sb-new" @click="showAddDialog = true">
+        <v-icon icon="mdi-plus" size="15"></v-icon>
+        <span>{{ t('sidebar.newPlaylist') }}</span>
+      </button>
+    </nav>
+
+    <!-- 底部入口 -->
+    <nav class="sb-bottom" aria-label="更多">
+      <button
+        class="sb-item"
+        :aria-current="activeView === 'stats'"
         @click="emit('navigate', 'stats')"
       >
-        {{ t('sidebar.listeningStats') }}
-      </v-btn>
-      <v-btn
-        block
-        variant="text"
-        prepend-icon="mdi-chart-bar"
-        :class="['settings-btn', { active: activeView === 'analysis' }]"
+        <v-icon icon="mdi-chart-timeline-variant" size="17"></v-icon>
+        <span>{{ t('sidebar.listeningStats') }}</span>
+      </button>
+      <button
+        class="sb-item"
+        :aria-current="activeView === 'analysis'"
         @click="emit('navigate', 'analysis')"
       >
-        {{ t('sidebar.analysis') }}
-      </v-btn>
-      <v-btn
-        block
-        variant="text"
-        prepend-icon="mdi-cog"
-        :class="['settings-btn', { active: activeView === 'settings' }]"
+        <v-icon icon="mdi-chart-bar" size="17"></v-icon>
+        <span>{{ t('sidebar.analysis') }}</span>
+      </button>
+      <button
+        class="sb-item"
+        :aria-current="activeView === 'settings'"
         @click="emit('navigate', 'settings')"
       >
-        {{ t('sidebar.settings') }}
-      </v-btn>
-    </div>
+        <v-icon icon="mdi-cog" size="17"></v-icon>
+        <span>{{ t('sidebar.settings') }}</span>
+      </button>
+    </nav>
 
     <!-- Context menu -->
     <v-menu
@@ -239,7 +258,7 @@ function handleExportPlaylist() {
       :target="[contextMenu.x, contextMenu.y]"
       :close-on-content-click="false"
     >
-      <v-list density="compact" min-width="140">
+      <v-list density="compact" min-width="150">
         <v-list-item prepend-icon="mdi-folder-open" :title="t('sidebar.importFolder')" @click="handleImport" />
         <v-list-item prepend-icon="mdi-export" :title="t('sidebar.exportPlaylist')" @click="handleExportPlaylist" />
         <v-list-item prepend-icon="mdi-playlist-remove" :title="t('sidebar.clearPlaylist')" @click="handleClearPlaylist" />
@@ -298,15 +317,23 @@ function handleExportPlaylist() {
 
 <style scoped>
 .sidebar {
-  background: var(--glass-bg);
-  backdrop-filter: blur(var(--glass-blur));
-  border-right: 1px solid var(--glass-border);
   display: flex;
   flex-direction: column;
-  padding: 16px 0;
-  flex-shrink: 0;
-  overflow-y: auto;
+  min-height: 0;
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.55);
+  backdrop-filter: blur(var(--glass-blur)) saturate(1.55);
+  border-right: var(--hairline-w) solid var(--hairline);
+  padding: 6px 10px 10px;
   position: relative;
+  z-index: 30;
+  overflow: hidden;
+}
+/* 浅色：极简实底，不用玻璃 */
+:global(.scx-light) .sidebar {
+  background: var(--surface-0);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 
 .sidebar.dragging {
@@ -315,78 +342,131 @@ function handleExportPlaylist() {
 
 .resize-handle {
   position: absolute;
-  right: 0;
+  right: -2px;
   top: 0;
   bottom: 0;
-  width: 4px;
+  width: 5px;
   cursor: col-resize;
-  transition: background-color 0.2s;
+  z-index: 5;
 }
-
 .resize-handle:hover {
-  background-color: rgb(var(--v-theme-primary));
+  background: rgb(var(--accent-rgb) / 0.35);
 }
 
-.sidebar-logo {
+.sb-brand {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 0 16px 20px;
+  gap: 9px;
+  padding: 8px 8px 14px;
+}
+/* macOS 原生标题栏在场（Overlay 被系统忽略）时无自绘标题行，侧栏从 y=0 开始，
+ * 品牌行需让开顶部 28pt 红绿灯区，落到「资料库」组上方 */
+:global(.native-mac-bar) .sb-brand {
+  padding-top: 34px;
+}
+.sb-brand .mark {
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  background: linear-gradient(135deg, var(--accent), rgb(var(--accent-rgb) / 0.55));
+  display: grid;
+  place-items: center;
+  color: var(--on-accent);
+  flex-shrink: 0;
+}
+.sb-brand .name {
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: 0.01em;
 }
 
-.logo-icon {
-  width: 28px;
-  height: 28px;
+.sb-group {
+  padding: 10px 4px 4px;
+}
+.sb-group-playlists {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+}
+.sb-group-label {
+  font-size: 10.5px;
+  font-weight: 640;
+  letter-spacing: 0.09em;
+  color: var(--text-3);
+  padding: 6px 8px;
+}
+
+.sb-item {
   display: flex;
   align-items: center;
-  justify-content: center;
-  background: var(--v-gradient-brand);
-  border-radius: 8px;
+  gap: 9px;
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: 7px;
+  color: var(--text-2);
+  font-size: 13px;
+  text-align: left;
+  transition: background 0.14s, color 0.14s;
+  cursor: pointer;
+  background: none;
+  border: none;
+  font-family: inherit;
+}
+.sb-item > :deep(.v-icon) {
+  flex-shrink: 0;
+  opacity: 0.8;
+}
+.sb-item .pl-name {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sb-item:hover {
+  background: var(--surface-2);
+  color: var(--text-1);
+}
+.sb-item[aria-current='true'] {
+  background: rgb(var(--accent-rgb) / 0.16);
+  color: var(--text-1);
+}
+.sb-item[aria-current='true'] :deep(.v-icon) {
+  color: var(--accent);
+  opacity: 1;
+}
+.sb-item .count {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--text-3);
   flex-shrink: 0;
 }
 
-.logo-text {
-  font-size: var(--text-md);
-  font-weight: 700;
-  background: var(--v-gradient-brand-text);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-}
-
-.sidebar-section {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  padding: 0 8px;
-  min-height: 0;
-}
-
-.section-header {
+.sb-new {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 4px 12px 8px;
-  font-size: 1.5rem;
+  gap: 9px;
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: 7px;
+  color: var(--text-3);
+  font-size: 12.5px;
+  margin-top: 2px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.14s, color 0.14s;
+}
+.sb-new:hover {
+  background: var(--surface-2);
+  color: var(--text-1);
 }
 
-.section-title {
-  font-weight: 600;
-  text-transform: uppercase;
-  color: var(--v-text-muted);
-  letter-spacing: 0.5px;
-}
-
-.playlist-list { padding: 0; }
-.playlist-list :deep(.v-list-item) { padding-left: 16px; }
-
-.sidebar-bottom { padding: 0 12px; }
-.settings-btn {
-  letter-spacing: 0;
-  color: var(--v-text-secondary);
-}
-.settings-btn.active {
-  color: rgb(var(--v-theme-primary));
-  background: var(--v-accent-bg);
+.sb-bottom {
+  margin-top: auto;
+  border-top: var(--hairline-w) solid var(--hairline);
+  padding-top: 6px;
 }
 </style>

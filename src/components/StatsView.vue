@@ -14,8 +14,10 @@ import {
 import { CanvasRenderer } from 'echarts/renderers'
 import VChart from 'vue-echarts'
 import { useStatsStore } from '../stores/stats'
+import { useSettingsStore } from '../stores/settings'
 import { useI18n } from '../composables/useI18n'
 import type { ListeningRange } from '../types'
+import SegControl from './common/SegControl.vue'
 import ReportTab from './ReportTab.vue'
 
 use([
@@ -26,7 +28,9 @@ use([
 
 const emit = defineEmits<{ back: [] }>()
 const statsStore = useStatsStore()
+const settingsStore = useSettingsStore()
 const { overview, topSongs, topArtists, genreDistribution, trend, heatmap, loading, currentRange, formattedTotalDuration } = storeToRefs(statsStore)
+const { accentHex, isDark } = storeToRefs(settingsStore)
 const { t } = useI18n()
 
 const activeTab = ref<'stats' | 'report'>('stats')
@@ -35,41 +39,41 @@ onMounted(() => {
   statsStore.loadData('7d')
 })
 
-const primaryColor = getComputedStyle(document.documentElement).getPropertyValue('--v-theme-primary').trim()
+// ===== 图表配色：跟随动态强调色 =====
 
-function getThemeColors() {
-  const style = getComputedStyle(document.documentElement)
-  const p = style.getPropertyValue('--v-theme-primary').trim()
-  const colors = [
-    `rgb(${p})`,
-    '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0',
-    '#9966FF', '#FF9F40', '#C9CBCF', '#7BC8A4',
-    '#E7E9ED', '#FF6B6B', '#4ECDC4', '#45B7D1',
-  ]
-  return colors
+function hexToRgbArr(hex: string): [number, number, number] {
+  const v = hex.replace('#', '')
+  return [parseInt(v.slice(0, 2), 16), parseInt(v.slice(2, 4), 16), parseInt(v.slice(4, 6), 16)]
+}
+function accentRgba(alpha: number): string {
+  const [r, g, b] = hexToRgbArr(accentHex.value)
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`
+}
+/** 单色阶梯（环形图）：accent 依序递减透明度。 */
+function monoLadder(count: number): string[] {
+  return Array.from({ length: count }, (_, i) => accentRgba(Math.max(0.18, 1 - i * 0.14)))
 }
 
-const textColor = computed(() => {
-  const style = getComputedStyle(document.documentElement)
-  return `rgb(${style.getPropertyValue('--v-theme-on-surface').trim() || '128,128,128'})`
-})
+const textColor = computed(() => (isDark.value ? 'rgba(242,242,245,0.58)' : 'rgba(29,29,31,0.64)'))
+const hairlineColor = computed(() => (isDark.value ? 'rgba(255,255,255,0.085)' : 'rgba(0,0,0,0.09)'))
 
 const topSongsOption = computed(() => {
   if (!topSongs.value.length) return {}
   const data = topSongs.value.slice().reverse()
   return {
     tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
-    grid: { left: 120, right: 20, top: 10, bottom: 20 },
-    xAxis: { type: 'value', axisLabel: { color: textColor.value } },
+    grid: { left: 130, right: 20, top: 10, bottom: 20 },
+    xAxis: { type: 'value', axisLabel: { color: textColor.value }, splitLine: { lineStyle: { color: hairlineColor.value } } },
     yAxis: {
       type: 'category',
-      data: data.map(d => `${d.title} - ${d.artist}`),
-      axisLabel: { color: textColor.value, width: 110, overflow: 'truncate', fontSize: 11 },
+      data: data.map(d => `${d.title} · ${d.artist}`),
+      axisLabel: { color: textColor.value, width: 120, overflow: 'truncate', fontSize: 11 },
+      axisLine: { lineStyle: { color: hairlineColor.value } },
     },
     series: [{
       type: 'bar',
       data: data.map(d => d.playCount),
-      itemStyle: { color: `rgb(${primaryColor})`, borderRadius: [0, 4, 4, 0] },
+      itemStyle: { color: accentHex.value, borderRadius: [0, 4, 4, 0] },
       barWidth: '60%',
     }],
   }
@@ -81,16 +85,17 @@ const topArtistsOption = computed(() => {
   return {
     tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
     grid: { left: 100, right: 20, top: 10, bottom: 20 },
-    xAxis: { type: 'value', axisLabel: { color: textColor.value } },
+    xAxis: { type: 'value', axisLabel: { color: textColor.value }, splitLine: { lineStyle: { color: hairlineColor.value } } },
     yAxis: {
       type: 'category',
       data: data.map(d => d.artist),
       axisLabel: { color: textColor.value, width: 90, overflow: 'truncate', fontSize: 11 },
+      axisLine: { lineStyle: { color: hairlineColor.value } },
     },
     series: [{
       type: 'bar',
       data: data.map(d => d.playCount),
-      itemStyle: { color: `rgb(${primaryColor})`, borderRadius: [0, 4, 4, 0] },
+      itemStyle: { color: accentHex.value, borderRadius: [0, 4, 4, 0] },
       barWidth: '60%',
     }],
   }
@@ -98,7 +103,7 @@ const topArtistsOption = computed(() => {
 
 const genreOption = computed(() => {
   if (!genreDistribution.value.length) return {}
-  const colors = getThemeColors()
+  const colors = monoLadder(genreDistribution.value.length)
   return {
     tooltip: { trigger: 'item', formatter: '{b}: {c}s ({d}%)' },
     legend: {
@@ -108,7 +113,7 @@ const genreOption = computed(() => {
     },
     series: [{
       type: 'pie',
-      radius: ['40%', '70%'],
+      radius: ['52%', '72%'],
       center: ['35%', '50%'],
       avoidLabelOverlap: false,
       label: { show: false },
@@ -130,15 +135,17 @@ const trendOption = computed(() => {
       type: 'category',
       data: trend.value.map(d => d.date),
       axisLabel: { color: textColor.value, fontSize: 10, rotate: 30 },
+      axisLine: { lineStyle: { color: hairlineColor.value } },
     },
-    yAxis: { type: 'value', axisLabel: { color: textColor.value, formatter: '{value}m' } },
+    yAxis: { type: 'value', axisLabel: { color: textColor.value, formatter: '{value}m' }, splitLine: { lineStyle: { color: hairlineColor.value } } },
     series: [{
       type: 'line',
       data: trend.value.map(d => Math.round(d.durationSecs / 60)),
       smooth: true,
-      areaStyle: { opacity: 0.3 },
-      lineStyle: { color: `rgb(${primaryColor})` },
-      itemStyle: { color: `rgb(${primaryColor})` },
+      areaStyle: { opacity: 0.16, color: accentHex.value },
+      lineStyle: { color: accentHex.value, width: 2 },
+      itemStyle: { color: accentHex.value },
+      symbolSize: 5,
     }],
   }
 })
@@ -150,6 +157,8 @@ const heatmapOption = computed(() => {
   const firstDate = data[0]?.[0]
   const lastDate = data[data.length - 1]?.[0]
   if (!firstDate || !lastDate) return {}
+  const emptyCell = isDark.value ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'
+  const cellBorder = isDark.value ? '#1b1b23' : '#f5f5f4'
   return {
     tooltip: { formatter: (p: any) => `${p.value[0]}: ${p.value[1]}min` },
     visualMap: {
@@ -160,11 +169,11 @@ const heatmapOption = computed(() => {
       left: 'center',
       top: 0,
       pieces: [
-        { min: 0, max: 0, color: '#ebedf0', label: '0' },
-        { min: 1, max: 15, color: '#9be9a8', label: '1-15' },
-        { min: 16, max: 30, color: '#40c463', label: '16-30' },
-        { min: 31, max: 60, color: '#30a14e', label: '31-60' },
-        { min: 61, color: '#216e39', label: '60+' },
+        { min: 0, max: 0, color: emptyCell, label: '0' },
+        { min: 1, max: 15, color: accentRgba(0.25), label: '1-15' },
+        { min: 16, max: 30, color: accentRgba(0.45), label: '16-30' },
+        { min: 31, max: 60, color: accentRgba(0.7), label: '31-60' },
+        { min: 61, color: accentRgba(1), label: '60+' },
       ],
       textStyle: { color: textColor.value, fontSize: 10 },
     },
@@ -176,7 +185,7 @@ const heatmapOption = computed(() => {
       range: [firstDate, lastDate],
       cellSize: ['auto', 14],
       splitLine: { show: false },
-      itemStyle: { borderWidth: 3, borderColor: '#fff' },
+      itemStyle: { borderWidth: 3, borderColor: cellBorder, color: emptyCell },
       yearLabel: { show: false },
       dayLabel: { firstDay: 1, color: textColor.value, fontSize: 10 },
       monthLabel: { color: textColor.value, fontSize: 10 },
@@ -189,148 +198,166 @@ const heatmapOption = computed(() => {
   }
 })
 
-function switchRange(range: ListeningRange) {
-  statsStore.loadData(range)
+function switchRange(range: string | number) {
+  statsStore.loadData(range as ListeningRange)
 }
 </script>
 
 <template>
   <div class="stats-view">
-    <div class="stats-header">
-      <v-btn icon variant="plain" size="small" @click="emit('back')">
-        <v-icon icon="mdi-arrow-left" size="20" />
-      </v-btn>
-      <h2 class="stats-title">{{ t('stats.title') }}</h2>
+    <!-- 页头：返回 + 衬线标题 + 分页 + 时间范围 -->
+    <div class="page-head">
+      <button class="ph-back" :aria-label="t('common.back')" @click="emit('back')">
+        <v-icon icon="mdi-chevron-left" size="18"></v-icon>
+      </button>
+      <h1 class="ph-title">{{ t('stats.title') }}</h1>
+      <div class="page-tools">
+        <SegControl
+          v-model="activeTab"
+          :options="[
+            { value: 'stats', label: t('stats.title') },
+            { value: 'report', label: t('report.tab') },
+          ]"
+          :aria-label="t('stats.title')"
+        />
+        <SegControl
+          v-if="activeTab === 'stats'"
+          :model-value="currentRange"
+          :options="[
+            { value: '7d', label: t('stats.last7days') },
+            { value: '30d', label: t('stats.last30days') },
+            { value: 'all', label: t('stats.all') },
+          ]"
+          :aria-label="t('stats.all')"
+          @update:model-value="switchRange"
+        />
+      </div>
     </div>
 
-    <v-tabs v-model="activeTab" density="compact" color="primary" class="stats-tabs">
-      <v-tab value="stats">{{ t('stats.title') }}</v-tab>
-      <v-tab value="report">{{ t('report.tab') }}</v-tab>
-    </v-tabs>
+    <div v-if="activeTab === 'stats'" class="statpage">
+      <div v-if="loading" class="loading-state">
+        <v-progress-circular indeterminate color="primary" size="32" />
+        <span>{{ t('stats.loadingStats') }}</span>
+      </div>
 
-    <v-window v-model="activeTab" class="stats-window">
-      <v-window-item value="stats">
-        <div class="range-selector">
-          <v-btn-toggle v-model="currentRange" mandatory density="compact" variant="outlined" divided @update:model-value="switchRange">
-            <v-btn value="7d" size="small">{{ t('stats.last7days') }}</v-btn>
-            <v-btn value="30d" size="small">{{ t('stats.last30days') }}</v-btn>
-            <v-btn value="all" size="small">{{ t('stats.all') }}</v-btn>
-          </v-btn-toggle>
+      <template v-else-if="overview">
+        <!-- 概览数字格 -->
+        <div class="ov">
+          <div class="ov-cell">
+            <b class="num">{{ overview.playCount.toLocaleString() }}</b>
+            <span>{{ t('stats.playCount') }}</span>
+          </div>
+          <div class="ov-cell">
+            <b class="num">{{ formattedTotalDuration }}</b>
+            <span>{{ t('stats.totalDuration') }}</span>
+          </div>
+          <div class="ov-cell">
+            <b class="num">{{ overview.genreCount }}</b>
+            <span>{{ t('stats.genresListened') }}</span>
+          </div>
+          <div class="ov-cell">
+            <b class="num">{{ overview.artistCount }}</b>
+            <span>{{ t('stats.artistsListened') }}</span>
+          </div>
         </div>
 
-        <div v-if="loading" class="loading-state">
-          <v-progress-circular indeterminate color="primary" size="32" />
-          <span>{{ t('stats.loadingStats') }}</span>
-        </div>
-
-        <template v-else-if="overview">
-          <!-- Overview Cards -->
-          <div class="overview-grid">
-            <div class="stat-card">
-              <div class="stat-label">{{ t('stats.playCount') }}</div>
-              <div class="stat-value">{{ overview.playCount.toLocaleString() }}</div>
-              <div class="stat-unit">{{ t('stats.times') }}</div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-label">{{ t('stats.totalDuration') }}</div>
-              <div class="stat-value">{{ formattedTotalDuration }}</div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-label">{{ t('stats.genresListened') }}</div>
-              <div class="stat-value">{{ overview.genreCount }}</div>
-              <div class="stat-unit">{{ t('stats.kinds') }}</div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-label">{{ t('stats.artistsListened') }}</div>
-              <div class="stat-value">{{ overview.artistCount }}</div>
-              <div class="stat-unit">{{ t('stats.artists') }}</div>
-            </div>
-          </div>
-
-          <!-- Charts Grid -->
-          <div class="charts-grid">
-            <v-card class="chart-card" variant="flat" color="surface">
-              <div class="card-header">
-                <span class="card-title">{{ t('stats.topSongs') }}</span>
-              </div>
-              <VChart v-if="topSongs.length" :option="topSongsOption" autoresize style="height: 320px" />
-              <div v-else class="empty-chart">{{ t('stats.emptyState') }}</div>
-            </v-card>
-
-            <v-card class="chart-card" variant="flat" color="surface">
-              <div class="card-header">
-                <span class="card-title">{{ t('stats.topArtists') }}</span>
-              </div>
-              <VChart v-if="topArtists.length" :option="topArtistsOption" autoresize style="height: 320px" />
-              <div v-else class="empty-chart">{{ t('stats.emptyState') }}</div>
-            </v-card>
-
-            <v-card class="chart-card" variant="flat" color="surface">
-              <div class="card-header">
-                <span class="card-title">{{ t('stats.genreDistribution') }}</span>
-              </div>
-              <VChart v-if="genreDistribution.length" :option="genreOption" autoresize style="height: 320px" />
-              <div v-else class="empty-chart">{{ t('stats.emptyState') }}</div>
-            </v-card>
-
-            <v-card class="chart-card" variant="flat" color="surface">
-              <div class="card-header">
-                <span class="card-title">{{ t('stats.trend') }}</span>
-              </div>
-              <VChart v-if="trend.length" :option="trendOption" autoresize style="height: 320px" />
-              <div v-else class="empty-chart">{{ t('stats.emptyState') }}</div>
-            </v-card>
-          </div>
-
-          <!-- Heatmap -->
-          <v-card class="chart-card" variant="flat" color="surface">
-            <div class="card-header">
-              <span class="card-title">{{ t('stats.heatmap') }}</span>
-            </div>
-            <VChart v-if="heatmap.length" :option="heatmapOption" autoresize style="height: 200px" />
+        <!-- 图表 -->
+        <div class="charts2">
+          <div class="chart">
+            <h4>{{ t('stats.topSongs') }}</h4>
+            <VChart v-if="topSongs.length" :option="topSongsOption" autoresize class="chart-canvas" />
             <div v-else class="empty-chart">{{ t('stats.emptyState') }}</div>
-          </v-card>
-        </template>
-
-        <div v-else class="empty-state">
-          <p>{{ t('stats.emptyState') }}</p>
+          </div>
+          <div class="chart">
+            <h4>{{ t('stats.topArtists') }}</h4>
+            <VChart v-if="topArtists.length" :option="topArtistsOption" autoresize class="chart-canvas" />
+            <div v-else class="empty-chart">{{ t('stats.emptyState') }}</div>
+          </div>
+          <div class="chart">
+            <h4>{{ t('stats.genreDistribution') }}</h4>
+            <VChart v-if="genreDistribution.length" :option="genreOption" autoresize class="chart-canvas" />
+            <div v-else class="empty-chart">{{ t('stats.emptyState') }}</div>
+          </div>
+          <div class="chart">
+            <h4>{{ t('stats.trend') }}</h4>
+            <VChart v-if="trend.length" :option="trendOption" autoresize class="chart-canvas" />
+            <div v-else class="empty-chart">{{ t('stats.emptyState') }}</div>
+          </div>
         </div>
-      </v-window-item>
 
-      <v-window-item value="report">
-        <ReportTab />
-      </v-window-item>
-    </v-window>
+        <div class="chart">
+          <h4>{{ t('stats.heatmap') }}</h4>
+          <VChart v-if="heatmap.length" :option="heatmapOption" autoresize style="height: 200px" />
+          <div v-else class="empty-chart">{{ t('stats.emptyState') }}</div>
+        </div>
+      </template>
+
+      <div v-else class="empty-state">
+        <p>{{ t('stats.emptyState') }}</p>
+      </div>
+    </div>
+
+    <div v-else class="statpage">
+      <ReportTab />
+    </div>
   </div>
 </template>
 
 <style scoped>
 .stats-view {
-  padding: 32px;
-  overflow-y: auto;
   height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
-.stats-header {
+/* 页头 */
+.page-head {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  padding: 20px 28px 0;
+  flex-shrink: 0;
+}
+.ph-back {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  margin-bottom: 4px;
+  display: grid;
+  place-items: center;
+  color: var(--text-2);
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+.ph-back:hover {
+  background: var(--surface-2);
+  color: var(--text-1);
+}
+.ph-title {
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 560;
+  line-height: 1.15;
+  color: var(--text-1);
+}
+.page-tools {
+  margin-left: auto;
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 16px;
+  gap: 10px;
+  padding-bottom: 4px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
-.stats-title {
-  font-size: var(--text-xl);
-  font-weight: 700;
-  color: rgb(var(--v-theme-on-background));
+.statpage {
   flex: 1;
-}
-
-.stats-tabs {
-  margin-bottom: 16px;
-}
-
-.range-selector {
-  margin-bottom: 16px;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 14px 28px 28px;
 }
 
 .loading-state,
@@ -340,74 +367,74 @@ function switchRange(range: ListeningRange) {
   align-items: center;
   gap: 12px;
   padding: 64px 0;
-  color: rgb(var(--v-theme-on-surface));
-  font-size: var(--text-sm);
+  color: var(--text-3);
+  font-size: 12.5px;
 }
 
-.overview-grid {
+/* 概览数字格 */
+.ov {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 12px;
-  margin-bottom: 20px;
-}
-
-.stat-card {
-  background: rgb(var(--v-theme-surface));
-  border-radius: 12px;
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  text-align: center;
-}
-
-.stat-label {
-  font-size: var(--text-xs);
-  color: rgb(var(--v-theme-on-surface));
-}
-
-.stat-value {
-  font-size: var(--text-lg);
-  font-weight: 700;
-  color: rgb(var(--v-theme-on-background));
-}
-
-.stat-unit {
-  font-size: var(--text-xs);
-  color: rgb(var(--v-theme-on-surface));
-}
-
-.charts-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 16px;
   margin-bottom: 16px;
 }
-
-.chart-card {
-  padding: 16px;
+.ov-cell {
+  border: var(--hairline-w) solid var(--hairline);
   border-radius: 12px;
+  padding: 14px 8px 12px;
+  text-align: center;
+}
+.ov-cell b {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 560;
+  line-height: 1.25;
+  color: var(--text-1);
+}
+.ov-cell span {
+  font-size: 11px;
+  color: var(--text-3);
+  margin-top: 3px;
+  display: block;
 }
 
-.card-header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 8px;
+/* 图表卡片 */
+.charts2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
 }
-
-.card-title {
-  font-size: var(--text-md);
-  font-weight: 600;
+.chart {
+  border: var(--hairline-w) solid var(--hairline);
+  border-radius: 12px;
+  padding: 14px 16px 12px;
+  margin-bottom: 14px;
 }
-
+.chart h4 {
+  font-size: 12.5px;
+  font-weight: 640;
+  margin-bottom: 12px;
+  color: var(--text-1);
+}
+.chart-canvas {
+  height: 300px;
+}
 .empty-chart {
-  height: 320px;
+  height: 300px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: rgb(var(--v-theme-on-surface));
-  font-size: var(--text-sm);
+  color: var(--text-3);
+  font-size: 12.5px;
+}
+
+@media (max-width: 960px) {
+  .charts2 {
+    grid-template-columns: 1fr;
+  }
+  .ov {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 </style>

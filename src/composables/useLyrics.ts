@@ -28,13 +28,22 @@ export function useLyrics(currentSong: Ref<Song | null>) {
   async function fetchLyrics(song: Song) {
     isLoading.value = true
     try {
-      const result = await invoke<LyricsResult | null>('get_lyrics', {
+      const invokeP = invoke<LyricsResult | null>('get_lyrics', {
         songId: song.id,
         filePath: song.filePath,
         title: song.title,
         artist: song.artist,
         durationSecs: song.durationSecs,
       })
+      // 兜底超时：LRCLIB 网络挂住时 8s 后先放行 UI（显示暂无歌词），
+      // 真实结果晚到时若仍是同一首歌则补填歌词
+      const timeoutP = new Promise<null>((resolve) => setTimeout(() => resolve(null), 8000))
+      void invokeP.then((late) => {
+        if (late?.rawLrc && currentSong.value?.id === song.id && !isLoading.value) {
+          lines.value = parseLrc(late.rawLrc)
+        }
+      })
+      const result = await Promise.race([invokeP, timeoutP])
       if (result && result.rawLrc) {
         rawLrc.value = result.rawLrc
         source.value = result.source

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { usePlayerStore } from '../stores/player'
 import { useLibraryStore } from '../stores/library'
@@ -7,10 +7,9 @@ import { useAudioEffectsStore } from '../stores/audioEffects'
 import { usePlaybackMode } from '../composables/usePlaybackMode'
 import { useI18n } from '../composables/useI18n'
 import { useLyrics } from '../composables/useLyrics'
-import { getCoverUrl } from '../composables/useCoverArt'
+import { useMiniPlayer } from '../composables/useMiniPlayer'
 import LyricsDisplay from './LyricsDisplay.vue'
-import PulseDots from './common/PulseDots.vue'
-import IconButtonWithTooltip from './IconButtonWithTooltip.vue'
+import AppSlider from './common/AppSlider.vue'
 import CoverArt from './player/CoverArt.vue'
 
 const emit = defineEmits<{ close: []; toggleQueue: [] }>()
@@ -27,7 +26,8 @@ const eqPanelOpen = ref(false)
 function onEqToggle(v: boolean | null) {
   if (v !== null) setEnabled(v)
 }
-const { modeIcon, modeLabel, isModeActive, cycleMode } = usePlaybackMode()
+const { playbackMode, toggleShuffle, cycleRepeat } = usePlaybackMode()
+const { enter: enterMini } = useMiniPlayer()
 
 const {
   currentSong,
@@ -65,132 +65,111 @@ async function toggleLike() {
 }
 
 const progressModel = computed({
-  get: () => duration.value > 0 ? (progress.value / duration.value) * 100 : 0,
-  set: (val: number) => { if (duration.value > 0) seek((val / 100) * duration.value) },
+  get: () => (duration.value > 0 ? (progress.value / duration.value) * 100 : 0),
+  set: (val: number) => {
+    if (duration.value > 0) seek((val / 100) * duration.value)
+  },
 })
 
 function onLyricSeek(time: number) {
   seek(time)
 }
 
-// 歌词偏移步进（底部操作栏中央，仅有同步歌词时显示）
+// 歌词偏移步进（仅有同步歌词时显示，悬浮于控制面板上方）
 const offsetLabel = computed(() => {
   const v = offsetSecs.value
   return v === 0 ? '0.0s' : v > 0 ? `+${v.toFixed(1)}s` : `${v.toFixed(1)}s`
 })
 
-// 沉浸背景：与 CoverArt 共享 useCoverArt 的缓存/inflight，不会重复 IPC
-const bgUrl = ref<string | null>(null)
-watch(
-  () => currentSong.value?.id,
-  async (id) => {
-    bgUrl.value = null
-    if (!id) return
-    const url = await getCoverUrl(id)
-    if (currentSong.value?.id === id) bgUrl.value = url
-  },
-  { immediate: true },
+// 播放模式双按钮状态
+const shuffleOn = computed(() => playbackMode.value === 'shuffle')
+const repeatLabel = computed(() =>
+  playbackMode.value === 'repeat_one'
+    ? t('playbackMode.repeatOne')
+    : playbackMode.value === 'repeat_all'
+      ? t('playbackMode.repeatAll')
+      : t('playbackMode.off'),
 )
-
 </script>
 
 <template>
-  <div class="overlay">
-    <div class="bg-layer" :class="{ 'has-cover': !!bgUrl }">
-      <img v-if="bgUrl" :src="bgUrl" class="bg-img" alt="" />
-      <div class="bg-dim" />
-      <div class="vignette" />
+  <section class="np" role="dialog" aria-modal="true" :aria-label="t('player.nowPlaying')">
+    <!-- 顶栏 -->
+    <div class="np-top">
+      <button class="np-glass-btn close-btn" :aria-label="t('player.collapse')" @click="emit('close')">
+        <v-icon icon="mdi-chevron-down" size="18"></v-icon>
+      </button>
+      <button class="np-glass-btn" :aria-label="t('player.playQueue')" @click.stop="emit('toggleQueue')">
+        <v-icon icon="mdi-playlist-music-outline" size="16"></v-icon>
+      </button>
     </div>
 
-    <div class="mode-status-bar" v-if="isModeActive">
-      <div class="status-item">
-        <v-icon :icon="modeIcon" size="14" color="secondary"></v-icon>
-        <span>{{ modeLabel }}</span>
+    <!-- 主体：左封面 / 右信息 + 歌词 -->
+    <div class="np-body">
+      <div class="cover-column">
+        <CoverArt :song-id="currentSong?.id" class="np-cover" />
       </div>
-    </div>
-    <v-btn variant="text" size="small" class="close-btn" @click="emit('close')">
-      <v-icon icon="mdi-chevron-down" size="18"></v-icon>
-      {{ t('player.collapse') }}
-    </v-btn>
-
-    <div class="content">
-      <div class="main-row">
-        <div class="cover-column">
-          <CoverArt :song-id="currentSong?.id" class="hero-cover" />
-        </div>
-        <div class="lyrics-column">
-          <div class="song-header">
-            <div class="song-title">{{ currentSong?.title ?? t('player.notPlaying') }}</div>
-            <div class="song-artist-row">
-              <span class="song-artist">{{ currentSong ? `${currentSong.artist} · ${currentSong.album}` : '--' }}</span>
-              <PulseDots v-if="isPlaying && currentSong" :size="7" :gap="5" />
-            </div>
-          </div>
-          <LyricsDisplay
-            :lines="lines"
-            :current-line-index="currentLineIndex"
-            :is-loading="isLoading"
-            :get-seek-time="getSeekTime"
-            @seek="onLyricSeek"
-          />
-        </div>
-      </div>
-
-      <div class="progress-section">
-        <v-slider
-          v-model="progressModel"
-          :max="100"
-          :step="0.1"
-          hide-details
-          density="compact"
-          color="secondary"
-          track-color="surface-variant"
-          class="progress-slider"
+      <div class="lyrics-column">
+        <div class="np-eyebrow">{{ currentSong ? `${t('library.album')} · ${currentSong.album}` : '' }}</div>
+        <h1 class="np-title">{{ currentSong?.title ?? t('player.notPlaying') }}</h1>
+        <div class="np-artist">{{ currentSong?.artist ?? '' }}</div>
+        <LyricsDisplay
+          :lines="lines"
+          :current-line-index="currentLineIndex"
+          :is-loading="isLoading"
+          :get-seek-time="getSeekTime"
+          @seek="onLyricSeek"
         />
-        <div class="time-row">
-          <span>{{ formatTime(progress) }}</span>
-          <span>{{ formatTime(duration) }}</span>
-        </div>
       </div>
+    </div>
 
-      <div class="controls">
-        <v-btn icon variant="plain" :class="{ muted: !isModeActive }" @click="cycleMode">
-          <v-icon :icon="modeIcon"></v-icon>
-        </v-btn>
-        <v-btn icon variant="plain" @click="previous">
-          <v-icon icon="mdi-skip-previous"></v-icon>
-        </v-btn>
-        <v-btn icon size="x-large" color="secondary" elevation="8" class="play-btn-lg" @click="togglePlayPause">
-          <v-icon size="large" :icon="isPlaying ? 'mdi-pause' : 'mdi-play'" color="white"></v-icon>
-        </v-btn>
-        <v-btn icon variant="plain" @click="next">
-          <v-icon icon="mdi-skip-next"></v-icon>
-        </v-btn>
-        <v-btn icon variant="plain" :disabled="!currentSong" @click="toggleLike">
-          <v-icon :icon="isLiked ? 'mdi-heart' : 'mdi-heart-outline'" :color="isLiked ? 'secondary' : undefined"></v-icon>
-        </v-btn>
-
-        <div v-if="lines.length > 0" class="offset-bar">
-          <v-btn icon variant="text" size="small" density="compact" @click="adjustOffset(-0.1)">
-            <v-icon icon="mdi-minus" size="20" />
-          </v-btn>
-          <span class="offset-value">{{ offsetLabel }}</span>
-          <v-btn icon variant="text" size="small" density="compact" @click="adjustOffset(0.1)">
-            <v-icon icon="mdi-plus" size="20" />
-          </v-btn>
-          <v-btn
-            v-if="offsetSecs !== 0"
-            icon
-            variant="text"
-            size="small"
-            density="compact"
-            @click="resetOffset"
+    <!-- 底部玻璃控制面板 -->
+    <div class="np-panel">
+      <div class="np-progress progress-section">
+        <span class="np-time num">{{ formatTime(progress) }}</span>
+        <AppSlider
+          v-model="progressModel"
+          variant="line"
+          class="np-slider"
+          :fill-style="{ background: 'var(--np-panel-fg)' }"
+          :aria-label="t('player.play')"
+          :disabled="!currentSong"
+        />
+        <span class="np-time num">{{ formatTime(duration) }}</span>
+      </div>
+      <div class="np-mid controls">
+        <button
+          class="np-icobtn"
+          :class="{ on: isLiked }"
+          :aria-label="isLiked ? t('player.unlike') : t('player.addToFavorite')"
+          :disabled="!currentSong"
+          @click="toggleLike"
+        >
+          <v-icon :icon="isLiked ? 'mdi-heart' : 'mdi-heart-outline'" size="18"></v-icon>
+        </button>
+        <div class="np-transport">
+          <button
+            class="np-icobtn"
+            :class="{ on: shuffleOn }"
+            :aria-label="t('playbackMode.shuffle')"
+            @click="toggleShuffle"
           >
-            <v-icon icon="mdi-restore" size="20" />
-          </v-btn>
+            <v-icon icon="mdi-shuffle" size="17"></v-icon>
+          </button>
+          <button class="np-icobtn" :aria-label="t('player.previous')" @click="previous">
+            <v-icon icon="mdi-skip-previous" size="22"></v-icon>
+          </button>
+          <button class="np-play-main" :aria-label="t('player.play')" :disabled="!currentSong" @click="togglePlayPause">
+            <v-icon :icon="isPlaying ? 'mdi-pause' : 'mdi-play'" size="20"></v-icon>
+          </button>
+          <button class="np-icobtn" :aria-label="t('player.next')" @click="next">
+            <v-icon icon="mdi-skip-next" size="22"></v-icon>
+          </button>
+          <button class="np-icobtn" :class="{ on: playbackMode !== 'sequential' && playbackMode !== 'shuffle' }" :aria-label="repeatLabel" @click="cycleRepeat">
+            <v-icon :icon="playbackMode === 'repeat_one' ? 'mdi-repeat-once' : 'mdi-repeat'" size="17"></v-icon>
+          </button>
         </div>
-
-        <div class="controls-extra">
+        <div class="np-panel-right">
           <div class="eq-entry">
             <div v-if="eqPanelOpen" class="eq-backdrop" @click="eqPanelOpen = false" />
             <Transition name="eq-pop">
@@ -200,7 +179,7 @@ watch(
                   <v-switch
                     :model-value="eqEnabled"
                     density="compact"
-                    color="secondary"
+                    color="primary"
                     hide-details
                     :aria-label="t('settings.eq.enabled')"
                     @update:model-value="onEqToggle"
@@ -223,155 +202,325 @@ watch(
                 </button>
               </div>
             </Transition>
-            <IconButtonWithTooltip
-              icon="mdi-tune-variant"
-              :tooltip="t('settings.eq.title')"
-              size="small"
-              @click.stop="eqPanelOpen = !eqPanelOpen"
-            />
+            <button class="np-icobtn" :aria-label="t('settings.eq.title')" @click.stop="eqPanelOpen = !eqPanelOpen">
+              <v-icon icon="mdi-tune-variant" size="17"></v-icon>
+            </button>
           </div>
-          <IconButtonWithTooltip
-            icon="mdi-playlist-music-outline"
-            :tooltip="t('player.playlist')"
-            size="small"
-            @click.stop="emit('toggleQueue')"
-          />
+          <button class="np-icobtn" :aria-label="t('miniPlayer.enter')" @click="enterMini">
+            <v-icon icon="mdi-picture-in-picture-top-right" size="17"></v-icon>
+          </button>
         </div>
       </div>
+
+      <!-- 歌词偏移步进条：面板内居中一行 -->
+      <div v-if="lines.length > 0" class="offset-bar">
+        <button aria-label="-0.1s" @click="adjustOffset(-0.1)">
+          <v-icon icon="mdi-minus" size="18" />
+        </button>
+        <span class="offset-value num">{{ offsetLabel }}</span>
+        <button aria-label="+0.1s" @click="adjustOffset(0.1)">
+          <v-icon icon="mdi-plus" size="18" />
+        </button>
+        <button v-if="offsetSecs !== 0" :aria-label="t('lyrics.resetOffset')" @click="resetOffset">
+          <v-icon icon="mdi-restore" size="18" />
+        </button>
+      </div>
     </div>
-  </div>
+  </section>
 </template>
 
 <style scoped>
-.overlay {
-  position: absolute; inset: 0;
-  background: rgb(var(--v-theme-background)); /* 无封面回退底色 */
-  display: flex; flex-direction: column; align-items: center;
-  z-index: 20; overflow: hidden;
-}
-
-/* ===== 沉浸背景层 ===== */
-.bg-layer {
-  position: absolute; inset: 0;
-  pointer-events: none;
-  z-index: 0;
-}
-.bg-img {
-  width: 100%; height: 100%;
-  object-fit: cover;
-  transform: scale(1.2); /* blur 边缘露白补偿 */
-  filter: blur(60px);
-}
-/* 暗化遮罩：保证前景可读性，深浅两档 */
-.bg-dim {
-  position: absolute; inset: 0;
-  background: rgb(var(--v-theme-background));
-  opacity: 0.35;
-}
-:global(.v-theme--dark) .bg-layer.has-cover .bg-dim { opacity: 0.45; }
-/* 主题色 vignette：仅暗色模式，浅色极简无装饰背景 */
-.vignette {
-  position: absolute; inset: 0;
-  background: radial-gradient(ellipse at center top, rgb(var(--v-theme-primary) / 0.12), transparent 60%);
-}
-:global(.v-theme--light) .vignette { display: none; }
-
-/* 顶部悬浮件须高于 .content（同 z-index 时 DOM 靠后的 .content padding 区会盖住点击） */
-.close-btn { position: absolute; top: 16px; left: 20px; z-index: 3; color: var(--v-text-secondary); }
-.mode-status-bar { position: absolute; top: 16px; right: 20px; z-index: 3; }
-.status-item {
-  display: flex; align-items: center; gap: 6px;
-  padding: 6px 12px;
-  background: rgb(var(--v-theme-surface-variant) / 0.3);
-  border-radius: 16px; font-size: var(--text-xs); color: var(--v-text-secondary);
-}
-
-/* ===== 主内容 ===== */
-.content {
-  position: relative; z-index: 2;
-  width: 100%; max-width: 960px; flex: 1;
-  display: flex; flex-direction: column;
-  padding: 56px 32px 32px;
-  min-height: 0;
-}
-
-.main-row {
-  flex: 1;
+/* ===== 沉浸层 ===== */
+.np {
+  position: absolute;
+  inset: 0;
+  z-index: 60;
   display: flex;
-  align-items: stretch;
-  gap: 48px;
-  min-height: 0;
+  flex-direction: column;
+  /* 玻璃底：窗口透明 + 原生 UnderWindowBackground 毛玻璃（lib.rs），
+   * 此处只铺半透明着色，桌面从背后透出 */
+  background: var(--glass-bg);
+  overflow: hidden;
+  /* 沉浸层文字色（浅色主题为深色文字，遮罩相应变浅）。
+   * fg-3 给到 0.55：非活跃行叠加 spotlight 距离衰减后仍需可读 */
+  --np-fg: #ffffff;
+  --np-fg-2: rgba(255, 255, 255, 0.72);
+  --np-fg-3: rgba(255, 255, 255, 0.55);
+  --np-panel-bg: rgba(22, 22, 30, 0.44);
+  --np-panel-border: rgba(255, 255, 255, 0.12);
+  --np-panel-fg: #ffffff;
+  --np-play-bg: #ffffff;
+  --np-play-fg: #16161d;
+}
+:global(.scx-light) .np {
+  background: rgba(240, 240, 238, 0.55); /* 浅色玻璃着色 */
+  --np-fg: #1d1d1f;
+  --np-fg-2: rgba(29, 29, 31, 0.68);
+  --np-fg-3: rgba(29, 29, 31, 0.55);
+  --np-panel-bg: rgba(255, 255, 255, 0.6);
+  --np-panel-border: rgba(0, 0, 0, 0.08);
+  --np-panel-fg: #1d1d1f;
+  --np-play-bg: #1d1d1f;
+  --np-play-fg: #ffffff;
 }
 
-.cover-column {
+/* ===== 顶栏 ===== */
+.np-top {
+  position: relative;
+  z-index: 2;
+  height: 56px;
   flex-shrink: 0;
   display: flex;
   align-items: center;
+  gap: 8px;
+  padding: 0 18px 0 20px;
 }
-.hero-cover {
-  width: min(38vw, 380px);
-  height: min(38vw, 380px);
-  border-radius: var(--radius-xl);
-  box-shadow: 0 16px 48px rgb(0 0 0 / 0.35);
+.np-glass-btn {
+  margin-left: auto;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  color: var(--np-fg-2);
+  background: rgb(255 255 255 / 0.07);
+  border: 1px solid rgb(255 255 255 / 0.1);
+  cursor: pointer;
+}
+.np-glass-btn + .np-glass-btn {
+  margin-left: 0;
+}
+.np-glass-btn:hover {
+  background: rgb(255 255 255 / 0.15);
+  color: var(--np-fg);
+}
+:global(.scx-light) .np-glass-btn {
+  background: rgb(255 255 255 / 0.55);
+  border-color: rgb(0 0 0 / 0.08);
+}
+:global(.scx-light) .np-glass-btn:hover {
+  background: rgb(255 255 255 / 0.8);
 }
 
-.lyrics-column {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-}
-.song-header { flex-shrink: 0; margin-bottom: 8px; }
-.song-title {
-  font-size: var(--text-2xl); font-weight: 600;
-  color: rgb(var(--v-theme-on-background)); margin-bottom: 6px;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.song-artist-row { display: flex; align-items: center; gap: 10px; }
-.song-artist {
-  font-size: var(--text-md); color: var(--v-text-secondary);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.lyrics-column :deep(.lyrics-container) { flex: 1; min-height: 0; }
-
-.progress-section { width: 100%; z-index: 2; flex-shrink: 0; }
-.time-row { display: flex; justify-content: space-between; margin-top: 6px; font-size: var(--text-xs); color: var(--v-text-muted); }
-
-.controls {
+/* ===== 主体 =====
+ * flex 行布局：封面列定宽、歌词列占满剩余高度（stretch + min-height:0），
+ * 歌词容器 flex 0 1 auto——内容少时整块垂直居中，多时收缩为内部滚动区 */
+.np-body {
   position: relative;
-  display: flex; align-items: center; gap: 12px; z-index: 2; flex-shrink: 0;
+  z-index: 2;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  /* 不设 align-items:center——stretch 才能让歌词列继承有界高度（center 下列高=内容高，长歌词溢出） */
+  gap: clamp(28px, 5vw, 72px);
+  padding: clamp(6px, 1.6vh, 16px) clamp(28px, 6vw, 84px);
+  max-width: 1160px;
   width: 100%;
+  margin: 0 auto;
 }
-/* 歌词偏移步进栏：绝对定位居中于操作行，不参与两侧 flex 布局 */
-.offset-bar {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
+.cover-column {
+  flex: 0 1 380px;
+  min-width: 240px;
+  align-self: center;
   display: flex;
   align-items: center;
-  gap: 4px;
 }
-.offset-value {
-  font-size: var(--text-md);
-  color: var(--v-text-secondary);
-  min-width: 56px;
-  text-align: center;
-  font-variant-numeric: tabular-nums;
+.cover-column .np-cover {
+  width: 100%;
+  aspect-ratio: 1;
+  /* height:auto 必须压过 CoverArt 内部的 height:100%（列被 stretch 拉满时会变长方形），
+   * 故用两级选择器提高优先级；圆角按需求去除 */
+  height: auto;
+  border-radius: 0;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5), 0 4px 18px rgba(0, 0, 0, 0.35);
 }
-.play-btn-lg { box-shadow: var(--shadow-accent-lg); transition: transform 0.15s, box-shadow 0.15s; }
-.play-btn-lg:hover { transform: scale(1.06); }
-.muted { opacity: 0.5; }
-.controls-extra {
-  margin-left: auto;
-  display: flex; align-items: center; gap: var(--space-sm);
+.np-eyebrow {
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  font-weight: 620;
+  color: var(--np-fg-2);
+  text-transform: uppercase;
+}
+.np-title {
+  font-family: var(--font-display);
+  font-size: clamp(30px, 4.2vw, 52px);
+  font-weight: 540;
+  line-height: 1.12;
+  letter-spacing: 0.005em;
+  margin-top: 10px;
+  color: var(--np-fg);
+  text-shadow: 0 2px 26px rgba(0, 0, 0, 0.25);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+:global(.scx-light) .np-title {
+  text-shadow: none;
+}
+.np-artist {
+  font-size: 15px;
+  color: var(--np-fg-2);
+  margin-top: 8px;
+}
+/* 高度约束链：np-body(flex:1 有界, stretch) → lyrics-column(占满列高) →
+ * lyrics-container(flex 0 1 auto：短内容居中、长内容收缩) → lyrics-display(overflow 滚动)。
+ * 歌词绝不越过底部控制面板。 */
+.lyrics-column {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.lyrics-column :deep(.lyrics-container) {
+  flex: 0 1 auto;
+  min-height: 0;
+  margin-top: clamp(16px, 3vh, 32px);
 }
 
-/* ===== 音效快捷入口 ===== */
-.eq-entry { position: relative; display: flex; align-items: center; }
+/* ===== 底部玻璃控制面板 ===== */
+.np-panel {
+  position: relative;
+  z-index: 2;
+  flex-shrink: 0;
+  margin: 0 auto clamp(16px, 3vh, 32px);
+  width: min(620px, calc(100% - 48px));
+  border-radius: 18px;
+  padding: 14px 20px 16px;
+  background: var(--np-panel-bg);
+  /* 背景已是 Canvas 预模糊的平滑图，backdrop-filter 无视觉增益，故不再使用 */
+  border: 1px solid var(--np-panel-border);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 18px 50px rgba(0, 0, 0, 0.4);
+}
+:global(.scx-light) .np-panel {
+  box-shadow: 0 18px 50px rgba(20, 20, 24, 0.16);
+}
+.np-progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.np-slider {
+  flex: 1;
+}
+.np-time {
+  font-size: 11px;
+  color: var(--np-fg-2);
+  min-width: 36px;
+}
+.np-mid {
+  display: grid;
+  grid-template-columns: 44px 1fr auto;
+  align-items: center;
+  margin-top: 6px;
+}
+.np-transport {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+.np-icobtn {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  color: var(--np-fg-2);
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.np-icobtn:hover {
+  background: rgb(255 255 255 / 0.12);
+  color: var(--np-fg);
+}
+:global(.scx-light) .np-icobtn:hover {
+  background: rgb(0 0 0 / 0.06);
+}
+.np-icobtn.on {
+  color: var(--np-accent, var(--np-fg));
+}
+.np-icobtn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.np-play-main {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--np-play-bg);
+  color: var(--np-play-fg);
+  display: grid;
+  place-items: center;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.35);
+  transition: transform 0.16s var(--ease), filter 0.16s;
+}
+.np-play-main:hover:not(:disabled) {
+  transform: scale(1.05);
+}
+.np-play-main:active:not(:disabled) {
+  transform: scale(0.95);
+}
+.np-play-main:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.np-panel-right {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  justify-self: end;
+}
+
+/* ===== 歌词偏移步进条：面板内居中一行（不再浮在歌词上方） ===== */
+.offset-bar {
+  margin: 8px auto 0;
+  width: fit-content;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 8px;
+  border-radius: 99px;
+  background: rgb(255 255 255 / 0.06);
+  border: 1px solid var(--np-panel-border);
+}
+.offset-bar button {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: var(--np-fg-2);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+.offset-bar button:hover {
+  background: rgb(255 255 255 / 0.12);
+  color: var(--np-fg);
+}
+.offset-value {
+  font-size: 12px;
+  color: var(--np-fg-2);
+  min-width: 48px;
+  text-align: center;
+}
+
+/* ===== 音效快捷面板 ===== */
+.eq-entry {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
 .eq-backdrop {
-  position: fixed; inset: 0; z-index: 4;
-  /* 透明点击层：点面板外关闭 */
+  position: fixed;
+  inset: 0;
+  z-index: 4;
 }
 .eq-panel {
   position: absolute;
@@ -383,11 +532,12 @@ watch(
   display: flex;
   flex-direction: column;
   gap: 4px;
-  background: rgb(var(--v-theme-surface) / 0.96);
-  border: 1px solid var(--v-border-color);
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(24px) saturate(1.5);
+  backdrop-filter: blur(24px) saturate(1.5);
+  border: 1px solid var(--glass-border);
   border-radius: 12px;
-  box-shadow: 0 12px 32px rgb(0 0 0 / 0.35);
-  backdrop-filter: blur(12px);
+  box-shadow: var(--shadow-pop);
 }
 .eq-panel-header {
   display: flex;
@@ -396,58 +546,82 @@ watch(
   margin-bottom: 6px;
 }
 .eq-panel-title {
-  font-size: var(--text-sm);
-  font-weight: 600;
-  color: rgb(var(--v-theme-on-background));
+  font-size: 12px;
+  font-weight: 640;
+  color: var(--text-1);
 }
 .eq-preset {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  padding: 8px 10px;
+  padding: 7px 10px;
   border-radius: 8px;
   border: 1px solid transparent;
   background: transparent;
   cursor: pointer;
   transition: border-color 0.15s, background 0.15s;
-  color: rgb(var(--v-theme-on-background));
-  font-size: var(--text-sm);
+  color: var(--text-1);
+  font-size: 12px;
+  font-family: inherit;
   text-align: left;
 }
-.eq-preset:hover { background: var(--v-accent-bg); }
+.eq-preset:hover {
+  background: var(--surface-2);
+}
 .eq-preset.active {
-  border-color: rgb(var(--v-theme-secondary) / 0.6);
-  background: rgb(var(--v-theme-secondary) / 0.12);
+  border-color: var(--accent);
+  background: rgb(var(--accent-rgb) / 0.08);
   font-weight: 600;
 }
-.eq-preset-name { white-space: nowrap; }
+.eq-preset-name {
+  white-space: nowrap;
+}
 /* 迷你 EQ 曲线：0dB=8px，±12dB→-4..20px（下限 2px） */
 .eq-preset-curve {
-  display: flex; align-items: center; gap: 2px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
   flex: 0 0 auto;
 }
 .eq-preset-curve i {
   width: 3px;
   border-radius: 1.5px;
-  background: rgb(var(--v-theme-secondary) / 0.45);
+  background: var(--text-3);
 }
-.eq-preset.active .eq-preset-curve i { background: rgb(var(--v-theme-secondary)); }
+.eq-preset.active .eq-preset-curve i {
+  background: var(--accent);
+}
 
-.eq-pop-enter-active, .eq-pop-leave-active {
+.eq-pop-enter-active,
+.eq-pop-leave-active {
   transition: opacity 0.18s ease, transform 0.18s ease;
 }
-.eq-pop-enter-from, .eq-pop-leave-to {
+.eq-pop-enter-from,
+.eq-pop-leave-to {
   opacity: 0;
   transform: translateY(6px);
 }
 
-/* ===== 窄屏：<880px 纵向排列 ===== */
+/* ===== 窄屏纵向排列 ===== */
 @media (max-width: 880px) {
-  .main-row { flex-direction: column; align-items: center; gap: 16px; overflow-y: auto; }
-  .hero-cover { width: 200px; height: 200px; }
-  .lyrics-column { width: 100%; align-items: center; }
-  .song-header { text-align: center; }
-  .song-title, .song-artist-row { justify-content: center; }
+  .np-body {
+    flex-direction: column;
+    align-items: center;
+    gap: 22px;
+    padding: 0 24px;
+    overflow-y: auto;
+  }
+  .cover-column {
+    flex: 0 0 auto;
+  }
+  .np-cover {
+    max-width: 230px;
+  }
+  .lyrics-column {
+    flex: 0 1 auto;
+    width: 100%;
+    text-align: left;
+  }
 }
 </style>

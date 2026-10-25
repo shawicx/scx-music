@@ -1,17 +1,22 @@
 # 前端结构
 
+> **2026-10-22 UI 改版**：按「原生 macOS 材质 + 编辑式排版」原型整体重构。设计语言：中性表面分层（`--surface-0..3`）+ 1px 发丝线（`--hairline`）、衬线展示标题（`--font-display`，系统衬线栈零字体加载）、玻璃仅三处（暗色侧栏 / 正在播放控制面板 / 浮层）、封面动态取色驱动 `--accent` CSS 变量组。设计令牌在 `src/styles/tokens.css`（明暗两套），共享表格样式 `src/styles/song-table.css`（含 `eq-indicator.css` EQ 指示器）。
+
 ## 页面结构
 
-- **App.vue** - 根组件，侧边栏 + 主区域布局，负责初始化 Store 和事件监听
+- **App.vue** - 根组件，CSS Grid 骨架 `236px 1fr / 44px 1fr 64px`（areas: tb/sb/main/pb）：AppTitlebar + AppSidebar + 主区 + **PlayerBar（所有视图常驻底行）**；NowPlayingOverlay 挂 app 层（任意视图可展开）；onMounted 启动 `startCoverAccentWatcher()` 封面动态取色。标题栏挂载条件 `isMac && !hasNativeMacBar`：onMounted 先调 `get_titlebar_inset_height` 探测系统是否真正吃进 `titleBarStyle: Overlay`（个别系统版本如 macOS 26 beta 会静默忽略 Overlay，原生标题栏照常占位），原生栏在场时给 .app-shell 加 `no-titlebar` 收起自绘标题行并清空窗口标题（`setTitle('')` + `document.title = ''`，后者必须做——wry 会把 webview 标题同步回窗口标题，只 setTitle 会被 index.html 的 `<title>` 复活）；Windows 按 UA 判断同样收起
+- **AppTitlebar.vue** - macOS overlay 标题栏（44px 拖拽区，红绿灯左侧让位；tauri.conf main 窗口 `titleBarStyle: "Overlay"`，仅在系统真正生效时挂载，见 App.vue 探测）。拖拽用 `@mousedown` 显式调 `getCurrentWindow().startDragging()`（`data-tauri-drag-region` 只在 mousedown 命中属性元素本身时生效，被子元素挡住的区域全失效）；不绘制标题文字——应用名只由侧栏 brand 呈现。原生标题文字由 lib.rs setup 里 `hide_nswindow_title()`（NSWindow `setTitleVisibility:1` + `setTitlebarAppearsTransparent`）无条件隐藏：仅 `setTitle('')` 不够，macOS 对空标题会回退绘制应用名，且 JS 清空可能被 webview 标题同步复活。原生栏在场时 .app-shell 额外挂 `native-mac-bar` 类，AppSidebar 品牌行 `padding-top: 34px` 下移到红绿灯区之下（侧栏从 y=0 开始，品牌否则与红绿灯重叠）
 - **LibraryView.vue** - 音乐库主视图
-- **PlayerBar.vue** - 底部播放控制条（播放控制 + 进度条 + 音量；右侧功能区含迷你播放器/桌面歌词/队列/睡眠定时器入口；48px 真实封面走 CoverArt，无封面回退渐变）
-- **PlayQueueDrawer.vue** - 播放队列右侧抽屉（GSAP Flip 重排动画、当前歌曲高亮、模式切换）
-- **SettingsView.vue** - 设置页面
-- **AnalysisView.vue** - 曲库分析（概览卡片 + ECharts 图表 + 排行列表）
-- **StatsView.vue** - 听歌统计（双 Tab：`统计`=概览卡片+最爱歌曲/歌手排行+流派分布+播放趋势+年度热力图；`报告`=基于自然周期的听歌总结）
-- **NowPlayingOverlay.vue** - 正在播放覆盖层（2026-08-27 重设计：沉浸式布局——左侧静态方形大封面 + 右侧歌词（复用 LyricsDisplay）+ 封面模糊沉浸背景（blur(60px) + 主题分档暗化遮罩，无封面回退纯色 + vignette）；<880px 窄屏纵向排列；控制区含队列入口（emit toggleQueue → App.vue 切 PlayQueueDrawer）。**2026-09-19 起频谱前端展示已移除，无频谱入口**）
-- **LyricsDisplay.vue** - 歌词显示组件（LRC 解析、同步滚动、点击跳转）
-- **player/CoverArt.vue** - 封面组件（songId → useCoverArt blob URL；加载态/渐变回退/淡入切换；PlayerBar 48px 与全屏页大封面复用，尺寸由父级 CSS 控制）
+- **PlayerBar.vue** - 底部播放控制条（64px 三段式：左 290px 封面+元信息+心形 / 中 走带+2px 进度线（AppSlider）/ 右 290px 桌面歌词/队列/迷你/睡眠定时+音量组；36px 圆形 accent 播放键；播放模式拆为 shuffle + repeat 双按钮，repeat 循环 关→列表循环→单曲循环）
+- **PlayQueueDrawer.vue** - 播放队列右侧抽屉（340px 玻璃化；GSAP Flip 重排动画、当前歌曲 EQ 指示、模式切换）
+- **SettingsView.vue** - 设置页面（衬线页头 + 自绘 tabbar + 发丝线分组卡片）
+- **AnalysisView.vue** - 曲库分析（概览衬线数字格 + ECharts 图表（accent 单色阶梯）+ 专辑排行横条）
+- **StatsView.vue** - 听歌统计（双 Tab：`统计`=概览+最爱歌曲/歌手+流派环形+播放趋势+热力图（accent 单色阶梯）；`报告`=基于自然周期的听歌总结；tab/范围切换用 SegControl）
+- **NowPlayingOverlay.vue** - 正在播放沉浸层（全屏：封面 blur(64px) 背景 + accent 径向 tint；左大封面/右 eyebrow+衬线大标题+歌词；底部玻璃控制面板（白色 44px 播放键）；EQ 快捷面板与歌词偏移步进条保留；GSAP usePlayerExpand 进出场）。歌词列必须 `height: 100%` 有界（np-body → lyrics-column → lyrics-container → lyrics-display 滚动链），否则列高被内容撑开、歌词平铺沉到控制面板下方
+- **LyricsDisplay.vue** - 歌词显示组件（LRC 解析、同步滚动、点击跳转；14.5px 行 + 20px 衬线当前行，颜色走 `--np-fg*` 变量适配沉浸层明暗）
+- **player/CoverArt.vue** - 封面组件（songId → useCoverArt blob URL；无封面回退 accent 16% 着色底；尺寸由父级 CSS 控制）
+- **common/AppSlider.vue** - 自定义滑杆（3px track、hover 增粗、thumb 悬停浮现、pointer capture、键盘可达；`line`/`mini` 变体；进度/音量/迷你顶部进度线共用，替代 v-slider）
+- **common/SegControl.vue** - 分段控件（曲库浏览方式/显示方式/统计 tab/时间范围等共用）
 
 ### 独立窗口根组件
 - **App.vue** - 主窗口根（侧边栏 + 主区域 + PlayerBar）
@@ -105,13 +110,23 @@
 ### stores/settings.ts - 设置和主题管理 (useSettingsStore)
 
 **关键状态：**
-- `colorName` - 主题颜色
+- `colorName` - 主题颜色（六色回退）
 - `mode` - 主题模式 (light/dark/system)
 - `isDark` - 当前是否深色模式 (计算属性)
+- `dynamicColor` - 封面动态取色开关（设置键 `dynamic_color`，默认开启）
+- `accentHex` - 当前生效强调色（hex，ECharts 等非 CSS 场景读取）
+- `coverAccent` - 封面提取的原始 HSL（null = 回退）
 
 **IPC 封装：**
-- `loadThemeFromDb()` -> `get_setting`
-- `setColorTheme()` / `setMode()` -> `set_setting`
+- `loadThemeFromDb()` -> `get_setting`（含 theme_color/theme_mode/dynamic_color）
+- `setColorTheme()` / `setMode()` / `setDynamicColor()` -> `set_setting`
+
+**动态取色机制（2026-10-22 新增）：**
+- Rust 端 `get_cover_accent(songId)` 提取封面主色 HSL（36 色相桶 × 3 明度档饱和度加权直方图，进程内缓存）
+- `startCoverAccentWatcher()`（App.vue onMounted）watch `currentSong.id` → 取色 → `setCoverAccent`
+- `applyAccent` 按明暗钳制（s 0.34–0.72；l 暗色 0.55–0.66 / 浅色 0.34–0.44）后写 CSS 变量 `--accent/--accent-rgb/--on-accent/--np-accent/--amb-1/--amb-2`，并热更新 Vuetify current theme 的 `primary` 与 `accent-bg`（v-switch/v-slider 自动跟随）
+- 低饱和（s < 0.13）/无封面回退六色主题（同样钳制）
+- 跨窗口广播 `app:accent-changed`（预计算值 payload），独立 webview 用 `applyAccentBroadcast()` 直接写 CSS 变量（MiniPlayer 已接入）
 
 ### stores/analysis.ts - 曲库分析 (useAnalysisStore)
 
@@ -136,29 +151,33 @@
 - `loadData(range?)` -> `stats_dashboard`（统计 Tab 单次聚合加载 overview + 排行 + 分布 + 趋势 + 热力图，`topLimit: 10`）
 
 **主题系统：**
-- 使用 Vuetify 3.x 主题系统
-- 支持 6 种主题颜色：青色、靛蓝、蓝色、深紫、红色、琥珀
-- 支持 3 种主题模式：浅色、深色、跟随系统
+- 使用 Vuetify 4.0 主题系统（6 色 × 明暗双模式静态枚举 + 运行时 primary 热更新）
+- 支持 6 种主题颜色（回退）：青色 #009688 / 靛蓝 #3F51B5 / 蓝色 #2196F3 / 深紫 #673AB7 / 红色 #E53935 / 琥珀 #F2A900
+- 支持 3 种主题模式：浅色（极简实底）、深色（玻璃材质）、跟随系统
+- **封面动态取色**：当前播放歌曲封面主色驱动 `--accent` 变量组与 Vuetify primary（详见 stores/settings.ts 小节）；曲库界面保持中性，accent 只作用于播放体验
+- 中性表面：暗色 `#131318/#1b1b23/#23232e/#2a2a37`、浅色 `#ececea/#f5f5f4/rgba(0,0,0,.045)/#fff`（tokens.css `--surface-0..3`）
+- **令牌挂载点是 `<html>` 上的 `scx-dark`/`scx-light` 标记类**（useTheme 的 watch 按 isDark 切换），不是 Vuetify 主题类——Vuetify 类名是 `v-theme--{主题键名}`（如 `v-theme--teal-dark`），并非 `v-theme--dark`；组件浅色覆盖一律写 `:global(.scx-light) .foo`；迷你播放器窗口经 `app:accent-changed` 负载的 `dark` 字段同步标记类
+- 分段控件/Tab 激活态：暗色 `rgba(255,255,255,0.1)` 浮起 + 字重 600 + 投影，浅色纯白浮起（SegControl.vue / SettingsView.vue tabbar / settings-card.css mode-toggle 三处一致）
 - 系统主题检测通过 VueUse 的 `usePreferredDark` 实现
-- 数据库持久化用户偏好
-- 旧主题设置自动迁移
+- 数据库持久化用户偏好；旧主题设置自动迁移
 
 **主题配置位置：**
-- `plugins/vuetify.ts` - Vuetify 主题定义和颜色配置
-- 12 种主题变体（6 颜色 × 2 模式）
+- `plugins/vuetify.ts` - Vuetify 主题定义（中性表面 + 六色回退；Material 渐变/发光 variables 已移除）
+- `styles/tokens.css` - 设计令牌（表面/发丝线/文字/玻璃/字体/间距/圆角 + JS 动态写入组）
+- 12 种主题变体（6 颜色 × 2 模式）+ 运行时 primary 覆盖
 
 ## 组件结构
 
 ### 主要组件
-- **AppSidebar.vue** - 侧边栏导航
-- **LibraryView.vue** - 音乐库主容器
+- **AppSidebar.vue** - 侧边栏导航（默认 236px 可拖拽 208–320；「资料库」组（全部歌曲 `'all'` 虚拟歌单 + 我的收藏 `'fav'`）+「歌单」组（可滚动、右键菜单、新建/重命名对话框）+ 底部入口（统计/分析/设置）；暗色玻璃、浅色实底；宽度经 resize 事件写回 App.vue 的 `--sb-w` 网格列）
+- **LibraryView.vue** - 音乐库主容器（'all' 虚拟歌单标题映射；likedIds 传递 + toggleLike 处理）
 - **PlayerBar.vue** - 底部播放控制（toggleQueue 事件触发 PlayQueueDrawer）
 - **PlayQueueDrawer.vue** - 播放队列抽屉（GSAP Flip 列表重排动画、点击歌曲播放、模式切换按钮）
-- **SettingsView.vue** - 设置页面（容器，tab 切换：外观/音频/桌面歌词/快捷键/数据管理/启动；2026-06-21 D2 拆分后 621→118 行）
-- **AnalysisView.vue** - 曲库分析（5 概览卡片 + 4 ECharts 图表 + 专辑排行列表）
-- **NowPlayingOverlay.vue** - 正在播放覆盖层
+- **SettingsView.vue** - 设置页面（容器，衬线页头 + 自绘 tabbar 切换：外观/音频/桌面歌词/快捷键/数据管理/启动）
+- **AnalysisView.vue** - 曲库分析（5 概览衬线数字格 + 4 ECharts 图表（accent 单色阶梯配色）+ 专辑排行横条）
+- **NowPlayingOverlay.vue** - 正在播放沉浸层
 - **LyricsDisplay.vue** - 歌词显示（同步滚动、点击跳转、骨架屏加载态）
-- **IconButtonWithTooltip.vue** - 通用图标按钮 + Tooltip 组件
+- **IconButtonWithTooltip.vue** - 通用图标按钮 + Tooltip 组件（active 时加 `ib-active` 类供样式定制）
 
 ### ReportTab.vue
 
@@ -166,26 +185,26 @@
 
 **依赖**: `useListeningReport` composable
 **功能**:
-- 周期选择器（周/月/年 + offset 翻页 + 进行中标记）
-- 4 张概览卡（时长/次数/独立歌曲/艺术家）
-- 24 小时听歌时段分布柱状图（ECharts，按 4 时段配色）
+- 周期选择器（周/月/年 SegControl + offset 翻页 + 进行中标记）
+- 4 张概览数字格（时长/次数/独立歌曲/艺术家）
+- 24 小时听歌时段分布柱状图（ECharts，accent 单色）
 - 峰值时段洞察标签（夜猫子/早起鸟/通用模板）
 
 ### Library 子组件 (components/library/)
-- **BrowseCards.vue** - 浏览卡片视图（专辑/艺术家网格）
-- **EmptyStates.vue** - 空状态提示组件
-- **LibraryHeader.vue** - 库头部工具栏（搜索、显示模式切换）
+- **BrowseCards.vue** - 浏览视图（专辑 = gcard 封面网格（真实封面 + hover 玻璃播放钮）；艺术家 = 圆头像行列表；card 数据含 sampleSongId 供 CoverArt 取封面）
+- **EmptyStates.vue** - 空状态（衬线标题 + 安静文案）
+- **LibraryHeader.vue** - 库头部（编辑式：衬线大标题 + 元信息行（N 首 · 约 X 分钟）+ 自定义搜索框 + SegControl 浏览/显示方式切换 + 排序按钮；钻取时左侧返回）
 - **RenameDialog.vue** - 歌曲重命名对话框（标题必填、艺术家、专辑可选，loading/error 状态，Enter 提交）
 - **UpdateDialog.vue** - 自动更新提示弹窗（available/downloading/ready/error 四状态，进度条，重启按钮）
-- **SongGrid.vue** - 歌曲网格视图（小数据量）
-- **SongTable.vue** - 歌曲表格视图（门面组件，内部按 `songs.length > 100` 自动委托 VirtualSongTable；2026-06-21 D1 合并后由 LibraryView 单一引用）
+- **SongGrid.vue** - 歌曲网格（gcard：正方形真实封面 + hover 播放钮 + 名称/副标题；当前项 accent）
+- **SongTable.vue** - 歌曲表格门面（发丝线 46px 行：# 列（当前行 EQ 动效）/标题两行/专辑/心形（hover 浮现）/时长；共享样式 `styles/song-table.css`；内部按 `songs.length > 100` 自动委托 VirtualSongTable；行内右键菜单 + toggleLike 事件）
 - **SortMenu.vue** - 排序菜单（标题/艺术家/专辑/时长排序）
-- **VirtualSongTable.vue** - 虚拟滚动表格（大数据优化，>100首歌；现为 SongTable 内部委托组件，不再被 LibraryView 直接引用）
+- **VirtualSongTable.vue** - 虚拟滚动表格（行高 46px、sticky 表头，大数据 >100 首；与 SongTable 共享 song-table.css）
 
 ### Settings 子组件 (components/settings/)
 
 SettingsView.vue 是容器（tab 切换），6 个 tab 各委托一个子组件（2026-06-21 D2 拆分；2026-06-29 新增启动 tab）：
-- `AppearanceSettings.vue` — 外观（语言/主题模式/主题颜色）
+- `AppearanceSettings.vue` — 外观（语言/主题模式/主题颜色六色板 + **专辑封面动态配色开关**）
 - `AudioDeviceSettings.vue` — 音频输出设备（依赖 `useAudioDevice` composable）
 - `AudioEffectSettings.vue` — 音效 EQ 预设（启用开关 + 预设单选网格 + 迷你 EQ 曲线；依赖 `useAudioEffectsStore`，2026-09-21 新增）
 - `DesktopLyricsSettings.vue` — 桌面歌词配置（bgOpacity/fontSize/colorCurrent/colorNext/glowStrength/锁定）
@@ -228,7 +247,7 @@ SettingsView.vue 是容器（tab 切换），6 个 tab 各委托一个子组件�
 - **composables/useTheme.ts** - 主题核心逻辑（Store 的实际实现，含 useColorTheme + useThemeMode）
 - **composables/useToast.ts** - Toast 通知封装（全局消息提示）
 - **composables/useI18n.ts** - 国际化封装（语言初始化、切换、持久化）
-- **composables/usePlaybackMode.ts** - 播放模式切换（cycleMode 后调用 regenerateQueue 重新生成队列）
+- **composables/usePlaybackMode.ts** - 播放模式切换（`cycleMode` 四态循环；另有双按钮 UI 用的 `toggleShuffle`（shuffle 独立开关）/ `cycleRepeat`（关→列表循环→单曲循环）/ `setPlaybackMode` 原子设置；变更后 regenerateQueue 重新生成队列）
 - **composables/useAudioEffects.ts** - EQ 音效管理（init 启动恢复 eq_preset/eq_enabled、switchPreset/setEnabled 实时生效并持久化；薄 Store 包装 `stores/audioEffects.ts`；App.vue onMounted 并行 init，2026-09-21 新增。全屏播放页有快捷入口：NowPlayingOverlay 控制区 mdi-tune-variant 按钮弹出预设面板）
 - **composables/usePlayQueue.ts** - 播放队列生成（Fisher-Yates 洗牌、模式映射：sequential/repeat_all=原序、repeat_one=仅当前歌曲、shuffle=洗牌后当前歌曲排首位）
 - **composables/useLyrics.ts** - 歌词获取 + LRC 解析 + 同步跟踪（listen promise 加 await，防卸载竞态泄漏）
@@ -430,7 +449,9 @@ common / sidebar / library / player / lyrics / miniPlayer / settings / playbackM
 
 ## 迷你播放器窗口（Mini Player Window）
 
-独立 Tauri 窗口（label: `mini-player`），与主窗口互斥切换。无边框、置顶、固定尺寸，提供极简播放控制（封面 + 标题/艺术家 + 上一首/播放暂停/下一首 + 置顶 + 展开 + 关闭）。
+独立 Tauri 窗口（label: `mini-player`），与主窗口互斥切换。无边框、置顶、固定尺寸（360×120），极简卡片式：顶部全宽 2px 进度线（AppSlider line 变体，兼拖拽区）+ 主行（52px 真实封面 CoverArt + 标题/`艺术家 · 时间/总长` + 上一首/32px accent 播放键/下一首）+ hover 右上角窗口控件（置顶/展开/关闭）。
+
+**动态强调色同步**：MiniPlayer 监听 `app:accent-changed` 事件，用 `applyAccentBroadcast()` 直接写 CSS 变量（独立 webview 有自己的 Vuetify 实例，不走主窗口热更新链路）。
 
 ### 文件结构
 
@@ -467,3 +488,11 @@ common / sidebar / library / player / lyrics / miniPlayer / settings / playbackM
 6. **歌词同步** - composables/useLyrics.ts 进度驱动歌词行匹配
 7. **数据导入导出** - composables/useImportExport.ts 歌单导出、备份恢复、设置迁移
 8. **自动更新** - composables/useAutoUpdate.ts 启动时延迟检查更新，用户确认后下载安装，UpdateDialog 显示进度和状态
+
+## 已知平台问题：macOS beta WKWebView 合成器卡死
+
+症状：整个 webview 画面冻结在陈旧/扁平色块（沉浸层只剩模糊底、所有文字不绘制），但 DOM 完全健康（元素几何/opacity 正常、JS 可执行）。页面 reload 不恢复，仅重启应用恢复；非确定性复现、与具体 CSS/GSAP/布局无关（同代码多实例表现不一）。排查时曾用「Rust 侧轮询 eval + settings 表回传」建立无 DevTools 的 webview 检查通道确认 DOM 健康，最终定位为系统 beta 的 GPU 合成问题，非应用代码缺陷。遇到时重启应用即可。
+
+缓解措施（2026-10-23）：全窗口 CSS `blur(64px)` 与沉浸层面板/按钮的 `backdrop-filter` 已全部移除——这是此类合成故障的最大嫌疑触发面，且 blur(64px) 本身 GPU 开销大。沉浸背景为**玻璃质感**（用户要求）：主窗口 `transparent: true` + lib.rs 给主窗口 `make_nswindow_transparent` + `apply_main_window_vibrancy`（NSVisualEffectView UnderWindowBackground，桌面从背后被原生模糊——CSS backdrop-filter 模糊不到桌面，必须原生材质）；`.np` 只铺半透明着色（暗 `--glass-bg` / 浅 rgba(240,240,238,.55)）。np 打开期间 body 挂 `np-glass` 类使 html→v-application→app-shell 全链透明，主界面表面（侧栏/主区/播放条）`v-show` 隐藏，after-leave 后才恢复（避免退场动画期间闪回）。封面 `.np-cover` 正方形无圆角（`height:auto` 需两级选择器压过 CoverArt 内部 `height:100%`）；歌词偏移步进条收进控制面板内部（居中一行），不再浮于歌词上方。
+
+歌词可读性与布局（2026-10-23）：非活跃行 18px / 活跃行 26px 衬线；沉浸层 `--np-fg-3` 提到 55%、spotlight 衰减放缓（1/0.85/0.7/0.55，色阶由行基色提供）；`get_lyrics` 加 8s 兜底超时（LRCLIB 挂住时先显示暂无歌词，晚到结果自动补填）。歌词列高度约束用 **flex 链**：np-body 为 flex 行（此前 grid 的 `height:100%` 在 auto 行不解析→列被内容撑高、歌词溢出到面板外）。⚠️ np-body 不能设 `align-items:center`——cross 轴 center 会让歌词列高=内容高、stretch 失效（长歌词再次溢出）；垂直居中由封面列 `align-self:center` + 歌词列自身 `justify-content:center` 承担。歌词容器 `flex:0 1 auto` + 歌词滚动容器 `flex:1 1 auto; min-height:0`（缺 min-height:0 时 flex 子项下限=内容全高，同样溢出；basis 用 auto 而非 0，否则短歌词时容器塌缩为 0）——短内容整块垂直居中、长内容内部滚动；`.lyrics-display` 必须 `position:relative`（scrollToCurrent 的 offsetTop 以最近定位祖先为基准，锚点落在外层 .np-body 会每次多滚一个头部高度、把歌词推到面板外）。

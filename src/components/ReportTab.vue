@@ -1,16 +1,21 @@
 <script setup lang="ts">
 import { onMounted, computed } from 'vue'
+import { storeToRefs } from 'pinia'
 import { use } from 'echarts/core'
 import { BarChart } from 'echarts/charts'
 import { GridComponent, TooltipComponent } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
 import VChart from 'vue-echarts'
 import { useListeningReport } from '../composables/useListeningReport'
+import { useSettingsStore } from '../stores/settings'
 import { useI18n } from '../composables/useI18n'
+import SegControl from './common/SegControl.vue'
 
 use([BarChart, GridComponent, TooltipComponent, CanvasRenderer])
 
 const { t } = useI18n()
+const settingsStore = useSettingsStore()
+const { accentHex, isDark } = storeToRefs(settingsStore)
 const {
   periodState,
   overview,
@@ -25,27 +30,16 @@ const {
   loadReport,
   shiftPeriod,
   setKind,
-  TIME_SLOTS,
 } = useListeningReport()
 
 onMounted(() => {
   loadReport()
 })
 
-const primaryColor = getComputedStyle(document.documentElement)
-  .getPropertyValue('--v-theme-primary')
-  .trim()
-
-const textColor = computed(() => {
-  const style = getComputedStyle(document.documentElement)
-  return `rgb(${style.getPropertyValue('--v-theme-on-surface').trim() || '128,128,128'})`
-})
+const textColor = computed(() => (isDark.value ? 'rgba(242,242,245,0.58)' : 'rgba(29,29,31,0.64)'))
+const hairlineColor = computed(() => (isDark.value ? 'rgba(255,255,255,0.085)' : 'rgba(0,0,0,0.09)'))
 
 const hourlyOption = computed(() => {
-  const slotColor = (hour: number) => {
-    const slot = TIME_SLOTS.find(s => hour >= s.range[0] && hour <= s.range[1])
-    return slot?.color || primaryColor
-  }
   return {
     tooltip: {
       trigger: 'axis',
@@ -61,6 +55,7 @@ const hourlyOption = computed(() => {
       type: 'category',
       data: hourlyDistribution.value.map(h => String(h.hour)),
       axisLabel: { color: textColor.value, fontSize: 10 },
+      axisLine: { lineStyle: { color: hairlineColor.value } },
     },
     yAxis: {
       type: 'value',
@@ -69,14 +64,14 @@ const hourlyOption = computed(() => {
         formatter: '{value}m',
         fontSize: 10,
       },
-      splitLine: { lineStyle: { color: 'rgba(128,128,128,0.15)' } },
+      splitLine: { lineStyle: { color: hairlineColor.value } },
     },
     series: [
       {
         type: 'bar',
         data: hourlyDistribution.value.map(h => ({
           value: Math.round(h.durationSecs / 60),
-          itemStyle: { color: slotColor(h.hour), borderRadius: [3, 3, 0, 0] },
+          itemStyle: { color: accentHex.value, borderRadius: [3, 3, 0, 0] },
         })),
         barWidth: '70%',
       },
@@ -109,47 +104,29 @@ const hasData = computed(
 
 <template>
   <div class="report-tab">
-    <!-- Period Selector -->
+    <!-- 周期选择 + 期次导航 -->
     <div class="period-bar">
-      <div class="period-kind">
-        <v-btn-toggle
-          :model-value="periodState.kind"
-          mandatory
-          density="compact"
-          variant="outlined"
-          divided
-          @update:model-value="setKind($event as any)"
-        >
-          <v-btn value="week" size="small">{{ t('report.week') }}</v-btn>
-          <v-btn value="month" size="small">{{ t('report.month') }}</v-btn>
-          <v-btn value="year" size="small">{{ t('report.year') }}</v-btn>
-        </v-btn-toggle>
-      </div>
+      <SegControl
+        :model-value="periodState.kind"
+        :options="[
+          { value: 'week', label: t('report.week') },
+          { value: 'month', label: t('report.month') },
+          { value: 'year', label: t('report.year') },
+        ]"
+        :aria-label="t('report.tab')"
+        @update:model-value="setKind($event as any)"
+      />
       <div class="period-nav">
-        <v-btn
-          icon
-          variant="plain"
-          size="small"
-          :disabled="!canGoForward"
-          @click="shiftPeriod(1)"
-        >
-          <v-icon icon="mdi-chevron-left" size="22" />
-        </v-btn>
-        <div class="period-label">
+        <button class="nav-btn" :disabled="!canGoForward" :aria-label="t('common.back')" @click="shiftPeriod(1)">
+          <v-icon icon="mdi-chevron-left" size="20"></v-icon>
+        </button>
+        <div class="period-label num">
           {{ periodLabel }}
-          <span v-if="isInProgress" class="in-progress-tag">
-            {{ t('report.inProgress') }}
-          </span>
+          <span v-if="isInProgress" class="in-progress-tag">{{ t('report.inProgress') }}</span>
         </div>
-        <v-btn
-          icon
-          variant="plain"
-          size="small"
-          :disabled="periodState.offset >= 0"
-          @click="shiftPeriod(-1)"
-        >
-          <v-icon icon="mdi-chevron-right" size="22" />
-        </v-btn>
+        <button class="nav-btn" :disabled="periodState.offset >= 0" :aria-label="t('common.next')" @click="shiftPeriod(-1)">
+          <v-icon icon="mdi-chevron-right" size="20"></v-icon>
+        </button>
       </div>
     </div>
 
@@ -158,48 +135,43 @@ const hasData = computed(
     </div>
 
     <template v-else-if="hasData">
-      <!-- Overview Cards -->
-      <div class="overview-grid">
-        <div class="stat-card">
-          <div class="stat-label">{{ t('report.totalDuration') }}</div>
-          <div class="stat-value">{{ formattedTotalDuration }}</div>
+      <!-- 概览数字格 -->
+      <div class="ov">
+        <div class="ov-cell">
+          <b class="num">{{ formattedTotalDuration }}</b>
+          <span>{{ t('report.totalDuration') }}</span>
         </div>
-        <div class="stat-card">
-          <div class="stat-label">{{ t('report.playCount') }}</div>
-          <div class="stat-value">
-            {{ overview?.playCount.toLocaleString() }}
-          </div>
-          <div class="stat-unit">{{ t('report.times') }}</div>
+        <div class="ov-cell">
+          <b class="num">{{ overview?.playCount.toLocaleString() }}</b>
+          <span>{{ t('report.playCount') }}</span>
         </div>
-        <div class="stat-card">
-          <div class="stat-label">{{ t('report.uniqueSongs') }}</div>
-          <div class="stat-value">{{ overview?.uniqueSongCount ?? 0 }}</div>
-          <div class="stat-unit">{{ t('report.songs') }}</div>
+        <div class="ov-cell">
+          <b class="num">{{ overview?.uniqueSongCount ?? 0 }}</b>
+          <span>{{ t('report.uniqueSongs') }}</span>
         </div>
-        <div class="stat-card">
-          <div class="stat-label">{{ t('report.uniqueArtists') }}</div>
-          <div class="stat-value">{{ overview?.artistCount ?? 0 }}</div>
-          <div class="stat-unit">{{ t('report.artists') }}</div>
+        <div class="ov-cell">
+          <b class="num">{{ overview?.artistCount ?? 0 }}</b>
+          <span>{{ t('report.uniqueArtists') }}</span>
         </div>
       </div>
 
-      <!-- Hourly Distribution -->
-      <v-card class="chart-card" variant="flat" color="surface">
-        <div class="card-header">
-          <span class="card-title">{{ t('report.hourlyDistribution') }}</span>
+      <!-- 时段分布 -->
+      <div class="chart">
+        <h4>
+          {{ t('report.hourlyDistribution') }}
           <span v-if="insightText" class="insight-tag">{{ insightText }}</span>
-        </div>
+        </h4>
         <VChart
           v-if="hourlyDistribution.length"
           :option="hourlyOption"
           autoresize
           style="height: 280px"
         />
-      </v-card>
+      </div>
     </template>
 
     <div v-else class="empty-state">
-      <v-icon icon="mdi-chart-line-variant" size="48" class="empty-icon" />
+      <v-icon icon="mdi-chart-line-variant" size="40" class="empty-icon" />
       <p>{{ t('report.emptyState') }}</p>
     </div>
   </div>
@@ -209,7 +181,7 @@ const hasData = computed(
 .report-tab {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 16px;
 }
 
 .period-bar {
@@ -217,18 +189,37 @@ const hasData = computed(
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  flex-wrap: wrap;
 }
 
 .period-nav {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+}
+.nav-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  color: var(--text-2);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+.nav-btn:hover:not(:disabled) {
+  background: var(--surface-2);
+  color: var(--text-1);
+}
+.nav-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
 }
 
 .period-label {
-  font-size: var(--text-lg);
-  font-weight: 700;
-  color: rgb(var(--v-theme-on-background));
+  font-size: 12px;
+  color: var(--text-2);
   display: flex;
   align-items: center;
   gap: 8px;
@@ -237,12 +228,12 @@ const hasData = computed(
 }
 
 .in-progress-tag {
-  font-size: 10px;
-  font-weight: 500;
-  color: rgb(var(--v-theme-primary));
-  background: rgba(var(--v-theme-primary), 0.1);
-  padding: 2px 8px;
-  border-radius: 10px;
+  font-size: 10.5px;
+  font-style: normal;
+  color: var(--text-3);
+  border: var(--hairline-w) solid var(--hairline);
+  padding: 2px 9px;
+  border-radius: 99px;
 }
 
 .loading-state,
@@ -252,8 +243,8 @@ const hasData = computed(
   align-items: center;
   gap: 12px;
   padding: 64px 0;
-  color: rgb(var(--v-theme-on-surface));
-  font-size: var(--text-sm);
+  color: var(--text-3);
+  font-size: 12.5px;
 }
 
 .empty-icon {
@@ -261,63 +252,62 @@ const hasData = computed(
   margin-bottom: 8px;
 }
 
-.overview-grid {
+/* 概览数字格 */
+.ov {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 12px;
 }
-
-.stat-card {
-  background: rgb(var(--v-theme-surface));
+.ov-cell {
+  border: var(--hairline-w) solid var(--hairline);
   border-radius: 12px;
-  padding: 20px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
+  padding: 14px 8px 12px;
   text-align: center;
 }
-
-.stat-label {
-  font-size: var(--text-xs);
-  color: rgb(var(--v-theme-on-surface));
+.ov-cell b {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 560;
+  line-height: 1.25;
+  color: var(--text-1);
+}
+.ov-cell span {
+  font-size: 11px;
+  color: var(--text-3);
+  margin-top: 3px;
+  display: block;
 }
 
-.stat-value {
-  font-size: var(--text-xl);
-  font-weight: 700;
-  color: rgb(var(--v-theme-on-background));
-}
-
-.stat-unit {
-  font-size: var(--text-xs);
-  color: rgb(var(--v-theme-on-surface));
-}
-
-.chart-card {
-  padding: 16px;
+.chart {
+  border: var(--hairline-w) solid var(--hairline);
   border-radius: 12px;
+  padding: 14px 16px 12px;
 }
-
-.card-header {
+.chart h4 {
+  font-size: 12.5px;
+  font-weight: 640;
+  margin-bottom: 12px;
+  color: var(--text-1);
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 10px;
-  margin-bottom: 8px;
   flex-wrap: wrap;
 }
 
-.card-title {
-  font-size: var(--text-md);
-  font-weight: 600;
+.insight-tag {
+  margin-left: auto;
+  font-size: 10.5px;
+  font-weight: 500;
+  color: var(--accent);
+  background: rgb(var(--accent-rgb) / 0.1);
+  padding: 3px 10px;
+  border-radius: 99px;
 }
 
-.insight-tag {
-  font-size: var(--text-xs);
-  color: rgb(var(--v-theme-primary));
-  background: rgba(var(--v-theme-primary), 0.1);
-  padding: 4px 12px;
-  border-radius: 12px;
+@media (max-width: 960px) {
+  .ov {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 </style>

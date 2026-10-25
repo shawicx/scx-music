@@ -42,7 +42,7 @@ function onToggle(v: boolean | null) {
           <i
             v-for="(g, i) in preset.gainsDb"
             :key="i"
-            :style="{ height: `${Math.max(2, 12 + g * 2)}px` }"
+            :style="{ height: `${Math.max(2, 8 + g)}px` }"
           />
         </span>
       </button>
@@ -59,33 +59,36 @@ function onToggle(v: boolean | null) {
 
 .preset-list {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
   gap: 8px;
+  padding: 4px 0 8px;
 }
 
 .preset-option {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 8px;
-  padding: 10px 14px;
-  border-radius: 8px;
-  border: 2px solid transparent;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 9px;
+  border: var(--hairline-w) solid var(--hairline);
   background: transparent;
   cursor: pointer;
   transition: border-color 0.2s, background 0.2s;
-  color: rgb(var(--v-theme-on-background));
-  font-size: var(--text-md);
+  color: var(--text-1);
+  font-size: 12.5px;
+  font-family: inherit;
   text-align: left;
 }
 
 .preset-option:hover {
-  background: var(--v-accent-bg);
+  background: var(--surface-2);
 }
 
 .preset-option.active {
-  border-color: rgb(var(--v-theme-primary));
-  background: var(--v-accent-bg);
+  border-color: var(--accent);
+  background: rgb(var(--accent-rgb) / 0.08);
+  font-weight: 560;
 }
 
 .preset-name {
@@ -95,22 +98,24 @@ function onToggle(v: boolean | null) {
   max-width: 100%;
 }
 
-/* 迷你 EQ 曲线：10 频段增益映射为柱高（0dB=12px，±12dB=0..36px） */
+/* 迷你 EQ 曲线：10 频段增益映射为柱高（0dB=8px，±12dB=-4..20px，下限 2px） */
 .preset-curve {
   display: flex;
   align-items: center;
-  gap: 3px;
-  height: 36px;
+  gap: 2px;
+  height: 16px;
+  flex: 0 0 auto;
 }
 
 .preset-curve i {
-  width: 4px;
-  border-radius: 2px;
-  background: rgb(var(--v-theme-primary) / 0.45);
+  width: 3px;
+  border-radius: 1.5px;
+  background: var(--text-3);
   transition: height 0.2s;
 }
 
 .preset-option.active .preset-curve i {
-  background: rgb(var(--v-theme-primary));
+  background: var(--accent);
+  opacity: 0.75;
 }
 </style>

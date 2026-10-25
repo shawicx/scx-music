@@ -62,10 +62,12 @@ Rust Handler -> IPC Event -> Pinia Store -> UI Update
 
 | Label | Hash | 根组件 | 用途 |
 |-------|------|--------|------|
-| `main` | (默认) | `App.vue` | 主窗口，侧边栏 + 主区域 + PlayerBar |
+| `main` | (默认) | `App.vue` | 主窗口，CSS Grid 骨架（44px 自绘标题栏 + 侧边栏 + 主区域 + 64px PlayerBar 常驻） |
 | `desktop-lyrics` | `#desktop-lyrics` | `DesktopLyricsApp.vue` | 桌面歌词悬浮窗口（透明、置顶、双行） |
 | `desktop-lyrics-lock` | — | — | 锁定态辅助窗口（36×36 锁按钮，光标穿透占位） |
 | `mini-player` | `#mini-player` | `MiniPlayerApp.vue` | 迷你播放器悬浮窗口，与主窗口互斥切换 |
+
+> **主窗口标题栏（2026-10-22）：** `titleBarStyle: "overlay"`（仅 macOS 生效）——红绿灯悬浮于 webview 内容之上，前端以 `AppTitlebar.vue` 自绘 44px 拖拽栏（`data-tauri-drag-region`，左侧 58px 让位红绿灯）；Windows 保持系统原生标题栏（组件按 UA 不挂载，Grid 首行收起为 0）。
 
 > 各窗口的根组件结构见 [frontend.md#多窗口架构](frontend.md#多窗口架构)；跨窗口状态来源与同步见 [state.md#多窗口状态来源](state.md#多窗口状态来源)。四个窗口各自独立 JS 上下文，composable 模块级状态在窗口内单例；跨窗口通过 `app.emit()` 广播 + 各窗口 `listen()` 接收同步。
 
@@ -148,8 +150,9 @@ graph TB
 - `PlaybackState` - 播放状态
 
 **主题类型：**
-- `ThemeColor` - 主题颜色
+- `ThemeColor` - 主题颜色（六色回退）
 - `ThemeMode` - 主题模式 (light/dark/system)
+- `AccentHsl` - 封面提取主色 `{h, s, l}`（composables/useTheme.ts，对应 Rust `get_cover_accent` 返回）
 
 **视图类型：**
 - `ViewMode` - 视图模式

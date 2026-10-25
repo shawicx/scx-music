@@ -34,6 +34,7 @@ const tooltipText = computed(() =>
     :density="'compact'"
     :disabled="disabled"
     :color="active ? color : undefined"
+    :class="{ 'ib-active': active }"
     @click="emit('click', $event)"
   >
     <v-tooltip activator="parent" location="top" content-class="scx-tip">{{ tooltipText }}</v-tooltip>

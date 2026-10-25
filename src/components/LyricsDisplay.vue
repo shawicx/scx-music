@@ -77,65 +77,69 @@ function onClickLine(line: LrcLine) {
   min-height: 0;
   position: relative;
   z-index: 1;
-  /* 歌词区背景遮罩：压暗中间区域的音频可视化，使可视化退居背景，歌词成为视觉主体 */
-  background: radial-gradient(ellipse 95% 80% at center, rgb(var(--v-theme-background) / 0.82) 30%, transparent 90%);
 }
 
 .lyrics-display {
-  flex: 1;
+  /* basis auto + min-height:0：短内容撑开容器（列内居中）、长内容收缩为内部滚动区；
+   * 缺 min-height:0 时 flex 子项默认下限是内容全高，会把歌词推出面板外 */
+  flex: 1 1 auto;
+  min-height: 0;
+  /* 定位锚点：歌词行 offsetTop 以此容器为基准（scrollToCurrent 的滚动数学依赖它，
+   * 若锚点落到更外层的 .np-body，每次滚动都会多滚一个头部高度、把歌词推到面板外） */
+  position: relative;
   overflow-y: auto;
   overflow-x: hidden;
-  -webkit-mask-image: linear-gradient(transparent 0%, black 12%, black 88%, transparent 100%);
-  mask-image: linear-gradient(transparent 0%, black 12%, black 88%, transparent 100%);
+  -webkit-mask-image: linear-gradient(transparent 0%, black 10%, black 90%, transparent 100%);
+  mask-image: linear-gradient(transparent 0%, black 10%, black 90%, transparent 100%);
   scrollbar-width: none;
 }
 .lyrics-display::-webkit-scrollbar { display: none; }
 
+/* 行颜色：正在播放沉浸层通过 --np-fg* 覆盖；其他场景回退主题文本色 */
 .lyric-line {
-  padding: 7px 8px;
-  font-size: 15px;
-  line-height: 1.7;
-  color: rgba(var(--v-theme-on-background), 0.25);
+  padding: 8px 0;
+  font-size: 18px;
+  line-height: 1.6;
+  color: var(--np-fg-3, rgba(var(--v-theme-on-background), 0.3));
   cursor: pointer;
-  text-align: center;
-  /* 文字描边阴影：保证歌词在任何可视化背景上都清晰可读 */
-  text-shadow: 0 1px 4px rgb(var(--v-theme-background) / 0.8), 0 0 12px rgb(var(--v-theme-background) / 0.6);
+  text-align: left;
+  transition: color 0.4s, opacity 0.4s;
 }
 .lyric-line:hover {
-  color: rgba(var(--v-theme-on-background), 0.5);
+  color: var(--np-fg-2, rgba(var(--v-theme-on-background), 0.55));
 }
 .lyric-line.active {
-  color: rgb(var(--v-theme-on-background));
-  font-size: 19px;
-  font-weight: 600;
-  text-shadow: 0 1px 6px rgb(var(--v-theme-background) / 0.9), 0 0 16px rgb(var(--v-theme-background) / 0.7);
+  color: var(--np-fg, rgb(var(--v-theme-on-background)));
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 560;
 }
 .lyric-spacer {
-  height: 40%;
+  height: 38%;
 }
 .lyrics-empty {
   display: flex;
   align-items: center;
   justify-content: center;
   height: 100%;
-  color: var(--v-text-muted);
+  color: var(--np-fg-3, var(--v-text-muted));
   font-size: var(--text-md);
 }
 .lyrics-skeleton {
   display: flex;
   flex-direction: column;
   gap: 14px;
-  padding: 40% 20px 0;
+  padding: 38% 20px 0;
 }
 .skeleton-line {
   height: 14px;
   border-radius: 7px;
-  background: rgba(var(--v-theme-on-background), 0.06);
+  background: var(--np-fg-3, rgba(var(--v-theme-on-background), 0.08));
   animation: skeleton-pulse 1.5s ease-in-out infinite;
 }
-.skeleton-line:nth-child(2) { width: 75%; margin: 0 auto; }
-.skeleton-line:nth-child(4) { width: 85%; margin: 0 auto; }
-.skeleton-line:nth-child(6) { width: 60%; margin: 0 auto; }
+.skeleton-line:nth-child(2) { width: 75%; }
+.skeleton-line:nth-child(4) { width: 85%; }
+.skeleton-line:nth-child(6) { width: 60%; }
 @keyframes skeleton-pulse {
   0%, 100% { opacity: 0.4; }
   50% { opacity: 1; }

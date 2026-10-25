@@ -13,6 +13,8 @@ export function rebuildSourceList(
   playlistId: string | null,
 ): Song[] {
   if (!playlistId) return songs
+  // 'all' 为虚拟歌单（侧栏「全部歌曲」），不落库
+  if (playlistId === 'all') return songs
   const ids = playlistSongsMap[playlistId]
   if (!ids || ids.length === 0) return []
   const idSet = new Set(ids)

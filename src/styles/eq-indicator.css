@@ -1,0 +1,46 @@
+/* EQ 播放指示（歌曲表格 / 队列抽屉共用）。挂在含 .is-playing 的容器内、.current 行中使用。 */
+
+.eq {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 14px;
+}
+.eq i {
+  width: 2.5px;
+  border-radius: 2px;
+  background: currentColor;
+  height: 5px;
+  transform-origin: bottom;
+}
+.eq i:nth-child(2) {
+  height: 11px;
+}
+.eq i:nth-child(3) {
+  height: 8px;
+}
+.is-playing .current .eq i {
+  animation: song-eq 1s ease-in-out infinite;
+}
+.is-playing .current .eq i:nth-child(2) {
+  animation-delay: 0.25s;
+}
+.is-playing .current .eq i:nth-child(3) {
+  animation-delay: 0.5s;
+}
+@keyframes song-eq {
+  0%,
+  100% {
+    transform: scaleY(0.4);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .is-playing .current .eq i {
+    transform: scaleY(0.6) !important;
+    animation: none !important;
+  }
+}

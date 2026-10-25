@@ -27,31 +27,36 @@ const stateConfig: Record<string, { icon: string; titleKey: string; hintKey: str
 </script>
 
 <template>
-  <div class="empty-state">
-    <v-icon :icon="stateConfig[type].icon" size="48" color="secondary"></v-icon>
-    <p class="empty-text">{{ t(stateConfig[type].titleKey) }}</p>
-    <p class="empty-hint">{{ t(stateConfig[type].hintKey) }}</p>
+  <div class="empty">
+    <v-icon :icon="stateConfig[type].icon" size="40" class="e-icon"></v-icon>
+    <div class="e-title">{{ t(stateConfig[type].titleKey) }}</div>
+    <p>{{ t(stateConfig[type].hintKey) }}</p>
   </div>
 </template>
 
 <style scoped>
-.empty-state {
+.empty {
   flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  opacity: 0.5;
+  padding: 64px 20px;
+  color: var(--text-3);
+  gap: 0;
 }
-
-.empty-text {
-  font-size: var(--text-lg);
-  color: var(--v-text-secondary);
+.e-icon {
+  opacity: 0.4;
+  margin-bottom: 12px;
 }
-
-.empty-hint {
-  font-size: var(--text-sm);
-  color: var(--v-text-muted);
+.e-title {
+  font-family: var(--font-display);
+  font-size: 21px;
+  color: var(--text-2);
+  font-weight: 540;
+}
+.empty p {
+  font-size: 12.5px;
+  margin-top: 6px;
 }
 </style>

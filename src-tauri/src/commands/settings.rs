@@ -17,6 +17,8 @@ const ALLOWED_EXACT_KEYS: &[&str] = &[
     "theme",
     "theme_color",
     "theme_mode",
+    // 专辑封面动态取色（useTheme.ts）
+    "dynamic_color",
     "visualization_style",
     "visualization_enabled",
     "output_device",
@@ -128,6 +130,7 @@ mod tests {
         assert!(validate_setting_key("theme").is_ok());
         assert!(validate_setting_key("theme_color").is_ok());
         assert!(validate_setting_key("theme_mode").is_ok());
+        assert!(validate_setting_key("dynamic_color").is_ok());
         assert!(validate_setting_key("visualization_style").is_ok());
         assert!(validate_setting_key("visualization_enabled").is_ok());
         assert!(validate_setting_key("output_device").is_ok());

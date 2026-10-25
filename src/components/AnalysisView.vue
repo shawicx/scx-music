@@ -12,37 +12,38 @@ import {
 import { CanvasRenderer } from 'echarts/renderers'
 import VChart from 'vue-echarts'
 import { useAnalysisStore } from '../stores/analysis'
+import { useSettingsStore } from '../stores/settings'
 import { useI18n } from '../composables/useI18n'
 
 use([BarChart, PieChart, TitleComponent, TooltipComponent, GridComponent, LegendComponent, CanvasRenderer])
 
 const emit = defineEmits<{ back: [] }>()
 const analysisStore = useAnalysisStore()
+const settingsStore = useSettingsStore()
 const { stats, loading, formattedTotalSize, formattedTotalDuration } = storeToRefs(analysisStore)
+const { accentHex, isDark } = storeToRefs(settingsStore)
 const { t } = useI18n()
 
 onMounted(() => {
   analysisStore.loadStats()
 })
 
-const primaryColor = getComputedStyle(document.documentElement).getPropertyValue('--v-theme-primary').trim()
+// ===== 图表配色：跟随动态强调色 =====
 
-function getThemeColors() {
-  const style = getComputedStyle(document.documentElement)
-  const p = style.getPropertyValue('--v-theme-primary').trim()
-  const colors = [
-    `rgb(${p})`,
-    '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0',
-    '#9966FF', '#FF9F40', '#C9CBCF', '#7BC8A4',
-    '#E7E9ED', '#FF6B6B', '#4ECDC4', '#45B7D1',
-  ]
-  return colors
+function hexToRgbArr(hex: string): [number, number, number] {
+  const v = hex.replace('#', '')
+  return [parseInt(v.slice(0, 2), 16), parseInt(v.slice(2, 4), 16), parseInt(v.slice(4, 6), 16)]
+}
+function accentRgba(alpha: number): string {
+  const [r, g, b] = hexToRgbArr(accentHex.value)
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`
+}
+function monoLadder(count: number): string[] {
+  return Array.from({ length: count }, (_, i) => accentRgba(Math.max(0.18, 1 - i * 0.14)))
 }
 
-const textColor = computed(() => {
-  const style = getComputedStyle(document.documentElement)
-  return `rgb(${style.getPropertyValue('--v-theme-on-surface').trim() || '128,128,128'})`
-})
+const textColor = computed(() => (isDark.value ? 'rgba(242,242,245,0.58)' : 'rgba(29,29,31,0.64)'))
+const hairlineColor = computed(() => (isDark.value ? 'rgba(255,255,255,0.085)' : 'rgba(0,0,0,0.09)'))
 
 const artistChartOption = computed(() => {
   if (!stats.value) return {}
@@ -50,7 +51,7 @@ const artistChartOption = computed(() => {
   return {
     tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
     grid: { left: 100, right: 20, top: 10, bottom: 20 },
-    xAxis: { type: 'value', axisLabel: { color: textColor.value } },
+    xAxis: { type: 'value', axisLabel: { color: textColor.value }, splitLine: { lineStyle: { color: hairlineColor.value } } },
     yAxis: {
       type: 'category',
       data: data.map(d => d.artist),
@@ -60,12 +61,13 @@ const artistChartOption = computed(() => {
         overflow: 'truncate',
         fontSize: 11,
       },
+      axisLine: { lineStyle: { color: hairlineColor.value } },
     },
     series: [{
       type: 'bar',
       data: data.map(d => d.songCount),
       itemStyle: {
-        color: `rgb(${primaryColor})`,
+        color: accentHex.value,
         borderRadius: [0, 4, 4, 0],
       },
       barWidth: '60%',
@@ -75,7 +77,7 @@ const artistChartOption = computed(() => {
 
 const genreChartOption = computed(() => {
   if (!stats.value) return {}
-  const colors = getThemeColors()
+  const colors = monoLadder(stats.value.genreDistribution.length)
   return {
     tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
     legend: {
@@ -87,7 +89,7 @@ const genreChartOption = computed(() => {
     },
     series: [{
       type: 'pie',
-      radius: ['40%', '70%'],
+      radius: ['52%', '72%'],
       center: ['35%', '50%'],
       avoidLabelOverlap: false,
       label: { show: false },
@@ -102,7 +104,7 @@ const genreChartOption = computed(() => {
 
 const qualityChartOption = computed(() => {
   if (!stats.value) return {}
-  const colors = getThemeColors()
+  const colors = monoLadder(stats.value.qualityDistribution.length)
   return {
     tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
     legend: {
@@ -111,7 +113,7 @@ const qualityChartOption = computed(() => {
     },
     series: [{
       type: 'pie',
-      radius: ['40%', '70%'],
+      radius: ['52%', '72%'],
       center: ['50%', '45%'],
       label: { show: false },
       data: stats.value.qualityDistribution.map((d, i) => ({
@@ -138,143 +140,156 @@ const durationChartOption = computed(() => {
       type: 'category',
       data: data.map(d => d.label),
       axisLabel: { color: textColor.value },
+      axisLine: { lineStyle: { color: hairlineColor.value } },
     },
-    yAxis: { type: 'value', axisLabel: { color: textColor.value } },
+    yAxis: { type: 'value', axisLabel: { color: textColor.value }, splitLine: { lineStyle: { color: hairlineColor.value } } },
     series: [{
       type: 'bar',
       data: data.map(d => d.count),
       itemStyle: {
-        color: `rgb(${primaryColor})`,
+        color: accentHex.value,
         borderRadius: [4, 4, 0, 0],
       },
       barWidth: '50%',
     }],
   }
 })
+
+// 专辑排行（横条）
+const albumMax = computed(() => Math.max(1, ...(stats.value?.albumRanking.slice(0, 10).map(a => a.songCount) ?? [1])))
 </script>
 
 <template>
   <div class="analysis-view">
-    <div class="analysis-header">
-      <v-btn icon variant="plain" size="small" @click="emit('back')">
-        <v-icon icon="mdi-arrow-left" size="20" />
-      </v-btn>
-      <h2 class="analysis-title">{{ t('analysis.title') }}</h2>
+    <!-- 页头 -->
+    <div class="page-head">
+      <button class="ph-back" :aria-label="t('common.back')" @click="emit('back')">
+        <v-icon icon="mdi-chevron-left" size="18"></v-icon>
+      </button>
+      <h1 class="ph-title">{{ t('analysis.title') }}</h1>
     </div>
 
-    <div v-if="loading" class="loading-state">
-      <v-progress-circular indeterminate color="primary" size="32" />
-      <span>{{ t('analysis.loadingStats') }}</span>
-    </div>
-
-    <template v-else-if="stats">
-      <!-- Overview Cards -->
-      <div class="overview-grid">
-        <div class="stat-card">
-          <v-icon icon="mdi-music-note" size="20" class="stat-icon" />
-          <div class="stat-value">{{ stats.totalSongs }}</div>
-          <div class="stat-label">{{ t('analysis.totalSongs') }}</div>
-        </div>
-        <div class="stat-card">
-          <v-icon icon="mdi-account-music" size="20" class="stat-icon" />
-          <div class="stat-value">{{ stats.totalArtists }}</div>
-          <div class="stat-label">{{ t('analysis.totalArtists') }}</div>
-        </div>
-        <div class="stat-card">
-          <v-icon icon="mdi-album" size="20" class="stat-icon" />
-          <div class="stat-value">{{ stats.totalAlbums }}</div>
-          <div class="stat-label">{{ t('analysis.totalAlbums') }}</div>
-        </div>
-        <div class="stat-card">
-          <v-icon icon="mdi-clock-outline" size="20" class="stat-icon" />
-          <div class="stat-value">{{ formattedTotalDuration }}</div>
-          <div class="stat-label">{{ t('analysis.totalDuration') }}</div>
-        </div>
-        <div class="stat-card">
-          <v-icon icon="mdi-harddisk" size="20" class="stat-icon" />
-          <div class="stat-value">{{ formattedTotalSize }}</div>
-          <div class="stat-label">{{ t('analysis.storageSize') }}</div>
-        </div>
+    <div class="statpage">
+      <div v-if="loading" class="loading-state">
+        <v-progress-circular indeterminate color="primary" size="32" />
+        <span>{{ t('analysis.loadingStats') }}</span>
       </div>
 
-      <!-- Charts Grid -->
-      <div class="charts-grid">
-        <v-card class="chart-card" variant="flat" color="surface">
-          <div class="card-header">
-            <v-icon icon="mdi-account-music" size="18" class="card-icon" />
-            <span class="card-title">{{ t('analysis.artistRanking') }}</span>
+      <template v-else-if="stats">
+        <!-- 概览数字格 -->
+        <div class="ov five">
+          <div class="ov-cell">
+            <b class="num">{{ stats.totalSongs }}</b>
+            <span>{{ t('analysis.totalSongs') }}</span>
           </div>
-          <VChart :option="artistChartOption" autoresize style="height: 320px" />
-        </v-card>
-
-        <v-card class="chart-card" variant="flat" color="surface">
-          <div class="card-header">
-            <v-icon icon="mdi-tag-multiple" size="18" class="card-icon" />
-            <span class="card-title">{{ t('analysis.genreDistribution') }}</span>
+          <div class="ov-cell">
+            <b class="num">{{ stats.totalArtists }}</b>
+            <span>{{ t('analysis.totalArtists') }}</span>
           </div>
-          <VChart :option="genreChartOption" autoresize style="height: 320px" />
-        </v-card>
-
-        <v-card class="chart-card" variant="flat" color="surface">
-          <div class="card-header">
-            <v-icon icon="mdi-tune-variant" size="18" class="card-icon" />
-            <span class="card-title">{{ t('analysis.qualityDistribution') }}</span>
+          <div class="ov-cell">
+            <b class="num">{{ stats.totalAlbums }}</b>
+            <span>{{ t('analysis.totalAlbums') }}</span>
           </div>
-          <VChart :option="qualityChartOption" autoresize style="height: 320px" />
-        </v-card>
-
-        <v-card class="chart-card" variant="flat" color="surface">
-          <div class="card-header">
-            <v-icon icon="mdi-timer-sand" size="18" class="card-icon" />
-            <span class="card-title">{{ t('analysis.durationDistribution') }}</span>
+          <div class="ov-cell">
+            <b class="num">{{ formattedTotalDuration }}</b>
+            <span>{{ t('analysis.totalDuration') }}</span>
           </div>
-          <VChart :option="durationChartOption" autoresize style="height: 320px" />
-        </v-card>
-      </div>
-
-      <!-- Album Ranking -->
-      <v-card class="chart-card" variant="flat" color="surface">
-        <div class="card-header">
-          <v-icon icon="mdi-album" size="18" class="card-icon" />
-          <span class="card-title">{{ t('analysis.albumRanking') }}</span>
+          <div class="ov-cell">
+            <b class="num">{{ formattedTotalSize }}</b>
+            <span>{{ t('analysis.storageSize') }}</span>
+          </div>
         </div>
-        <div class="album-list">
+
+        <!-- 图表 -->
+        <div class="charts2">
+          <div class="chart">
+            <h4>{{ t('analysis.artistRanking') }}</h4>
+            <VChart :option="artistChartOption" autoresize class="chart-canvas" />
+          </div>
+          <div class="chart">
+            <h4>{{ t('analysis.genreDistribution') }}</h4>
+            <VChart :option="genreChartOption" autoresize class="chart-canvas" />
+          </div>
+          <div class="chart">
+            <h4>{{ t('analysis.qualityDistribution') }}</h4>
+            <VChart :option="qualityChartOption" autoresize class="chart-canvas" />
+          </div>
+          <div class="chart">
+            <h4>{{ t('analysis.durationDistribution') }}</h4>
+            <VChart :option="durationChartOption" autoresize class="chart-canvas" />
+          </div>
+        </div>
+
+        <!-- 专辑排行 -->
+        <div class="chart">
+          <h4>{{ t('analysis.albumRanking') }}</h4>
           <div
             v-for="(album, i) in stats.albumRanking.slice(0, 10)"
             :key="i"
             class="album-item"
           >
-            <span class="album-rank">{{ i + 1 }}</span>
-            <div class="album-info">
+            <span class="album-rank num">{{ String(i + 1).padStart(2, '0') }}</span>
+            <span class="album-info">
               <span class="album-name">{{ album.album }}</span>
               <span class="album-artist">{{ album.artist }}</span>
-            </div>
-            <span class="album-count">{{ t('common.songs', { count: album.songCount }) }}</span>
+            </span>
+            <span class="album-bar" aria-hidden="true">
+              <b :style="{ width: Math.max(4, Math.round((album.songCount / albumMax) * 100)) + '%' }"></b>
+            </span>
+            <span class="album-count num">{{ t('common.songs', { count: album.songCount }) }}</span>
           </div>
         </div>
-      </v-card>
-    </template>
+      </template>
+    </div>
   </div>
 </template>
 
 <style scoped>
 .analysis-view {
-  padding: 32px;
-  overflow-y: auto;
   height: 100%;
-}
-
-.analysis-header {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 24px;
+  flex-direction: column;
+  min-height: 0;
 }
 
-.analysis-title {
-  font-size: var(--text-xl);
-  font-weight: 700;
-  color: rgb(var(--v-theme-on-background));
+/* 页头 */
+.page-head {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  padding: 20px 28px 0;
+  flex-shrink: 0;
+}
+.ph-back {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  margin-bottom: 4px;
+  display: grid;
+  place-items: center;
+  color: var(--text-2);
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+.ph-back:hover {
+  background: var(--surface-2);
+  color: var(--text-1);
+}
+.ph-title {
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 560;
+  line-height: 1.15;
+  color: var(--text-1);
+}
+
+.statpage {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 14px 28px 28px;
 }
 
 .loading-state {
@@ -283,124 +298,135 @@ const durationChartOption = computed(() => {
   align-items: center;
   gap: 12px;
   padding: 64px 0;
-  color: rgb(var(--v-theme-on-surface));
-  font-size: var(--text-sm);
+  color: var(--text-3);
+  font-size: 12.5px;
 }
 
-.overview-grid {
+/* 概览数字格 */
+.ov {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 12px;
-  margin-bottom: 20px;
-}
-
-.stat-card {
-  background: rgb(var(--v-theme-surface));
-  border-radius: 12px;
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  text-align: center;
-}
-
-.stat-icon {
-  color: rgb(var(--v-theme-on-surface));
-  margin-bottom: 4px;
-}
-
-.stat-value {
-  font-size: var(--text-lg);
-  font-weight: 700;
-  color: rgb(var(--v-theme-on-background));
-}
-
-.stat-label {
-  font-size: var(--text-xs);
-  color: rgb(var(--v-theme-on-surface));
-}
-
-.charts-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 16px;
   margin-bottom: 16px;
 }
-
-.chart-card {
-  padding: 16px;
+.ov.five {
+  grid-template-columns: repeat(5, 1fr);
+}
+.ov-cell {
+  border: var(--hairline-w) solid var(--hairline);
   border-radius: 12px;
+  padding: 14px 8px 12px;
+  text-align: center;
+}
+.ov-cell b {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 560;
+  line-height: 1.25;
+  color: var(--text-1);
+}
+.ov-cell span {
+  font-size: 11px;
+  color: var(--text-3);
+  margin-top: 3px;
+  display: block;
 }
 
-.card-header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 8px;
+/* 图表卡片 */
+.charts2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+.chart {
+  border: var(--hairline-w) solid var(--hairline);
+  border-radius: 12px;
+  padding: 14px 16px 12px;
+  margin-bottom: 14px;
+}
+.chart h4 {
+  font-size: 12.5px;
+  font-weight: 640;
+  margin-bottom: 12px;
+  color: var(--text-1);
+}
+.chart-canvas {
+  height: 300px;
 }
 
-.card-icon {
-  color: rgb(var(--v-theme-on-surface));
-}
-
-.card-title {
-  font-size: var(--text-md);
-  font-weight: 600;
-}
-
-.album-list {
-  display: flex;
-  flex-direction: column;
-}
-
+/* 专辑排行 */
 .album-item {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 10px 0;
-  border-bottom: 1px solid var(--v-border-color);
+  padding: 9px 0;
+  border-bottom: var(--hairline-w) solid var(--hairline);
 }
-
 .album-item:last-child {
   border-bottom: none;
 }
-
 .album-rank {
-  width: 24px;
-  text-align: center;
-  font-weight: 700;
-  font-size: var(--text-sm);
-  color: rgb(var(--v-theme-primary));
+  width: 26px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-3);
+  flex-shrink: 0;
 }
-
 .album-info {
-  flex: 1;
+  width: 200px;
+  flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
   min-width: 0;
 }
-
 .album-name {
-  font-size: var(--text-sm);
-  font-weight: 500;
+  font-size: 12.5px;
+  font-weight: 580;
+  color: var(--text-1);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-
 .album-artist {
-  font-size: var(--text-xs);
-  color: rgb(var(--v-theme-on-surface));
+  font-size: 10.5px;
+  color: var(--text-3);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-
+.album-bar {
+  flex: 1;
+  height: 6px;
+  border-radius: 99px;
+  background: var(--surface-2);
+  position: relative;
+  overflow: hidden;
+}
+.album-bar b {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  border-radius: 99px;
+  background: var(--accent);
+  display: block;
+}
 .album-count {
-  font-size: var(--text-xs);
-  color: rgb(var(--v-theme-on-surface));
-  white-space: nowrap;
+  width: 56px;
+  font-size: 11px;
+  color: var(--text-3);
+  text-align: right;
+  flex-shrink: 0;
+}
+
+@media (max-width: 960px) {
+  .charts2 {
+    grid-template-columns: 1fr;
+  }
+  .ov.five {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 </style>

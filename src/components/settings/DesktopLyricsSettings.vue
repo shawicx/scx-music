@@ -126,6 +126,11 @@ async function onDesktopLyricsConfigChange(key: keyof typeof desktopLyricsConfig
   min-width: 0;
 }
 
+/* 发光强度分段控件不随 .desktop-lyrics-control 的 flex:1 拉伸整行 */
+.mode-toggle.desktop-lyrics-control {
+  flex: 0 0 auto;
+}
+
 .color-input {
   width: 48px;
   height: 32px;

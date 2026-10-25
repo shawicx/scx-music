@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Song } from '../../types'
+import CoverArt from '../player/CoverArt.vue'
 
 defineProps<{
   songs: Song[]
@@ -19,16 +20,23 @@ const emit = defineEmits<{
       v-for="(song, i) in songs"
       :key="song.id"
       :data-song-id="song.id"
-      class="grid-card"
-      :class="{ playing: song.id === currentSongId }"
+      class="gcard"
+      :class="{ current: song.id === currentSongId }"
+      role="button"
+      tabindex="0"
+      :aria-label="song.title"
       @click="emit('songClick', i)"
+      @keydown.enter="emit('songClick', i)"
       @contextmenu="emit('songMenu', $event, song.id)"
     >
-      <div class="grid-art" :style="{ background: song.artGradient }">
-        <v-icon v-if="song.id === currentSongId" :icon="isPlaying ? 'mdi-play' : 'mdi-pause'" size="24" color="white" class="grid-play-indicator" />
+      <div class="gc-cover">
+        <CoverArt :song-id="song.id" />
+        <span class="gc-play" aria-hidden="true">
+          <v-icon :icon="song.id === currentSongId && isPlaying ? 'mdi-pause' : 'mdi-play'" size="16"></v-icon>
+        </span>
       </div>
-      <div class="grid-title">{{ song.title }}</div>
-      <div class="grid-artist">{{ song.artist }}</div>
+      <div class="gc-name">{{ song.title }}</div>
+      <div class="gc-sub">{{ song.artist }}</div>
     </div>
   </div>
 </template>
@@ -37,55 +45,72 @@ const emit = defineEmits<{
 .grid-scroll {
   flex: 1;
   overflow-y: auto;
-  padding: 16px 20px;
+  padding: 12px 28px 28px;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(158px, 1fr));
+  gap: 20px;
   align-content: start;
 }
 
-.grid-card {
+.gcard {
   cursor: pointer;
-  transition: transform 0.15s ease;
 }
-
-.grid-card:hover {
-  transform: translateY(-2px);
-}
-
-.grid-card.playing .grid-art {
-  box-shadow: var(--shadow-accent-lg);
-}
-
-.grid-art {
-  width: 100%;
+.gc-cover {
+  position: relative;
   aspect-ratio: 1;
   border-radius: var(--radius-lg);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 8px;
-  position: relative;
+  overflow: hidden;
+  background: var(--surface-2);
+  box-shadow: var(--cover-shadow);
 }
-
-.grid-play-indicator {
-  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+.gc-play {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: rgba(20, 20, 26, 0.72);
+  color: #fff;
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  display: grid;
+  place-items: center;
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 0.18s var(--ease), transform 0.18s var(--ease);
 }
-
-.grid-title {
-  font-size: var(--text-md);
-  font-weight: 500;
-  color: rgb(var(--v-theme-on-background));
+.gcard:hover .gc-play,
+.gcard:focus-visible .gc-play {
+  opacity: 1;
+  transform: none;
+}
+.gcard.current .gc-play {
+  opacity: 1;
+  transform: none;
+  background: var(--accent);
+  color: var(--on-accent);
+  border-color: transparent;
+}
+.gc-name {
+  margin-top: 10px;
+  font-size: 13px;
+  font-weight: 580;
+  color: var(--text-1);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-
-.grid-artist {
-  font-size: var(--text-xs);
-  color: var(--v-text-secondary);
+.gc-sub {
+  font-size: 11.5px;
+  color: var(--text-3);
+  margin-top: 1px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.gcard.current .gc-name {
+  color: var(--accent);
 }
 </style>

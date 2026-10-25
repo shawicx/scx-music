@@ -67,7 +67,7 @@ const result = await invokeCommand('command_name', { param: value })
 | **设置** | | | |
 | `get_all_settings` | useStartupOptions.ts / useMiniPlayer.ts / useDesktopLyrics.ts / useGlobalShortcuts.ts / App.vue 等 | commands/settings.rs | 获取所有设置 |
 | `get_setting` | stores/settings.ts | commands/settings.rs | 获取单个设置 |
-| `set_setting` | stores/settings.ts, stores/library.ts | commands/settings.rs | 设置单个键值对（**key 白名单校验**：精确 11 项 + 前缀 4 项；前缀必须带非空子键。2026-06-29 新增 `last_position` / `restore_last_playback` 两个精确 key 用于启动恢复播放） |
+| `set_setting` | stores/settings.ts, stores/library.ts | commands/settings.rs | 设置单个键值对（**key 白名单校验**：精确 15 项 + 前缀 4 项；前缀必须带非空子键。2026-06-29 新增 `last_position` / `restore_last_playback`；2026-10-22 新增 `dynamic_color` 封面动态取色开关） |
 | `set_window_position` | composables/useMiniPlayer.ts, composables/useDesktopLyrics.ts | commands/settings.rs | 批量写入窗口位置（单事务双 key，2026-06-26 新增，替代拖动后的两次 set_setting） |
 | `get_system_locale` | composables/useI18n.ts | commands/settings.rs | 获取系统语言 |
 | **文件扫描** | | | |
@@ -85,6 +85,7 @@ const result = await invokeCommand('command_name', { param: value })
 | `clear_orphan_lyrics` | composables/useCache.ts | commands/cache.rs | 清理孤儿歌词（song_id 不在 songs 表，删歌曲残留） |
 | `clear_play_history` | composables/useCache.ts | commands/cache.rs | 按时间段清理播放历史（beforeDays：null=全部，正数=保留近 N 天） |
 | `get_song_cover` | composables/useCoverArt.ts | commands/covers.rs | 获取歌曲封面（**raw bytes**：`tauri::ipc::Response` → 前端 ArrayBuffer，空 body = 无封面；后端文件缓存 + Lofty 按需提取 + `.none` 负缓存） |
+| `get_cover_accent` | composables/useTheme.ts（startCoverAccentWatcher） | commands/covers.rs | **封面动态取色（2026-10-22 新增）**：提取封面主色 → `AccentHsl {h,s,l}`；48×48 缩略图 36 色相桶 × 3 明度档饱和度加权直方图；`image` crate 解码在 spawn_blocking；进程内 HashMap 缓存；无封面/失败返回 null（前端回退六色主题） |
 | `get_cover_cache_stats` | composables/useCache.ts | commands/covers.rs | 封面缓存统计（文件数/总字节） |
 | `clear_cover_cache` | composables/useCache.ts | commands/covers.rs | 清空封面文件缓存（前端同步作废 blob URL 缓存） |
 | **导入导出** | | | |
@@ -115,6 +116,7 @@ const result = await invokeCommand('command_name', { param: value })
 | `shortcuts_is_registered` | composables/useGlobalShortcuts.ts | commands/shortcuts.rs | 检查组合键是否已被注册（系统层冲突预检） |
 | `shortcuts_register_all` | composables/useGlobalShortcuts.ts | commands/shortcuts.rs | 批量注册（启动场景） |
 | `app_toggle_main_window` | composables/useGlobalShortcuts.ts | commands/window.rs | 切换主窗口可见性（仅 main，不影响其他窗口） |
+| `get_titlebar_inset_height` | App.vue onMounted（启动一次） | commands/window.rs | 原生标题栏占位高度（NSWindow frame − contentLayoutRect）；titleBarStyle: Overlay 生效时 ≈0，系统忽略 Overlay（macOS 26 beta）时 ≈28，前端据此收起自绘标题栏并清空窗口标题 |
 | **启动选项** | | | |
 | `app_get_autostart` | composables/useStartupOptions.ts | commands/autostart.rs | 查询开机自启状态（**读操作系统真实状态**，不读 settings 表） |
 | `app_set_autostart` | composables/useStartupOptions.ts | commands/autostart.rs | 开启/关闭开机自启（写入 OS 启动项：macOS LaunchAgent / Windows 注册表 / Linux .desktop）。状态**不落库** |

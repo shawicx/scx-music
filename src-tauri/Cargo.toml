@@ -37,7 +37,11 @@ tauri-plugin-process = "2"
 sha2 = "0.11.0"
 tauri-plugin-global-shortcut = "2"
 tauri-plugin-autostart = "2"
+# 封面动态取色：解码内嵌封面缩略图后做直方图量化
+image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp", "bmp", "gif", "tiff"] }
 
 # macOS 桌面歌词透明窗口:强制 NSWindow 透明(WKWebView 原生层双保险)
 [target.'cfg(target_os = "macos")'.dependencies]
 objc = "0.2"
+# NSRect/CGRect 类型（标题栏占位检测等 objc 调用）
+core-graphics = "0.24"

@@ -38,7 +38,8 @@ async function loadFromDb() {
 
     currentSongId.value = data.settings['currentSongId'] ?? null
     viewMode.value = (data.settings['viewMode'] as ViewMode) ?? 'list'
-    activePlaylistId.value = data.settings['activePlaylistId'] ?? null
+    // 首次使用默认落在「全部歌曲」虚拟歌单
+    activePlaylistId.value = data.settings['activePlaylistId'] ?? 'all'
     displayMode.value = (data.settings['displayMode'] as DisplayMode) ?? 'songs'
 
     ready.value = true
@@ -56,6 +57,8 @@ function saveSetting(key: string, value: string) {
 const currentPlaylistSongs = computed(() => {
   const pid = activePlaylistId.value
   if (!pid) return []
+  // 'all' 为虚拟歌单（侧栏「全部歌曲」），不落库
+  if (pid === 'all') return songs.value
   const ids = playlistSongs.value[pid]
   if (!ids) return []
   const idSet = new Set(ids)
@@ -93,20 +96,24 @@ const { sortBy, sortOrder, sorted: displayedSongs } = useOptimizedSort(drilldown
 
 const filteredAlbums = computed(() => {
   const source = searchedSongs.value
-  const map = new Map<string, number>()
+  const map = new Map<string, { count: number; sampleSongId: string | null }>()
   for (const s of source) {
-    map.set(s.album, (map.get(s.album) ?? 0) + 1)
+    const cur = map.get(s.album) ?? { count: 0, sampleSongId: s.id }
+    cur.count++
+    map.set(s.album, cur)
   }
-  return Array.from(map.entries()).map(([name, count]) => ({ name, count }))
+  return Array.from(map.entries()).map(([name, v]) => ({ name, count: v.count, sampleSongId: v.sampleSongId }))
 })
 
 const filteredArtists = computed(() => {
   const source = searchedSongs.value
-  const map = new Map<string, number>()
+  const map = new Map<string, { count: number; sampleSongId: string | null }>()
   for (const s of source) {
-    map.set(s.artist, (map.get(s.artist) ?? 0) + 1)
+    const cur = map.get(s.artist) ?? { count: 0, sampleSongId: s.id }
+    cur.count++
+    map.set(s.artist, cur)
   }
-  return Array.from(map.entries()).map(([name, count]) => ({ name, count }))
+  return Array.from(map.entries()).map(([name, v]) => ({ name, count: v.count, sampleSongId: v.sampleSongId }))
 })
 
 const currentSong = computed(() =>

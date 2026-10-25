@@ -30,10 +30,34 @@ export function usePlaybackMode() {
   async function cycleMode() {
     const modes: readonly PlaybackModeKey[] = ['sequential', 'repeat_all', 'repeat_one', 'shuffle']
     const currentKey = playbackMode.value as PlaybackModeKey
-    const idx = modes.indexOf(currentKey)
-    const nextMode = modes[(idx + 1) % modes.length]
-    await playerStore.setMode(nextMode)
+    const nextMode = modes[(idxOf(currentKey) + 1) % modes.length]
+    await setPlaybackMode(nextMode)
+  }
+
+  function idxOf(key: PlaybackModeKey): number {
+    const modes: readonly PlaybackModeKey[] = ['sequential', 'repeat_all', 'repeat_one', 'shuffle']
+    const i = modes.indexOf(key)
+    return i < 0 ? 0 : i
+  }
+
+  /** 设定播放模式并重建队列（cycleMode 的原子版本，供双按钮 UI 使用）。 */
+  async function setPlaybackMode(mode: PlaybackModeKey) {
+    await playerStore.setMode(mode)
     await playerStore.regenerateQueue()
+  }
+
+  /**
+   * 双按钮 UI：shuffle 独立开关；
+   * repeat 在 关 → 列表循环 → 单曲循环 间循环（shuffle 开启时点 repeat 切到列表循环）。
+   */
+  async function toggleShuffle() {
+    await setPlaybackMode(playbackMode.value === 'shuffle' ? 'sequential' : 'shuffle')
+  }
+
+  async function cycleRepeat() {
+    const cur = playbackMode.value
+    if (cur === 'repeat_all') await setPlaybackMode('repeat_one')
+    else await setPlaybackMode('repeat_all')
   }
 
   return {
@@ -43,5 +67,8 @@ export function usePlaybackMode() {
     modeLabel,
     isModeActive,
     cycleMode,
+    setPlaybackMode,
+    toggleShuffle,
+    cycleRepeat,
   }
 }

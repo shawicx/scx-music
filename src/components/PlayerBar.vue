@@ -5,7 +5,7 @@ import { usePlayerStore } from '../stores/player'
 import { useLibraryStore } from '../stores/library'
 import IconButtonWithTooltip from './IconButtonWithTooltip.vue'
 import CoverArt from './player/CoverArt.vue'
-import PulseDots from './common/PulseDots.vue'
+import AppSlider from './common/AppSlider.vue'
 import { usePlaybackMode } from '../composables/usePlaybackMode'
 import { useDesktopLyrics } from '../composables/useDesktopLyrics'
 import { useDraggableProgress } from '../composables/useDraggableProgress'
@@ -17,7 +17,7 @@ const emit = defineEmits<{ expand: []; toggleQueue: [] }>()
 
 const playerStore = usePlayerStore()
 const libraryStore = useLibraryStore()
-const { modeIcon, modeLabel, isModeActive, cycleMode } = usePlaybackMode()
+const { playbackMode, toggleShuffle, cycleRepeat } = usePlaybackMode()
 const { visible: desktopLyricsVisible, toggle: toggleDesktopLyrics } = useDesktopLyrics()
 const { enter: enterMini } = useMiniPlayer()
 const { isActive: sleepTimerActive, remainingSecs, totalMinutes, formatRemaining, start: startSleepTimer, cancel: cancelSleepTimer } = useSleepTimer()
@@ -98,102 +98,118 @@ function toggleMute() {
 }
 
 const { progressModel, displayProgress, isDragging } = useDraggableProgress(progress, duration, seek)
+
+// 播放模式双按钮状态
+const shuffleOn = computed(() => playbackMode.value === 'shuffle')
+const repeatLabel = computed(() =>
+  playbackMode.value === 'repeat_one'
+    ? t('playbackMode.repeatOne')
+    : playbackMode.value === 'repeat_all'
+      ? t('playbackMode.repeatAll')
+      : t('playbackMode.off'),
+)
 </script>
 
 <template>
-  <div class="player-bar">
-    <div class="player-left" @click="$emit('expand')">
-      <CoverArt :song-id="currentSong?.id" class="cover-art" />
-      <div class="song-meta">
-        <div class="song-name">{{ currentSong?.title ?? t('player.notPlaying') }}</div>
-        <div class="song-artist">
-          {{ currentSong?.artist ?? '--' }}
-          <PulseDots v-if="isPlaying && currentSong" :size="4" :gap="3" class="pulse-inline" />
-        </div>
-      </div>
+  <footer class="player-bar" aria-label="播放控制">
+    <!-- 左：封面 + 元信息 + 收藏 -->
+    <div class="pb-left">
+      <button class="pb-cover" :disabled="!currentSong" aria-label="展开正在播放" @click.stop="emit('expand')">
+        <CoverArt :song-id="currentSong?.id" class="cover-fill" />
+      </button>
+      <button class="pb-meta" :disabled="!currentSong" @click.stop="emit('expand')">
+        <span class="pb-title">{{ currentSong?.title ?? t('player.notPlaying') }}</span>
+        <span class="pb-artist">{{ currentSong?.artist ?? t('player.notPlaying') }}</span>
+      </button>
       <IconButtonWithTooltip
         :icon="isLiked ? 'mdi-heart' : 'mdi-heart-outline'"
         icon-active="mdi-heart"
         :active="isLiked"
-        :tooltip="() => isLiked ? t('player.unlike') : t('player.addToFavorite')"
+        :tooltip="() => (isLiked ? t('player.unlike') : t('player.addToFavorite'))"
         :disabled="!currentSong"
         size="x-small"
-        class="like-btn"
+        class="pb-heart"
         @click.stop="toggleLike"
       />
     </div>
-    <div class="player-center">
-      <div class="controls">
+
+    <!-- 中：走带 + 进度线 -->
+    <div class="pb-center">
+      <div class="pb-transport">
         <IconButtonWithTooltip
-        icon="mdi-skip-previous"
-        :tooltip="t('player.previous')"
-        @click.stop="previous"
-      />
-
-      <IconButtonWithTooltip
-        :icon="isPlaying ? 'mdi-pause' : 'mdi-play'"
-        icon-active="mdi-pause"
-        :active="isPlaying"
-        :tooltip="t('player.play')"
-        color="secondary"
-        size="small"
-        class="play-btn"
-        :disabled="!currentSong"
-        @click.stop="togglePlayPause"
-      />
-
-      <IconButtonWithTooltip
-        icon="mdi-skip-next"
-        :tooltip="t('player.next')"
-        @click.stop="next"
-      />
-
-      <IconButtonWithTooltip
-        :icon="modeIcon"
-        :active="isModeActive"
-        :tooltip="modeLabel"
-        color="secondary"
-        @click.stop="cycleMode"
-      />
+          icon="mdi-shuffle"
+          :active="shuffleOn"
+          :tooltip="t('playbackMode.shuffle')"
+          size="x-small"
+          @click.stop="toggleShuffle"
+        />
+        <IconButtonWithTooltip
+          icon="mdi-skip-previous"
+          :tooltip="t('player.previous')"
+          size="small"
+          @click.stop="previous"
+        />
+        <button
+          class="play-main"
+          :disabled="!currentSong"
+          :aria-label="t('player.play')"
+          @click.stop="togglePlayPause"
+        >
+          <v-icon :icon="isPlaying ? 'mdi-pause' : 'mdi-play'" size="18"></v-icon>
+        </button>
+        <IconButtonWithTooltip
+          icon="mdi-skip-next"
+          :tooltip="t('player.next')"
+          size="small"
+          @click.stop="next"
+        />
+        <div class="repeat-wrap">
+          <IconButtonWithTooltip
+            :icon="playbackMode === 'repeat_one' ? 'mdi-repeat-once' : 'mdi-repeat'"
+            :active="playbackMode === 'repeat_all' || playbackMode === 'repeat_one'"
+            :tooltip="repeatLabel"
+            size="x-small"
+            @click.stop="cycleRepeat"
+          />
+        </div>
       </div>
-      <div class="progress-row">
-        <span class="time">{{ formatTime(displayProgress) }}</span>
-        <v-slider
+      <div class="pb-progress">
+        <span class="pb-time num">{{ formatTime(displayProgress) }}</span>
+        <AppSlider
           v-model="progressModel"
-          :max="100"
-          :step="0.1"
-          hide-details
-          density="compact"
-          color="secondary"
-          track-color="surface-variant"
-          class="progress-slider"
+          variant="line"
+          class="pb-slider"
+          :aria-label="t('player.play')"
+          :disabled="!currentSong"
           @start="isDragging = true"
           @end="isDragging = false"
         />
-        <span class="time">{{ formatTime(duration) }}</span>
+        <span class="pb-time num">{{ formatTime(duration) }}</span>
       </div>
     </div>
-    <div class="player-right">
-      <IconButtonWithTooltip
-        icon="mdi-picture-in-picture-top-right"
-        :tooltip="t('miniPlayer.enter')"
-        size="small"
-        @click.stop="enterMini"
-      />
+
+    <!-- 右：功能键 + 音量 -->
+    <div class="pb-right">
       <IconButtonWithTooltip
         icon="mdi-subtitles-outline"
         icon-active="mdi-subtitles"
         :active="desktopLyricsVisible"
         :tooltip="t('lyrics.desktopLyrics.toggle')"
-        color="secondary"
         size="small"
         @click.stop="toggleDesktopLyrics"
       />
       <IconButtonWithTooltip
         icon="mdi-playlist-music-outline"
-        :tooltip="t('player.playlist')"
+        icon-active="mdi-playlist-music"
+        :tooltip="t('player.playQueue')"
         size="small"
         @click.stop="emit('toggleQueue')"
+      />
+      <IconButtonWithTooltip
+        icon="mdi-picture-in-picture-top-right"
+        :tooltip="t('miniPlayer.enter')"
+        size="small"
+        @click.stop="enterMini"
       />
       <v-menu v-model="sleepMenuOpen" :close-on-content-click="false" location="top">
         <template #activator="{ props: menuProps }">
@@ -202,8 +218,8 @@ const { progressModel, displayProgress, isDragging } = useDraggableProgress(prog
             icon="mdi-power-sleep"
             :active="sleepTimerActive"
             :tooltip="sleepTooltip"
-            color="secondary"
             size="small"
+            @click.stop
           />
         </template>
         <v-list density="compact" min-width="160">
@@ -225,98 +241,216 @@ const { progressModel, displayProgress, isDragging } = useDraggableProgress(prog
           />
         </v-list>
       </v-menu>
-      <div class="volume-group">
+      <div class="vol-group">
         <IconButtonWithTooltip
           :icon="isMuted ? 'mdi-volume-off' : 'mdi-volume-high'"
           :active="isMuted"
-          :tooltip="() => isMuted ? t('player.unmute') : t('player.mute')"
+          :tooltip="() => (isMuted ? t('player.unmute') : t('player.mute'))"
           size="small"
           @click.stop="toggleMute"
         />
-        <v-slider
+        <AppSlider
           v-model="volumeModel"
-          :max="100"
-          hide-details
-          density="compact"
-          color="secondary"
-          track-color="surface-variant"
-          class="volume-slider"
+          variant="mini"
+          :aria-label="t('player.mute')"
         />
       </div>
     </div>
-  </div>
+  </footer>
 </template>
 
 <style scoped>
 .player-bar {
-  height: 72px;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 18px 0 16px;
   background: var(--glass-bg);
-  backdrop-filter: blur(var(--glass-blur));
-  border-top: 1px solid var(--glass-border);
-  display: flex;
-  align-items: center;
-  padding: 0 16px;
-  z-index: 10;
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.5);
+  backdrop-filter: blur(var(--glass-blur)) saturate(1.5);
+  border-top: var(--hairline-w) solid var(--hairline);
+}
+:global(.scx-light) .player-bar {
+  background: var(--surface-0);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 
-.player-left {
+/* 左段 */
+.pb-left {
   display: flex;
   align-items: center;
-  gap: 12px;
-  min-width: 240px;
+  gap: 11px;
+  width: 290px;
+  min-width: 0;
+}
+.pb-cover {
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  overflow: hidden;
+  flex-shrink: 0;
+  border: var(--hairline-w) solid var(--hairline);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
   cursor: pointer;
+  padding: 0;
+  background: none;
 }
-
-.cover-art {
-  width: 48px; height: 48px;
-  border-radius: var(--radius-md);
-  box-shadow: 0 4px 12px var(--v-accent-shadow);
+.pb-cover:disabled {
+  cursor: default;
+}
+.cover-fill {
+  width: 100%;
+  height: 100%;
+}
+.pb-meta {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+}
+.pb-meta:disabled {
+  cursor: default;
+}
+.pb-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.pb-artist {
+  font-size: 11.5px;
+  color: var(--text-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.pb-meta:not(:disabled):hover .pb-title {
+  color: var(--accent);
+}
+.pb-heart {
   flex-shrink: 0;
 }
-
-.song-meta { display: flex; flex-direction: column; gap: 0.2rem; overflow: hidden; }
-.song-name {
-  font-size: var(--text-md); font-weight: 500; color: rgb(var(--v-theme-on-background));
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+.pb-heart :deep(.ib-active),
+.pb-heart :deep(.v-btn--variant-plain .v-icon) {
+  color: var(--accent);
 }
-.song-artist {
-  font-size: var(--text-sm); color: var(--v-text-secondary);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  display: flex; align-items: center; gap: 6px;
+
+/* 中段 */
+.pb-center {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 0 8px;
 }
-.pulse-inline { flex-shrink: 0; }
-.like-btn { margin-left: 4px; }
-
-.player-center { display: flex; flex-direction: column; align-items: center; flex: 1; gap: 0; padding: 0 24px; }
-.controls { display: flex; align-items: center; gap: 0.5rem; }
-.play-btn { box-shadow: var(--shadow-accent); transition: transform 0.2s; }
-.play-btn:hover { transform: scale(1.1); }
-
-.progress-row { display: flex; align-items: center; gap: 8px; width: 100%; max-width: 600px; }
-.time { font-size: var(--text-xs); color: var(--v-text-secondary); min-width: 32px; text-align: center; }
-.progress-slider { flex: 1; }
-
-.player-right {
-  display: flex; align-items: center; gap: var(--space-sm);
-  min-width: 180px; justify-content: flex-end;
-}
-/* 功能按钮 | 音量组（图标 + 滑块）竖向分隔 */
-.volume-group {
+.pb-transport {
   display: flex;
   align-items: center;
-  gap: 0;
-  margin-left: var(--space-xs);
-  padding-left: var(--space-sm);
-  border-left: 1px solid var(--glass-border);
+  gap: 6px;
 }
-.volume-slider { width: 72px; }
+.play-main {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--on-accent);
+  display: grid;
+  place-items: center;
+  border: none;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: transform 0.16s var(--ease), filter 0.16s;
+  box-shadow: 0 2px 10px rgb(var(--accent-rgb) / 0.35);
+}
+.play-main:hover:not(:disabled) {
+  transform: scale(1.06);
+  filter: brightness(1.06);
+}
+.play-main:active:not(:disabled) {
+  transform: scale(0.95);
+}
+.play-main:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+/* 激活态按钮：accent 着色 */
+.pb-transport :deep(.ib-active .v-icon),
+.pb-right :deep(.ib-active .v-icon) {
+  color: var(--accent);
+}
+.pb-progress {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  max-width: 560px;
+}
+.pb-slider {
+  flex: 1;
+}
+.pb-time {
+  font-size: 11px;
+  color: var(--text-3);
+  min-width: 34px;
+}
+.pb-time:last-child {
+  text-align: left;
+}
 
-/* 窄屏:音量滑块收窄 */
-@media (max-width: 900px) {
-  .volume-slider { width: 56px; }
+/* 右段 */
+.pb-right {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  width: 290px;
+  justify-content: flex-end;
 }
-/* 极窄屏:隐藏音量滑块(音量用 ArrowUp/Down 快捷键调节) */
-@media (max-width: 720px) {
-  .volume-slider { display: none; }
+.vol-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 6px;
+  padding-left: 8px;
+  border-left: var(--hairline-w) solid var(--hairline);
+}
+
+/* 窄窗口：隐藏次要控件（音量用 ArrowUp/Down 快捷键调节） */
+@media (max-width: 960px) {
+  .pb-left {
+    width: 220px;
+  }
+  .pb-right {
+    width: auto;
+  }
+  .vol-group {
+    display: none;
+  }
+}
+@media (max-width: 780px) {
+  .pb-left {
+    width: auto;
+    flex: 1;
+  }
+  .pb-heart {
+    display: none;
+  }
+  .pb-progress .pb-time {
+    display: none;
+  }
 }
 </style>

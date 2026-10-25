@@ -4,13 +4,13 @@ import { getCoverUrl } from '../../composables/useCoverArt'
 
 const props = withDefaults(
   defineProps<{
-    songId?: string
+    songId?: string | null
     fallbackGradient?: string
     iconSize?: number
   }>(),
   {
     songId: undefined,
-    fallbackGradient: 'var(--v-gradient-brand)',
+    fallbackGradient: 'rgb(var(--accent-rgb) / 0.16)',
     iconSize: 20,
   },
 )
@@ -40,7 +40,7 @@ watch(
       v-if="!coverUrl"
       icon="mdi-music-note"
       :size="iconSize"
-      color="rgba(255,255,255,0.6)"
+      color="var(--text-3)"
     />
     <img
       v-else

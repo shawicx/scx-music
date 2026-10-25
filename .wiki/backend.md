@@ -101,6 +101,7 @@
 
 **commands/covers.rs** - 专辑封面提取与缓存（2026-08-27 新增）
 - `get_song_cover(song_id)` - 获取封面 raw bytes（`tauri::ipc::Response` 直传，前端收 ArrayBuffer；空 body = 无封面）。按需提取：查 songs 表 file_path → `{app_cache_dir}/covers/{song_id}.{ext}` 文件缓存 → 未命中用 Lofty 提取内嵌 picture（`Probe` + `read_properties(false)` 跳过帧扫描）；无内嵌封面写 `{song_id}.none` 负缓存标记
+- `get_cover_accent(song_id)` - **封面动态取色（2026-10-22 新增）**：复用封面缓存管线拿 bytes → `image` crate（default-features=false，仅 jpeg/png/webp/bmp/gif/tiff）在 `spawn_blocking` 解码 48×48 缩略图 → 36 色相桶 × 3 明度档直方图（饱和度加权，跳过过暗/过亮像素）→ 桶内 RGB 均值转 HSL 返回 `AccentHsl{h,s,l}`；`static OnceLock<Mutex<HashMap>>` 进程内缓存；无封面/解码失败返回 `Ok(None)`（前端回退六色主题）。明暗钳制在前端完成
 - `get_cover_cache_stats` / `clear_cover_cache` - 封面缓存统计与清理（接入 cache 体系，设置 → 数据管理）
 
 设计：核心逻辑为接收 `&Path`/`&Connection` 的纯函数，命令层薄包装 State/AppHandle；测试用手构造的最小 FLAC（fLaC 魔数 + STREAMINFO + PICTURE 块）夹具，无外部资源依赖。

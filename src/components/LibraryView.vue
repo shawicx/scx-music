@@ -33,6 +33,7 @@ const {
   filteredAlbums,
   filteredArtists,
   playlists,
+  playlistSongs,
 } = storeToRefs(libraryStore)
 
 const contentRef = ref<HTMLElement | null>(null)
@@ -60,20 +61,26 @@ const {
 } = playerStore
 
 const pageTitle = computed(() => {
-  if (!activePlaylist.value) return t('library.selectPlaylist')
   if (drilldown.value) {
-    return drilldown.value.type === 'album' ? drilldown.value.value : drilldown.value.value
+    return drilldown.value.value
   }
+  if (activePlaylistId.value === 'all') return t('sidebar.allSongs')
+  if (activePlaylistId.value === 'fav') return t('sidebar.favorites')
+  if (!activePlaylist.value) return t('library.selectPlaylist')
   return activePlaylist.value.name
 })
 
 const pageSubtitle = computed(() => {
-  if (!activePlaylist.value) return ''
+  if (!activePlaylist.value && activePlaylistId.value !== 'all' && activePlaylistId.value !== 'fav') return ''
   if (drilldown.value) {
-    return activePlaylist.value.name
+    return 'drilldown'
   }
   return ''
 })
+
+const totalDurationSecs = computed(() =>
+  displayedSongs.value.reduce((sum, s) => sum + (s.durationSecs || 0), 0),
+)
 
 // Whether to show card browse view (no drilldown, and displayMode is albums or artists)
 const showCardView = computed(() => !drilldown.value && (displayMode.value === 'albums' || displayMode.value === 'artists'))
@@ -87,6 +94,16 @@ const browseCards = computed(() => {
 
 function onSongClick(index: number) {
   playFromQueue(displayedSongs.value, index)
+}
+
+// 收藏（fav 歌单）
+const likedIds = computed(() => new Set(playlistSongs.value['fav'] ?? []))
+async function handleToggleLike(songId: string) {
+  if (likedIds.value.has(songId)) {
+    await removeSongFromPlaylist('fav', songId)
+  } else {
+    await addSongToPlaylist('fav', songId)
+  }
 }
 
 async function handleViewModeChange(mode: 'list' | 'grid') {
@@ -176,6 +193,7 @@ const emptyStateType = computed(() => {
       :page-title="pageTitle"
       :page-subtitle="pageSubtitle"
       :song-count="displayedSongs.length"
+      :total-duration-secs="totalDurationSecs"
       :search-query="searchQuery"
       :display-mode="displayMode"
       :view-mode="viewMode"
@@ -208,8 +226,10 @@ const emptyStateType = computed(() => {
           :songs="displayedSongs"
           :current-song-id="currentSong?.id"
           :is-playing="isPlaying"
+          :liked-ids="likedIds"
           @song-click="onSongClick"
           @song-menu="openSongMenu"
+          @toggle-like="handleToggleLike"
         />
 
         <!-- Grid view -->

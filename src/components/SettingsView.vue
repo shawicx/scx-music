@@ -43,24 +43,26 @@ watch(activeTab, async () => {
 
 <template>
   <div class="settings-view">
-    <div class="settings-header">
-      <v-btn icon variant="plain" size="small" @click="emit('back')">
-        <v-icon icon="mdi-arrow-left" size="20" />
-      </v-btn>
-      <h2 class="settings-title">{{ t('settings.title') }}</h2>
-    </div>
-
-    <nav class="settings-tabs">
-      <button
-        v-for="tab in tabs"
-        :key="tab.id"
-        :class="['tab-btn', { active: activeTab === tab.id }]"
-        @click="activeTab = tab.id"
-      >
-        <v-icon :icon="tab.icon" size="18" />
-        <span>{{ t(tab.label) }}</span>
+    <!-- 页头：返回 + 衬线标题 + 分组 tabbar -->
+    <div class="page-head">
+      <button class="ph-back" :aria-label="t('common.back')" @click="emit('back')">
+        <v-icon icon="mdi-chevron-left" size="18"></v-icon>
       </button>
-    </nav>
+      <h1 class="ph-title">{{ t('settings.title') }}</h1>
+      <nav class="tabbar" role="tablist" :aria-label="t('settings.title')">
+        <button
+          v-for="tab in tabs"
+          :key="tab.id"
+          class="tab-btn"
+          role="tab"
+          :aria-selected="activeTab === tab.id"
+          @click="activeTab = tab.id"
+        >
+          <v-icon :icon="tab.icon" size="14"></v-icon>
+          <span>{{ t(tab.label) }}</span>
+        </button>
+      </nav>
+    </div>
 
     <div ref="contentRef" class="settings-content">
       <AppearanceSettings v-if="activeTab === 'appearance'" />
@@ -84,57 +86,88 @@ watch(activeTab, async () => {
   overflow: hidden;
 }
 
-.settings-header {
+/* 页头 */
+.page-head {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 16px 32px;
-  border-bottom: 1px solid var(--v-border-color);
-}
-
-.settings-title {
-  font-size: var(--text-xl);
-  font-weight: 700;
-  color: rgb(var(--v-theme-on-background));
-}
-
-.settings-tabs {
-  display: flex;
-  gap: 4px;
-  padding: 8px 32px;
-  border-bottom: 1px solid var(--v-border-color);
-  overflow-x: auto;
+  align-items: flex-end;
+  gap: 12px;
+  padding: 20px 28px 14px;
+  border-bottom: var(--hairline-w) solid var(--hairline);
   flex-shrink: 0;
+  flex-wrap: wrap;
+  row-gap: 10px;
+}
+.ph-back {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  margin-bottom: 4px;
+  display: grid;
+  place-items: center;
+  color: var(--text-2);
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+.ph-back:hover {
+  background: var(--surface-2);
+  color: var(--text-1);
+}
+.ph-title {
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 560;
+  line-height: 1.15;
+  color: var(--text-1);
 }
 
+/* 分组 tabbar */
+.tabbar {
+  margin-left: auto;
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 9px;
+  background: var(--surface-2);
+  border: var(--hairline-w) solid var(--hairline);
+  flex-wrap: wrap;
+}
 .tab-btn {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 14px;
-  border-radius: 8px;
-  border: 1px solid transparent;
+  padding: 5px 11px;
+  border-radius: 7px;
   background: transparent;
-  color: var(--v-text-secondary);
+  color: var(--text-2);
   cursor: pointer;
-  font-size: var(--text-sm);
+  font-size: 12px;
+  font-family: inherit;
   white-space: nowrap;
-  transition: all 0.15s ease;
+  border: none;
+  transition: background 0.15s, color 0.15s;
 }
-
 .tab-btn:hover {
-  background: var(--v-accent-bg);
+  color: var(--text-1);
 }
-
-.tab-btn.active {
-  background: rgb(var(--v-theme-primary));
-  color: rgb(var(--v-theme-on-primary));
+.tab-btn[aria-selected='true'] {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-1);
   font-weight: 600;
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+:global(.scx-light) .tab-btn[aria-selected='true'] {
+  background: #ffffff;
+  box-shadow: 0 1px 4px rgba(20, 20, 24, 0.14);
 }
 
 .settings-content {
   flex: 1;
   overflow-y: auto;
-  padding: 32px;
+  padding: 20px 28px 28px;
+  max-width: 860px;
 }
 </style>

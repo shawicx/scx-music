@@ -8,7 +8,7 @@
 //! 负责 State/AppHandle 参数；本文件不持锁，`?` 直传 AppError。
 
 use crate::db::Db;
-use crate::error::AppResult;
+use crate::error::{AppError, AppResult};
 use rusqlite::{params, Connection};
 use serde::Serialize;
 use std::path::{Path, PathBuf};
@@ -180,6 +180,128 @@ pub fn clear_cover_cache(app: tauri::AppHandle) -> AppResult<crate::commands::ca
     clear_cover_cache_inner(&dir)
 }
 
+// ===== 专辑封面动态取色 =====
+
+/// 封面主色（HSL）。h 0..360，s/l 0..1；明暗钳制由前端完成。
+#[derive(Serialize, Clone, Copy, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct AccentHsl {
+    pub h: f64,
+    pub s: f64,
+    pub l: f64,
+}
+
+/// rgb(0..255) → HSL。
+fn rgb_to_hsl(r: f64, g: f64, b: f64) -> (f64, f64, f64) {
+    let (r, g, b) = (r / 255.0, g / 255.0, b / 255.0);
+    let mx = r.max(g).max(b);
+    let mn = r.min(g).min(b);
+    let l = (mx + mn) / 2.0;
+    if mx == mn {
+        return (0.0, 0.0, l);
+    }
+    let d = mx - mn;
+    let s = if l > 0.5 { d / (2.0 - mx - mn) } else { d / (mx + mn) };
+    let h = if mx == r {
+        (g - b) / d + if g < b { 6.0 } else { 0.0 }
+    } else if mx == g {
+        (b - r) / d + 2.0
+    } else {
+        (r - g) / d + 4.0
+    } * 60.0;
+    (h, s, l)
+}
+
+/// 封面字节 → 主色：48×48 缩略图上做 36 色相桶 × 3 明度档直方图，
+/// 饱和度加权计数，桶内取 RGB 均值转 HSL。与界面原型算法一致。
+fn extract_accent_from_bytes(bytes: &[u8]) -> Option<AccentHsl> {
+    let img = image::load_from_memory(bytes).ok()?;
+    let thumb = img.thumbnail(48, 48).to_rgba8();
+
+    const BUCKETS: usize = 36 * 3;
+    let mut counts = vec![0f64; BUCKETS];
+    let mut sums = vec![[0f64; 3]; BUCKETS];
+    let mut total = 0f64;
+    for px in thumb.pixels() {
+        let [r, g, b, _] = px.0;
+        total += 1.0;
+        let (h, s, l) = rgb_to_hsl(r as f64, g as f64, b as f64);
+        // 过暗/过亮像素不参与主色统计
+        if l < 0.06 || l > 0.96 {
+            continue;
+        }
+        let li = if l < 0.33 { 0 } else if l < 0.66 { 1 } else { 2 };
+        let bi = (((h / 10.0) as usize).min(35)) * 3 + li;
+        counts[bi] += 0.25 + s; // 饱和度加权
+        sums[bi][0] += r as f64;
+        sums[bi][1] += g as f64;
+        sums[bi][2] += b as f64;
+    }
+    if total == 0.0 {
+        return None;
+    }
+
+    let mut best: Option<usize> = None;
+    let mut best_score = 0f64;
+    let mean = total / BUCKETS as f64;
+    for (i, &cnt) in counts.iter().enumerate() {
+        if cnt <= 0.0 {
+            continue;
+        }
+        let score = cnt * (1.0 + 0.6 * (cnt / (mean + 1.0)));
+        if score > best_score {
+            best_score = score;
+            best = Some(i);
+        }
+    }
+    let bi = best?;
+    let cnt = counts[bi];
+    if cnt <= 0.0 {
+        return None;
+    }
+    let (h, s, l) = rgb_to_hsl(sums[bi][0] / cnt, sums[bi][1] / cnt, sums[bi][2] / cnt);
+    Some(AccentHsl { h, s, l })
+}
+
+/// 每歌曲主色记忆缓存（值极小，容量按曲库规模自然有界）。
+static ACCENT_CACHE: std::sync::OnceLock<std::sync::Mutex<std::collections::HashMap<String, AccentHsl>>> =
+    std::sync::OnceLock::new();
+
+fn accent_cache() -> &'static std::sync::Mutex<std::collections::HashMap<String, AccentHsl>> {
+    ACCENT_CACHE.get_or_init(|| std::sync::Mutex::new(std::collections::HashMap::new()))
+}
+
+/// 提取封面主色（HSL）。无封面/解码失败返回 Ok(None)，前端回退主题色。
+/// 解码在阻塞线程池执行，避免大图卡住 IPC。
+#[tauri::command]
+pub async fn get_cover_accent(
+    db: tauri::State<'_, Db>,
+    app: tauri::AppHandle,
+    song_id: String,
+) -> AppResult<Option<AccentHsl>> {
+    if let Some(cached) = accent_cache().lock().unwrap().get(&song_id) {
+        return Ok(Some(*cached));
+    }
+    let file_path = {
+        let conn = crate::audio::lock_or_recover(&db.0);
+        match song_file_path(&conn, &song_id)? {
+            Some(p) => p,
+            None => return Ok(None),
+        }
+    };
+    let dir = covers_dir(&app)?;
+    let Some(bytes) = cover_bytes_for(&dir, &file_path, &song_id) else {
+        return Ok(None);
+    };
+    let accent = tauri::async_runtime::spawn_blocking(move || extract_accent_from_bytes(&bytes))
+        .await
+        .map_err(|e| AppError::from(format!("封面取色任务失败: {}", e)))?;
+    if let Some(a) = accent {
+        accent_cache().lock().unwrap().insert(song_id, a);
+    }
+    Ok(accent)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -314,5 +436,41 @@ fn build_flac_with_picture(png: &[u8]) -> Vec<u8> {
         assert_eq!(result.cleared, 2);
         assert_eq!(cover_cache_stats_inner(&dir).total, 0);
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// 编码一张 64×64 纯色 PNG。
+    fn solid_png(r: u8, g: u8, b: u8) -> Vec<u8> {
+        let img = image::RgbaImage::from_pixel(64, 64, image::Rgba([r, g, b, 255]));
+        let mut out = std::io::Cursor::new(Vec::new());
+        image::DynamicImage::ImageRgba8(img)
+            .write_to(&mut out, image::ImageFormat::Png)
+            .unwrap();
+        out.into_inner()
+    }
+
+    #[test]
+    fn accent_extracts_dominant_hue() {
+        // 蓝色封面 → 色相应落在 200..260 度、饱和度较高
+        let accent = extract_accent_from_bytes(&solid_png(40, 90, 210)).unwrap();
+        assert!((200.0..=260.0).contains(&accent.h), "h={}", accent.h);
+        assert!(accent.s > 0.13, "s={}", accent.s);
+    }
+
+    #[test]
+    fn accent_returns_none_for_garbage_or_empty() {
+        assert!(extract_accent_from_bytes(b"not an image").is_none());
+        assert!(extract_accent_from_bytes(&[]).is_none());
+    }
+
+    #[test]
+    fn hsl_conversion_matches_reference_values() {
+        // 纯红 240,0,0 → h=0 s=1 l≈0.47
+        let (h, s, _) = rgb_to_hsl(240.0, 0.0, 0.0);
+        assert!((h - 0.0).abs() < 0.5, "h={h}");
+        assert!((s - 1.0).abs() < 1e-9, "s={s}");
+        // 灰色 → 饱和度 0
+        let (_, s, l) = rgb_to_hsl(128.0, 128.0, 128.0);
+        assert!(s.abs() < 1e-9);
+        assert!((l - 128.0 / 255.0).abs() < 1e-9);
     }
 }

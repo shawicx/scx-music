@@ -1,0 +1,142 @@
+/*
+ * 歌曲表格共享样式（SongTable 与 VirtualSongTable 一致的外观）。
+ * 编辑式发丝线表格：46px 行、当前行 EQ 动效、心形 hover 浮现。
+ */
+@import './eq-indicator.css';
+
+.song-table-head {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) minmax(0, 1.2fr) 40px 60px;
+  align-items: center;
+  height: 36px;
+  padding: 0 10px;
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: var(--surface-1);
+  font-size: 10.5px;
+  font-weight: 620;
+  letter-spacing: 0.08em;
+  text-align: left;
+  color: var(--text-3);
+  border-bottom: var(--hairline-w) solid var(--hairline);
+}
+
+.song-row {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) minmax(0, 1.2fr) 40px 60px;
+  align-items: center;
+  padding: 0 10px;
+  height: 46px;
+  border-bottom: var(--hairline-w) solid var(--hairline);
+  cursor: default;
+  transition: background 0.12s;
+}
+.song-row:hover {
+  background: var(--surface-2);
+}
+
+/* # 列 */
+.song-row .col-num {
+  color: var(--text-3);
+  font-size: 12px;
+  text-align: left;
+  padding-left: 6px;
+}
+.song-row:hover .col-num {
+  color: var(--text-2);
+}
+
+/* 标题两行 */
+.song-row .col-title {
+  min-width: 0;
+}
+.song-row .s-title {
+  font-size: 13px;
+  font-weight: 560;
+  color: var(--text-1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+.song-row .s-artist {
+  font-size: 11.5px;
+  color: var(--text-3);
+  margin-top: 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 专辑列 */
+.song-row .col-album {
+  color: var(--text-2);
+  font-size: 12.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 心形（hover 浮现） */
+.song-row .col-heart {
+  display: grid;
+  place-items: center;
+}
+.heart-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  display: grid;
+  place-items: center;
+  color: var(--text-3);
+  opacity: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: opacity 0.15s, color 0.15s, transform 0.1s;
+}
+.song-row:hover .heart-btn,
+.heart-btn.on {
+  opacity: 1;
+}
+.heart-btn:hover {
+  color: var(--text-1);
+  background: var(--surface-2);
+}
+.heart-btn:active {
+  transform: scale(0.9);
+}
+.heart-btn.on,
+.heart-btn.on:hover {
+  color: var(--accent);
+}
+
+/* 时长列 */
+.song-row .col-dur {
+  color: var(--text-3);
+  font-size: 12px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 当前行 */
+.song-row.current .s-title {
+  color: var(--accent);
+  font-weight: 640;
+}
+.song-row.current .col-num {
+  color: var(--accent);
+}
+
+/* 窄窗口隐藏专辑列 */
+@media (max-width: 1000px) {
+  .song-table-head .col-album-th,
+  .song-row .col-album {
+    display: none;
+  }
+  .song-table-head,
+  .song-row {
+    grid-template-columns: 44px minmax(0, 1fr) 40px 60px;
+  }
+}
