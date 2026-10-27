@@ -52,10 +52,11 @@ jobs:
           TAG_NAME: ${{ github.ref_name }}
           REPO: ${{ github.repository }}
         run: |
+          printf '%s' "$NOTES" > /tmp/release-notes.md
           jq -n --arg tag "$TAG_NAME" \
                 --arg name "SCX Music $TAG_NAME" \
-                --argjson body "$(jq -Rs . <<< "$NOTES")" \
-                '{tag_name: $tag, name: $name, body: ($body | fromjson), draft: true}' > /tmp/release-payload.json
+                --rawfile notes /tmp/release-notes.md \
+                '{tag_name: $tag, name: $name, body: $notes, draft: true}' > /tmp/release-payload.json
           release_id=$(gh api --method POST "repos/$REPO/releases" \
                 --input /tmp/release-payload.json \
                 --jq '.id') || release_id=''
