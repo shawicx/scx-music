@@ -12,7 +12,8 @@ jobs:
       contents: write
     runs-on: ubuntu-latest
     outputs:
-      body: ${{ steps.git-cliff.outputs.content }}
+      notes: ${{ steps.persist_notes.outputs.notes }}
+      release_id: ${{ steps.create_release.outputs.release_id }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -24,6 +25,51 @@ jobs:
         with:
           config: cliff.toml
           args: --latest --strip header
+
+      # cliff 的 notes 持久化为多行 output：build 阶段传给 tauri-action 的 releaseBody。
+      # 不传时 tauri-action 会用 head_commit.message 覆盖 release body，
+      # 导致 changelog 只剩一条提交信息
+      - name: Persist release notes
+        id: persist_notes
+        env:
+          NOTES: ${{ steps.git-cliff.outputs.content }}
+        run: |
+          {
+            echo 'notes<<NOTES_EOF'
+            printf '%s' "$NOTES"
+            echo
+            echo 'NOTES_EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      # 先建 draft release，各平台构建用 releaseId 直传产物到同一 release。
+      # 三个平台 job 若各自按 tagName 建 release，latest.json 会被并发覆盖成
+      # 单平台条目——arm 机器的更新器因此装到 x86_64 包（表现为应用被识别为 Intel）
+      - name: Create draft release
+        id: create_release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NOTES: ${{ steps.persist_notes.outputs.notes }}
+          TAG_NAME: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
+        run: |
+          jq -n --arg tag "$TAG_NAME" \
+                --arg name "SCX Music $TAG_NAME" \
+                --argjson body "$(jq -Rs . <<< "$NOTES")" \
+                '{tag_name: $tag, name: $name, body: ($body | fromjson), draft: true}' > /tmp/release-payload.json
+          release_id=$(gh api --method POST "repos/$REPO/releases" \
+                --input /tmp/release-payload.json \
+                --jq '.id') || release_id=''
+          # re-run 场景：同名 release 已存在（already_exists）→ 回退列表按 tag_name 匹配
+          if [ -z "$release_id" ] || [ "$release_id" = "null" ]; then
+            release_id=$(gh api "repos/$REPO/releases" \
+              --arg t "$TAG_NAME" \
+              --jq '[.[] | select(.tag_name == $t)][0].id')
+          fi
+          if [ -z "$release_id" ] || [ "$release_id" = "null" ]; then
+            echo "::error::release_id not resolvable for tag $TAG_NAME"
+            exit 1
+          fi
+          echo "release_id=$release_id" >> "$GITHUB_OUTPUT"
 
   build:
     needs: changelog
@@ -81,16 +127,31 @@ jobs:
         working-directory: src-tauri
         run: cargo test --verbose
 
+      # tauri-action 持有更新器签名私钥，自动产出各平台 updater 产物（.tar.gz/.zip + .sig）
+      # 并向同一 release 合并多平台 latest.json；releaseId 与 tagName 不能同时传：
+      # 后者会让 action 按 tag 查找/创建 release，破坏「单一 draft」约定
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: 'SCX Music ${{ github.ref_name }}'
-          releaseBody: ${{ needs.changelog.outputs.body }}
-          releaseDraft: false
-          prerelease: false
-          updaterJsonPreferWallpapers: false
+          releaseId: ${{ needs.changelog.outputs.release_id }}
+          releaseBody: ${{ needs.changelog.outputs.notes }}
           args: ${{ matrix.args }}
+
+  # 全平台产物就绪后才把 draft 转正式发布；此前客户端访问 endpoint 404，不会误装半成品。
+  # 部分平台失败时 draft 保留，re-run all jobs 即可补齐
+  publish:
+    needs: [changelog, build]
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # PATCH 只发 draft=false 时 GitHub 会重解析 tag，已存在的 tag 反而被
+          # untagged-<hash> 轻量 tag 顶替，必须回传 tag_name 强制绑定
+          TAG_NAME: ${{ github.ref_name }}
+        run: gh api -X PATCH 'repos/${{ github.repository }}/releases/${{ needs.changelog.outputs.release_id }}' -F draft=false -f tag_name="$TAG_NAME"

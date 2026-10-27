@@ -153,7 +153,9 @@ UI -> useLibraryStore.importToPlaylist()
 
 - GitHub Actions: `.github/workflows/build.yml`
 - 触发: 推送 `v*` tag
-- Changelog: `git-cliff` 从 Conventional Commits 自动生成，写入 GitHub Release body
+- 发布流程: changelog job 先建 **draft release** → 三个平台构建 job 用 `releaseId` 直传产物到同一 release（tauri-action 合并多平台 latest.json）→ publish job 全部成功后 draft 转正式
+- ⚠️ 各平台 job 禁止改回按 `tagName` 自建 release：并发建 release 会把 latest.json 覆盖成单平台条目，arm 机器更新器会装到 x86_64 包（应用被识别为 Intel）
+- Changelog: `git-cliff` 从 Conventional Commits 自动生成，经 persist_notes（heredoc 多行 output）传入 releaseBody
 - 配置: `cliff.toml`（过滤 feat/fix/perf/refactor，中文分组）
 
 ## 快速开始
